@@ -257,6 +257,30 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .k-ad{ flex:0 0 auto; }
 .k-sayi{ flex:1 1 auto; color:var(--sonuk); }
 
+/* --- §11 Su: ince şerit. Vurgu rengi burada kullanılmaz (§13). --- */
+.su-satir{ display:flex; align-items:center; gap:14px; }
+.su-etiket{ flex:0 0 auto; color:var(--sonuk); font-size:.85rem; }
+.su-serit{
+  flex:1 1 auto;
+  display:flex;
+  gap:3px;
+  padding:14px 0;              /* dokunma alanı; şeridin kendisi ince kalır */
+  background:none;
+  border:0;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-user-select:none;
+  user-select:none;
+}
+.su-serit i{
+  flex:1 1 0;
+  height:4px;
+  background:var(--cizgi);
+  transition:background-color 200ms ease;
+}
+.su-serit i.dolu{ background:var(--sonuk); }
+.su-sayi{ flex:0 0 auto; color:var(--sonuk); font-size:.85rem; min-width:3.2em; text-align:right; }
+
 .namaz-alt{
   display:flex;
   align-items:center;
@@ -832,6 +856,77 @@ $kaza.addEventListener("click", e => {
   kazaCiz();
 });
 
+/* ===============================================================
+   §11 — Su takibi
+   =============================================================== */
+
+const BARDAK    = 250;                       // ml
+const SU_HEDEFI = 10;                        // 2,5 litre
+
+const $su = document.getElementById("b-su");
+
+function suDegistir(delta){
+  const g = gunKaydi(uygulamaGunu());
+  g.su = Math.max(0, Math.min(SU_HEDEFI, (g.su || 0) + delta));
+  kaydet();
+  suCiz();
+}
+
+/* Şerit bir kez kurulur, sonra yerinde güncellenir. Her dokunuşta yeniden
+   çizersek düğme düğümü yok olur: hızlı dokunuşlar kaybolur, klavye odağı düşer. */
+function suCiz(){
+  const adet = gunKaydi(uygulamaGunu()).su || 0;
+
+  if(!document.getElementById("su-serit")){
+    let serit = "";
+    for(let i = 0; i < SU_HEDEFI; i++) serit += "<i></i>";
+    // Hedefe ulaşınca kutlama yok; şerit dolar, o kadar (§11).
+    $su.innerHTML =
+      '<div class="su-satir">' +
+        '<span class="su-etiket">Su</span>' +
+        '<button class="su-serit" id="su-serit">' + serit + '</button>' +
+        '<span class="su-sayi" id="su-sayi"></span>' +
+      '</div>';
+  }
+
+  const serit = document.getElementById("su-serit");
+  const kutu  = serit.querySelectorAll("i");
+  for(let i = 0; i < kutu.length; i++) kutu[i].className = i < adet ? "dolu" : "";
+  serit.setAttribute("aria-label",
+    "Su: " + adet + " bardak. Dokun bir bardak ekle, uzun bas geri al.");
+  document.getElementById("su-sayi").textContent =
+    (adet * BARDAK / 1000).toFixed(2).replace(".", ",") + " L";
+}
+
+/* Dokun: bir bardak ekle. Uzun bas: geri al. Klavyede geri almak için
+   odaktayken sol ok veya geri silme — §13 klavye erişimi. */
+(function suOlaylari(){
+  let zaman = null, uzunOldu = false;
+  const seritMi = e => e.target.closest("#su-serit");
+  const birak   = () => { clearTimeout(zaman); zaman = null; };
+
+  $su.addEventListener("pointerdown", e => {
+    if(!seritMi(e)) return;
+    uzunOldu = false;
+    zaman = setTimeout(() => { uzunOldu = true; suDegistir(-1); }, 500);
+  });
+  $su.addEventListener("pointerup", e => {
+    if(!seritMi(e)) return;
+    birak();
+    if(!uzunOldu) suDegistir(+1);
+  });
+  $su.addEventListener("pointerleave", birak);
+  $su.addEventListener("pointercancel", birak);
+  $su.addEventListener("contextmenu", e => { if(seritMi(e)) e.preventDefault(); });
+
+  // Klavye: Enter/Boşluk ekler (detail 0 = fareyle değil), sol ok / geri silme azaltır.
+  $su.addEventListener("click", e => { if(seritMi(e) && e.detail === 0) suDegistir(+1); });
+  $su.addEventListener("keydown", e => {
+    if(!seritMi(e)) return;
+    if(e.key === "ArrowLeft" || e.key === "Backspace"){ e.preventDefault(); suDegistir(-1); }
+  });
+})();
+
 /* --- Açılış --------------------------------------------------- */
 function baslat(){
   UYG.veri  = yukle();
@@ -839,6 +934,7 @@ function baslat(){
   vurguyuAyarla("yatsi");
 
   kazaCiz();
+  suCiz();
   namazKur().then(borcTara);                    // önce elde olanla çiz, sonra tara
   konumSor(false).then(k => {                   // izin gelirse konuma göre tazele
     if(k && k.kaynak === "cihaz") namazKur(true).then(borcTara);

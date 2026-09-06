@@ -45,16 +45,28 @@ function betigiCikar(){
   return parcalar.join("\n");
 }
 
-/* Sahte eleman — innerHTML'e yazılanı saklar, sorgulanabilir. */
-function eleman(id){
+/* Sahte eleman — innerHTML'e yazılanı saklar ve içindeki id'leri belgeye
+   tanıtır. Böylece "bu düğüm zaten var mı" kontrolleri gerçeğe uyar. */
+function eleman(id, belge){
+  let html = "";
   const e = {
-    id, innerHTML: "", style: { setProperty(){}, },
+    id, textContent: "", nitelik: {},
+    get innerHTML(){ return html; },
+    set innerHTML(v){ html = String(v); if(belge) belge._kayitEt(html); },
+    style: { setProperty(){} },
     dataset: {}, dinleyiciler: {},
     addEventListener(ad, f){ (e.dinleyiciler[ad] = e.dinleyiciler[ad] || []).push(f); },
     removeEventListener(){},
-    setAttribute(){}, removeAttribute(){}, focus(){}, closest(){ return null; },
-    querySelector(){ return null; }, querySelectorAll(){ return []; },
-    appendChild(){}, remove(){}, classList:{ add(){}, remove(){}, toggle(){}, contains(){ return false; } }
+    setAttribute(a, d){ e.nitelik[a] = d; }, removeAttribute(a){ delete e.nitelik[a]; },
+    getAttribute(a){ return e.nitelik[a]; },
+    focus(){}, closest(){ return null; },
+    querySelector(){ return null; },
+    querySelectorAll(sec){                       // yalnız basit etiket seçicisi
+      const n = (html.match(new RegExp("<" + sec + "\\b", "g")) || []).length;
+      return Array.from({ length:n }, () => eleman(sec, belge));
+    },
+    appendChild(){}, remove(){},
+    classList:{ add(){}, remove(){}, toggle(){}, contains(){ return false; } }
   };
   return e;
 }
@@ -88,13 +100,27 @@ function kur(se = {}){
     _elemanlar: new Map(),
     documentElement: { style: { setProperty(){}, getPropertyValue(){ return "800ms"; } } },
     body: { style: {} },
+    /* index.html'deki bölümler her zaman vardır; diğer id'ler ancak bir yere
+       yazıldıysa bulunur — gerçek DOM da böyle davranır. */
     getElementById(id){
-      if(!belge._elemanlar.has(id)) belge._elemanlar.set(id, eleman(id));
-      return belge._elemanlar.get(id);
+      if(belge._elemanlar.has(id)) return belge._elemanlar.get(id);
+      if(id.indexOf("b-") === 0){
+        const e = eleman(id, belge);
+        belge._elemanlar.set(id, e);
+        return e;
+      }
+      return null;
+    },
+    _kayitEt(html){
+      const bulunan = html.match(/id="([^"]+)"/g) || [];
+      for(const p of bulunan){
+        const kimlik = p.slice(4, -1);
+        if(!belge._elemanlar.has(kimlik)) belge._elemanlar.set(kimlik, eleman(kimlik, belge));
+      }
     },
     querySelector(){ return null; },
     querySelectorAll(){ return []; },
-    createElement(){ return eleman("yeni"); },
+    createElement(){ return eleman("yeni", belge); },
     addEventListener(){}
   };
 
@@ -168,7 +194,7 @@ function kur(se = {}){
     "aktifAralik","siradakiAralik","vakitGetir","namazKur","namazCiz","namazIsaretle",
     "gunKaydi","sureMetni","konumuKullan","konumSor","kaydet","yukle","VAKITLER",
     "borcTara","kazaCiz","toplamBorc","islenmisMi","borcDegistir","vakitleriHazirla",
-    "ayGetir","baslat"
+    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI"
   ].join(",") + " };", ctx, { filename:"index.html<script>" });
 
   return {

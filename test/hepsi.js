@@ -370,6 +370,48 @@ await dene("ağ yokken sonKontrol ilerlemez, bağlantı gelince borç hesaplanı
   esit(geri.veri.borc.yatsi, 3, "06, 07, 08 yatsıları");
 });
 
+/* ---------------------------------------------------------------
+   §11 — Su
+   --------------------------------------------------------------- */
+
+bolum("§11 — su");
+
+await dene("hedef 10 bardak, 250 ml", async () => {
+  const u = kur({});
+  esit(u.ic.SU_HEDEFI, 10);
+  u.ic.suDegistir(+4);
+  esit(u.ctx.document.getElementById("su-sayi").textContent, "1,00 L");
+});
+
+await dene("ekle ve geri al; sıfırın altına inmez, hedefi aşmaz", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  u.ic.suDegistir(+1); u.ic.suDegistir(+1);
+  esit(u.veri().gunler["2026-09-06"].su, 2);
+  u.ic.suDegistir(-1);
+  esit(u.veri().gunler["2026-09-06"].su, 1);
+  for(let i = 0; i < 5; i++) u.ic.suDegistir(-1);
+  esit(u.veri().gunler["2026-09-06"].su, 0, "sıfırın altına inmemeli");
+  for(let i = 0; i < 15; i++) u.ic.suDegistir(+1);
+  esit(u.veri().gunler["2026-09-06"].su, 10, "hedefi aşmamalı");
+});
+
+await dene("su sayacı gece kaymasına uyar: 00:30 dünün sayacı", async () => {
+  const u = kur({ simdi:"2026-09-07T00:30:00" });
+  u.ic.suDegistir(+3);
+  esit(u.veri().gunler["2026-09-06"].su, 3);
+  esit(u.veri().gunler["2026-09-07"], undefined);
+});
+
+await dene("şerit on bölmeli, hedefte kutlama yok", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  for(let i = 0; i < 10; i++) u.ic.suDegistir(+1);
+  const h = u.html("b-su");                       // şerit bir kez kurulur
+  esit((h.match(/<i>/g) || []).length, 10);
+  esit(u.ctx.document.getElementById("su-sayi").textContent, "2,50 L");
+  icermez(h, "tebrik"); icermez(h, "harika"); icermez(h, "🎉");
+  // Dolan bölmeler yerinde güncellendiği için tarayıcı tarafında doğrulanıyor.
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 
