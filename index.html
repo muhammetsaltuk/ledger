@@ -163,6 +163,96 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 
 .yukleniyor{ color:var(--sonuk); font-size:.85rem; }
 
+/* --- §4 Namaz: şu anki vakit --------------------------------- */
+.simdi{ margin:0 0 22px; }
+.vakit-ad{
+  font-family:var(--bas);
+  font-size:2.6rem;
+  line-height:1.04;
+  font-weight:500;
+  letter-spacing:-.015em;
+  color:var(--vakit);
+  transition:color var(--gecis) ease;
+  margin:0 0 4px;
+}
+.vakit-ad.bos{ color:var(--sonuk); font-size:1.6rem; }
+.kalan{ margin:0 0 12px; font-size:1rem; color:var(--metin); }
+.kalan .sure{ color:var(--sonuk); }
+.cubuk{
+  height:2px;
+  background:var(--cizgi);
+  overflow:hidden;
+}
+.cubuk > i{
+  display:block;
+  height:2px;
+  width:0;
+  background:var(--vakit);
+  transition:width 1000ms linear, background-color var(--gecis) ease;
+}
+@media (prefers-reduced-motion: reduce){ .cubuk > i{ transition:none; } }
+
+/* --- §4 Namaz: beş vakit listesi (ray) ----------------------- */
+.namaz-liste > li{
+  --tirnak:20px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:8px 0;
+  min-height:44px;
+}
+.namaz-liste > li + li{ border-top:1px solid var(--cizgi); }
+.namaz-liste > li.aktif::before{ background:var(--vakit); width:14px; }
+.n-saat{ color:var(--sonuk); font-size:.95rem; min-width:3.4em; }
+.n-ad{ flex:1 1 auto; font-size:1rem; }
+.namaz-liste > li.aktif .n-ad{ color:var(--vakit); }
+.namaz-liste > li.gecmis .n-saat,
+.namaz-liste > li.gecmis .n-ad{ color:var(--sonuk); }
+.n-durum{
+  font-size:.85rem;
+  color:var(--sonuk);
+  white-space:nowrap;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:34px;
+  padding:0 2px 0 10px;
+  background:none;
+  border:0;
+}
+.n-durum .nokta{
+  width:7px; height:7px; border-radius:999px;
+  border:1px solid var(--sonuk);
+  flex:0 0 auto;
+}
+.n-durum.tamam{ color:var(--tamam); }
+.n-durum.tamam .nokta{ background:var(--tamam); border-color:var(--tamam); }
+.n-durum.kaza{ color:var(--tamam); }
+.n-durum.kaza .nokta{ background:none; border-color:var(--tamam); }
+.n-durum.eksik{ color:var(--eksik); }
+.n-durum.eksik .nokta{ border-color:var(--eksik); }
+.n-durum.eylem{
+  border:1px solid var(--cizgi);
+  border-radius:999px;
+  padding:0 13px;
+  color:var(--metin);
+}
+.n-durum.eylem:hover{ border-color:var(--sonuk); }
+/* Kaçmış vakitler sessiz durur: beş tane çerçeveli düğme ekranı ağırlaştırıyor
+   ve §5'in kaçınmamızı istediği suçluluk tonunu getiriyor. */
+.n-durum.eylem-sessiz{ color:var(--sonuk); }
+.n-durum.eylem-sessiz .nokta{ border-color:var(--eksik); }
+.n-durum.eylem-sessiz:hover{ color:var(--metin); }
+
+.namaz-alt{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:14px;
+}
+.hata{ color:var(--eksik); font-size:.85rem; margin:10px 0 0; }
+
 .gizli{
   position:absolute; width:1px; height:1px;
   padding:0; margin:-1px; overflow:hidden;
@@ -215,7 +305,8 @@ const ANAHTAR = "ledger/v1";
 
 const VARSAYILAN = {
   surum: 1,
-  konum: null,                                              // {lat,lng,zaman}
+  konum: null,                                              // {lat,lng,kaynak,zaman}
+  vakitler: {},                                             // "tarih|lat,lng" -> ham vakitler
   gunler: {},                                               // "YYYY-MM-DD" -> gün kaydı
   borc: { sabah:0, ogle:0, ikindi:0, aksam:0, yatsi:0 },    // §5
   islenmisVakitler: [],                                     // §5 — "tarih|vakit"
@@ -265,12 +356,311 @@ function vurguyuAyarla(vakitAnahtar){
   sonRenk = renk;
 }
 
+/* ===============================================================
+   §4 — Namaz modülü
+   =============================================================== */
+
+/* --- Konum ---------------------------------------------------- */
+const BURSA = { lat:40.1826, lng:29.0665, kaynak:"varsayilan" };
+
+function konumuKullan(){
+  const k = UYG.veri.konum;
+  return (k && typeof k.lat === "number") ? k : BURSA;
+}
+
+/* İzin yoksa son bilinen konum, o da yoksa Bursa (§4).
+   Konum önbelleğe alınır; her açılışta sorulmaz. */
+function konumSor(zorla){
+  return new Promise(cozum => {
+    if(!("geolocation" in navigator)) return cozum(konumuKullan());
+    if(!zorla && UYG.veri.konum) return cozum(UYG.veri.konum);
+    navigator.geolocation.getCurrentPosition(
+      p => {
+        UYG.veri.konum = {
+          lat: +p.coords.latitude.toFixed(4),
+          lng: +p.coords.longitude.toFixed(4),
+          kaynak: "cihaz",
+          zaman: Date.now()
+        };
+        kaydet();
+        cozum(UYG.veri.konum);
+      },
+      () => cozum(konumuKullan()),
+      { enableHighAccuracy:false, timeout:9000, maximumAge:6*3600*1000 }
+    );
+  });
+}
+
+/* --- Vakit verisi --------------------------------------------- */
+const ALADHAN = "https://api.aladhan.com/v1/timings/";
+const ALANLAR = ["Fajr","Sunrise","Dhuhr","Asr","Maghrib","Isha"];
+
+function ddmmyyyy(t){ const p = t.split("-"); return p[2]+"-"+p[1]+"-"+p[0]; }
+function gunKaydir(t, adim){
+  const p = t.split("-").map(Number);
+  const d = new Date(p[0], p[1]-1, p[2]);
+  d.setDate(d.getDate() + adim);
+  return tarihAnahtar(d);
+}
+function saatDate(tarih, hhmm){
+  const t = tarih.split("-").map(Number);
+  const s = String(hhmm).split(":").map(Number);
+  return new Date(t[0], t[1]-1, t[2], s[0], s[1], 0, 0);
+}
+
+function vakitAnahtari(tarih, konum){
+  return tarih + "|" + konum.lat + "," + konum.lng;
+}
+
+/* Uçak modunda çökmemek için her cevap önbelleğe yazılır (§14). */
+async function vakitGetir(tarih, konum){
+  const anh = vakitAnahtari(tarih, konum);
+  const onbellek = UYG.veri.vakitler[anh];
+  if(onbellek) return onbellek;
+
+  const url = ALADHAN + ddmmyyyy(tarih) +
+    "?latitude=" + konum.lat + "&longitude=" + konum.lng + "&method=13";
+  const cevap = await fetch(url, { cache:"no-store" });
+  if(!cevap.ok) throw new Error("aladhan " + cevap.status);
+  const veri = await cevap.json();
+  const ham = veri && veri.data && veri.data.timings;
+  if(!ham) throw new Error("vakit verisi boş geldi");
+
+  const temiz = {};
+  for(const a of ALANLAR){
+    if(!ham[a]) throw new Error("eksik alan: " + a);
+    temiz[a] = String(ham[a]).split(" ")[0];   // "05:01 (+03)" -> "05:01"
+  }
+  UYG.veri.vakitler[anh] = temiz;
+  vakitleriBuda();
+  kaydet();
+  return temiz;
+}
+
+/* Önbellek sonsuza kadar büyümesin: en fazla 80 gün tutulur. */
+function vakitleriBuda(){
+  const anahtarlar = Object.keys(UYG.veri.vakitler);
+  if(anahtarlar.length <= 80) return;
+  anahtarlar.sort();
+  for(const a of anahtarlar.slice(0, anahtarlar.length - 80)) delete UYG.veri.vakitler[a];
+}
+
+/* --- Vakit aralıkları (§4) ------------------------------------ */
+const VAKITLER = [
+  { a:"sabah",  ad:"Sabah",  bas:"Fajr",    bit:"Sunrise" },
+  { a:"ogle",   ad:"Öğle",   bas:"Dhuhr",   bit:"Asr"     },
+  { a:"ikindi", ad:"İkindi", bas:"Asr",     bit:"Maghrib" },
+  { a:"aksam",  ad:"Akşam",  bas:"Maghrib", bit:"Isha"    },
+  { a:"yatsi",  ad:"Yatsı",  bas:"Isha",    bit:null      }   // ertesi günün Fajr'ı
+];
+
+function araliklar(tarih, bugunku, ertesi){
+  return VAKITLER.map(v => ({
+    a: v.a,
+    ad: v.ad,
+    bas: saatDate(tarih, bugunku[v.bas]),
+    bit: v.bit ? saatDate(tarih, bugunku[v.bit])
+               : saatDate(gunKaydir(tarih,1), ertesi.Fajr)
+  }));
+}
+
+/* Güneş ile öğle arası: aktif vakit yoktur (§4). */
+function aktifAralik(liste, an){
+  for(const v of liste) if(an >= v.bas && an < v.bit) return v;
+  return null;
+}
+function siradakiAralik(liste, an){
+  for(const v of liste) if(an < v.bas) return v;
+  return null;
+}
+
+/* --- Gün kaydı ------------------------------------------------ */
+function gunKaydi(tarih){
+  let g = UYG.veri.gunler[tarih];
+  if(!g){
+    g = UYG.veri.gunler[tarih] = { namaz:{}, maddeler:[], su:0, gununNotu:"" };
+  }
+  if(!g.namaz) g.namaz = {};
+  return g;
+}
+
+/* Üç durum: yok · "vaktinde" · "kaza" (§4). Hepsi geri alınabilir. */
+function namazIsaretle(tarih, vakit, durum){
+  const g = gunKaydi(tarih);
+  if(durum) g.namaz[vakit] = durum;
+  else delete g.namaz[vakit];
+  kaydet();
+  namazCiz();
+}
+
+/* --- Süre biçimi ---------------------------------------------- */
+function sureMetni(ms){
+  if(ms < 0) ms = 0;
+  const dk = Math.floor(ms / 60000);
+  const sa = Math.floor(dk / 60);
+  const kdk = dk % 60;
+  if(sa > 0) return sa + " sa " + kdk + " dk";
+  if(dk > 0) return dk + " dk";
+  return Math.max(0, Math.floor(ms/1000)) + " sn";
+}
+
+/* --- Çizim ---------------------------------------------------- */
+const $namaz = document.getElementById("b-namaz");
+
+function namazCiz(){
+  const d = UYG.namaz;
+  if(!d || !d.liste){
+    $namaz.innerHTML = '<p class="yukleniyor">Vakitler alınıyor…</p>' +
+      (d && d.hata ? '<p class="hata">' + kacir(d.hata) + '</p>' : '');
+    return;
+  }
+
+  const an     = new Date();
+  const aktif  = aktifAralik(d.liste, an);
+  const sonra  = siradakiAralik(d.liste, an);
+  const kayit  = gunKaydi(d.tarih).namaz;
+
+  vurguyuAyarla(aktif ? aktif.a : (UYG.namaz.sonAktif || "yatsi"));
+  if(aktif) UYG.namaz.sonAktif = aktif.a;
+
+  let ust;
+  if(aktif){
+    const kalan = aktif.bit - an;
+    const oran  = Math.max(0, Math.min(1, kalan / (aktif.bit - aktif.bas)));
+    ust =
+      '<div class="simdi">' +
+        '<h1 class="vakit-ad">' + aktif.ad + '</h1>' +
+        '<p class="kalan">çıkmasına <span class="sure">' + sureMetni(kalan) + '</span></p>' +
+        '<div class="cubuk" role="presentation"><i style="width:' + (oran*100).toFixed(2) + '%"></i></div>' +
+      '</div>';
+  } else if(sonra){
+    ust =
+      '<div class="simdi">' +
+        '<h1 class="vakit-ad bos">sıradaki: ' + sonra.ad + ' ' + ss(sonra.bas) + '</h1>' +
+        '<p class="kalan"><span class="sure">' + sureMetni(sonra.bas - an) + '</span> sonra</p>' +
+      '</div>';
+  } else {
+    ust = '<div class="simdi"><h1 class="vakit-ad bos">vakitler yükleniyor</h1></div>';
+  }
+
+  const satirlar = d.liste.map(v => {
+    const durum  = kayit[v.a];
+    const gecmis = an >= v.bit;
+    const suAn   = aktif && aktif.a === v.a;
+
+    let dugme;
+    if(durum === "vaktinde"){
+      dugme = '<button class="n-durum tamam" data-geri="' + v.a + '" title="geri al">' +
+              '<span class="nokta"></span>vaktinde</button>';
+    } else if(durum === "kaza"){
+      dugme = '<button class="n-durum kaza" data-geri="' + v.a + '" title="geri al">' +
+              '<span class="nokta"></span>kaza</button>';
+    } else if(gecmis){
+      dugme = '<button class="n-durum eylem-sessiz" data-kaza="' + v.a + '">' +
+              '<span class="nokta"></span>kaza kıldım</button>';
+    } else if(an >= v.bas){
+      dugme = '<button class="n-durum eylem" data-kildim="' + v.a + '">kıldım</button>';
+    } else {
+      dugme = '<span class="n-durum"></span>';
+    }
+
+    const sinif = (suAn ? "aktif " : "") + (gecmis && !durum ? "gecmis" : "");
+    return '<li class="' + sinif.trim() + '">' +
+             '<span class="n-saat">' + ss(v.bas) + '</span>' +
+             '<span class="n-ad">' + v.ad + '</span>' +
+             dugme +
+           '</li>';
+  }).join("");
+
+  const konum = konumuKullan();
+  const konumMetni = konum.kaynak === "cihaz" ? "konumuna göre" : "Bursa'ya göre";
+
+  $namaz.innerHTML =
+    ust +
+    '<ul class="ray namaz-liste">' + satirlar + '</ul>' +
+    '<div class="namaz-alt">' +
+      '<span class="sonuk">' + konumMetni + (d.eski ? " · kayıtlı vakitler" : "") + '</span>' +
+      '<button class="dg dg-sonuk" id="konum-yenile">konumu güncelle</button>' +
+    '</div>' +
+    (d.hata ? '<p class="hata">' + kacir(d.hata) + '</p>' : '');
+}
+
+function ss(d){ return iki(d.getHours()) + ":" + iki(d.getMinutes()); }
+function kacir(s){
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+/* Tıklamalar — liste her çizimde yenilendiği için olay delegasyonu. */
+$namaz.addEventListener("click", e => {
+  const d = e.target.closest("button");
+  if(!d || !UYG.namaz) return;
+  const t = UYG.namaz.tarih;
+  if(d.dataset.kildim) namazIsaretle(t, d.dataset.kildim, "vaktinde");
+  else if(d.dataset.kaza) namazIsaretle(t, d.dataset.kaza, "kaza");
+  else if(d.dataset.geri) namazIsaretle(t, d.dataset.geri, null);
+  else if(d.id === "konum-yenile") konumSor(true).then(() => namazKur(true));
+});
+
+/* --- Kurulum -------------------------------------------------- */
+async function namazKur(yeniden){
+  const tarih = uygulamaGunu();
+  const konum = konumuKullan();
+  UYG.namaz = UYG.namaz || {};
+  UYG.namaz.tarih = tarih;
+
+  try{
+    const bugunku = await vakitGetir(tarih, konum);
+    const ertesi  = await vakitGetir(gunKaydir(tarih, 1), konum);   // yatsının bitişi için
+    UYG.namaz.liste = araliklar(tarih, bugunku, ertesi);
+    UYG.namaz.hata  = null;
+    UYG.namaz.eski  = false;
+  }catch(err){
+    console.warn("vakitler alınamadı", err);
+    // Ağ yoksa aynı tarihe ait başka bir konumun önbelleği varsa onu kullan.
+    const yedek  = enYakinOnbellek(tarih);
+    const yedek2 = enYakinOnbellek(gunKaydir(tarih, 1));
+    if(yedek && yedek2){
+      UYG.namaz.liste = araliklar(tarih, yedek, yedek2);
+      UYG.namaz.eski  = true;
+      UYG.namaz.hata  = "Ağ yok; kayıtlı vakitler gösteriliyor.";
+    }else if(!UYG.namaz.liste){
+      UYG.namaz.hata = "Vakitler alınamadı. Bağlantı gelince yenilenecek.";
+    }
+  }
+  namazCiz();
+  if(!yeniden) namazSaati();
+}
+
+function enYakinOnbellek(tarih){
+  for(const anh of Object.keys(UYG.veri.vakitler)){
+    if(anh.indexOf(tarih + "|") === 0) return UYG.veri.vakitler[anh];
+  }
+  return null;
+}
+
+/* Saniyede bir yeniden çiz; gün veya vakit değişince yeniden kur. */
+function namazSaati(){
+  setInterval(() => {
+    if(!UYG.namaz || !UYG.namaz.liste) return;
+    const yeniGun = uygulamaGunu();
+    if(yeniGun !== UYG.namaz.tarih){ namazKur(true); return; }
+    const son = UYG.namaz.liste[UYG.namaz.liste.length - 1];
+    if(new Date() >= son.bit){ namazKur(true); return; }
+    namazCiz();
+  }, 1000);
+}
+
 /* --- Açılış --------------------------------------------------- */
 function baslat(){
   UYG.veri  = yukle();
   UYG.bugun = uygulamaGunu();
   vurguyuAyarla("yatsi");
-  console.info("Ledger hazır —", UYG.bugun);
+
+  namazKur();                                   // önce elde olanla çiz
+  konumSor(false).then(k => {                   // izin gelirse konuma göre tazele
+    if(k && k.kaynak === "cihaz") namazKur(true);
+  });
 }
 baslat();
 
