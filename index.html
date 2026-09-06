@@ -244,6 +244,19 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .n-durum.eylem-sessiz .nokta{ border-color:var(--eksik); }
 .n-durum.eylem-sessiz:hover{ color:var(--metin); }
 
+/* --- §5 Kaza: kuyruk, ceza puanı değil. Kırmızı yok, toplam yok. --- */
+.kaza-liste{ list-style:none; margin:0; padding:0; }
+.kaza-liste > li{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:7px 0;
+  min-height:44px;
+}
+.kaza-liste > li + li{ border-top:1px solid var(--cizgi); }
+.k-ad{ flex:0 0 auto; }
+.k-sayi{ flex:1 1 auto; color:var(--sonuk); }
+
 .namaz-alt{
   display:flex;
   align-items:center;
@@ -437,6 +450,53 @@ async function vakitGetir(tarih, konum){
   return temiz;
 }
 
+/* Geriye dönük tarama (§5) 60 güne kadar gidebilir. Gün gün sorsak 60 istek olurdu;
+   takvim uç noktası bir ayı tek seferde verir. */
+async function ayGetir(ay, konum){          // ay: "2026-09"
+  const p = ay.split("-");
+  const url = "https://api.aladhan.com/v1/calendar/" + p[0] + "/" + Number(p[1]) +
+    "?latitude=" + konum.lat + "&longitude=" + konum.lng + "&method=13";
+  const cevap = await fetch(url, { cache:"no-store" });
+  if(!cevap.ok) throw new Error("aladhan takvim " + cevap.status);
+  const veri = await cevap.json();
+  const gunler = veri && veri.data;
+  if(!Array.isArray(gunler)) throw new Error("takvim verisi boş geldi");
+
+  for(const g of gunler){
+    const gr = g.date && g.date.gregorian && g.date.gregorian.date;   // "DD-MM-YYYY"
+    if(!gr || !g.timings) continue;
+    const q = gr.split("-");
+    const tarih = q[2] + "-" + q[1] + "-" + q[0];
+    const temiz = {};
+    let tam = true;
+    for(const a of ALANLAR){
+      if(!g.timings[a]){ tam = false; break; }
+      temiz[a] = String(g.timings[a]).split(" ")[0];
+    }
+    if(tam) UYG.veri.vakitler[vakitAnahtari(tarih, konum)] = temiz;
+  }
+  vakitleriBuda();
+  kaydet();
+}
+
+/* İstenen günlerin hepsi önbellekte olsun. Eksikler ay ay çekilir. */
+async function vakitleriHazirla(tarihler, konum){
+  const eksik = tarihler.filter(t => !UYG.veri.vakitler[vakitAnahtari(t, konum)]);
+  if(!eksik.length) return true;
+
+  const aylar = [...new Set(eksik.map(t => t.slice(0,7)))];
+  for(const ay of aylar){
+    try{ await ayGetir(ay, konum); }
+    catch(e){ console.warn("ay alınamadı: " + ay, e); }
+  }
+  // Takvim tutmadıysa kalanları tek tek dene.
+  for(const t of tarihler){
+    if(UYG.veri.vakitler[vakitAnahtari(t, konum)]) continue;
+    try{ await vakitGetir(t, konum); }catch(e){ /* aşağıda eksik sayılır */ }
+  }
+  return tarihler.every(t => UYG.veri.vakitler[vakitAnahtari(t, konum)]);
+}
+
 /* Önbellek sonsuza kadar büyümesin: en fazla 80 gün tutulur. */
 function vakitleriBuda(){
   const anahtarlar = Object.keys(UYG.veri.vakitler);
@@ -484,13 +544,24 @@ function gunKaydi(tarih){
   return g;
 }
 
-/* Üç durum: yok · "vaktinde" · "kaza" (§4). Hepsi geri alınabilir. */
+/* Üç durum: yok · "vaktinde" · "kaza" (§4). Hepsi geri alınabilir.
+   Vakti kapanmış ve taramadan geçmiş bir namazın işareti değişirse borç da
+   değişir — §5: "Bugünün geçmiş bir vaktini kaza olarak işaretlemek de aynı
+   sayacı düşürür." Geri alma da simetrik olarak sayacı geri yükler. */
 function namazIsaretle(tarih, vakit, durum){
-  const g = gunKaydi(tarih);
+  const g     = gunKaydi(tarih);
+  const eski  = g.namaz[vakit] || null;
   if(durum) g.namaz[vakit] = durum;
   else delete g.namaz[vakit];
+
+  if(islenmisMi(tarih, vakit)){
+    if(!eski && durum) borcDegistir(vakit, -1);
+    else if(eski && !durum) borcDegistir(vakit, +1);
+  }
+
   kaydet();
   namazCiz();
+  kazaCiz();
 }
 
 /* --- Süre biçimi ---------------------------------------------- */
@@ -651,15 +722,126 @@ function namazSaati(){
   }, 1000);
 }
 
+/* ===============================================================
+   §5 — Kaza borcu (birikimli)
+   =============================================================== */
+
+const TARAMA_GUN = 60;                      // daha eskisine bakılmaz (§5)
+
+function islenmisAnahtar(tarih, vakit){ return tarih + "|" + vakit; }
+function islenmisMi(tarih, vakit){
+  return UYG.veri.islenmisVakitler.indexOf(islenmisAnahtar(tarih, vakit)) !== -1;
+}
+function borcDegistir(vakit, delta){
+  const b = UYG.veri.borc;
+  b[vakit] = Math.max(0, (b[vakit] || 0) + delta);   // sıfırın altına inmez (§5)
+}
+function toplamBorc(){
+  return VAKITLER.reduce((t, v) => t + (UYG.veri.borc[v.a] || 0), 0);
+}
+
+/* İşlenmiş liste de sonsuza kadar büyümesin. */
+function islenmisBuda(bugun){
+  const sinir = gunKaydir(bugun, -(TARAMA_GUN + 5));
+  UYG.veri.islenmisVakitler = UYG.veri.islenmisVakitler.filter(a => a.split("|")[0] >= sinir);
+}
+
+/**
+ * Son kontrolden şimdiye kadar kapanmış bütün vakitleri tarar.
+ * `islenmisVakitler` sayesinde aynı vakit iki kez sayılmaz — bu liste olmadan
+ * uygulamayı günde beş kez açan biri beş kat borç görür (§5).
+ */
+async function borcTara(){
+  const bugun = uygulamaGunu();
+  const konum = konumuKullan();
+  const an    = new Date();
+
+  // İlk açılış: kurulumdan önceki vakitler borç sayılmaz. Bugünün kapanmış
+  // vakitleri borç eklemeden "işlenmiş" yazılır, borç sıfırdan başlar.
+  const ilkAcilis = !UYG.veri.sonKontrol;
+  const basla = ilkAcilis
+    ? bugun
+    : (UYG.veri.sonKontrol < gunKaydir(bugun, -TARAMA_GUN)
+        ? gunKaydir(bugun, -TARAMA_GUN)
+        : UYG.veri.sonKontrol);
+
+  const gunler = [];
+  for(let t = basla; t <= bugun; t = gunKaydir(t, 1)) gunler.push(t);
+
+  // Yatsının bitişi için son günün ertesi de gerekir.
+  const gerekli = gunler.concat([gunKaydir(bugun, 1)]);
+  const tamam = await vakitleriHazirla(gerekli, konum);
+
+  let eklenen = 0;
+  for(const t of gunler){
+    const bugunku = UYG.veri.vakitler[vakitAnahtari(t, konum)];
+    const ertesi  = UYG.veri.vakitler[vakitAnahtari(gunKaydir(t,1), konum)];
+    if(!bugunku || !ertesi) continue;                 // veri yoksa bu gün atlanır
+
+    const kayit = (UYG.veri.gunler[t] && UYG.veri.gunler[t].namaz) || {};
+    for(const v of araliklar(t, bugunku, ertesi)){
+      if(an < v.bit) continue;                        // vakit henüz tamamen kapanmadı
+      const anh = islenmisAnahtar(t, v.a);
+      if(UYG.veri.islenmisVakitler.indexOf(anh) !== -1) continue;
+      UYG.veri.islenmisVakitler.push(anh);
+      if(!kayit[v.a] && !ilkAcilis){ borcDegistir(v.a, +1); eklenen++; }
+    }
+  }
+
+  // Bütün günler çözülemediyse sonKontrol ilerletilmez; bağlantı gelince tekrar denenir.
+  if(tamam) UYG.veri.sonKontrol = bugun;
+  else if(ilkAcilis) UYG.veri.sonKontrol = bugun;     // ilk açılışta yine de başlat
+
+  islenmisBuda(bugun);
+  kaydet();
+  kazaCiz();
+  if(eklenen) console.info("kaza borcuna eklenen vakit:", eklenen);
+}
+
+/* --- Çizim ---------------------------------------------------- */
+const $kaza = document.getElementById("b-kaza");
+
+function kazaCiz(){
+  if(toplamBorc() === 0){                             // borç yoksa bölüm hiç görünmez (§5)
+    $kaza.hidden = true;
+    $kaza.innerHTML = "";
+    return;
+  }
+  $kaza.hidden = false;
+
+  const satirlar = VAKITLER
+    .filter(v => (UYG.veri.borc[v.a] || 0) > 0)       // borcu olmayan tür listede yok (§5)
+    .map(v =>
+      '<li>' +
+        '<span class="k-ad">' + v.ad + '</span>' +
+        '<span class="k-sayi">' + UYG.veri.borc[v.a] + '</span>' +
+        '<button class="dg dg-sonuk" data-ode="' + v.a + '">kaza kıldım</button>' +
+      '</li>')
+    .join("");
+
+  $kaza.innerHTML =
+    '<h2 class="bolum-bas">Kaza</h2>' +
+    '<ul class="kaza-liste">' + satirlar + '</ul>';
+}
+
+$kaza.addEventListener("click", e => {
+  const d = e.target.closest("[data-ode]");
+  if(!d) return;
+  borcDegistir(d.dataset.ode, -1);                    // kullanıcı kaza kıldı
+  kaydet();
+  kazaCiz();
+});
+
 /* --- Açılış --------------------------------------------------- */
 function baslat(){
   UYG.veri  = yukle();
   UYG.bugun = uygulamaGunu();
   vurguyuAyarla("yatsi");
 
-  namazKur();                                   // önce elde olanla çiz
+  kazaCiz();
+  namazKur().then(borcTara);                    // önce elde olanla çiz, sonra tara
   konumSor(false).then(k => {                   // izin gelirse konuma göre tazele
-    if(k && k.kaynak === "cihaz") namazKur(true);
+    if(k && k.kaynak === "cihaz") namazKur(true).then(borcTara);
   });
 }
 baslat();

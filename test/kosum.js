@@ -11,23 +11,32 @@ const KOK = path.join(__dirname, "..");
 /* Bursa, 6 Eylül 2026 — aladhan'dan alınmış gerçek veri (method=13). */
 const BURSA_06 = { Fajr:"05:01", Sunrise:"06:29", Dhuhr:"13:07", Asr:"16:44",
                    Maghrib:"19:35", Isha:"20:56" };
-const BURSA_07 = { Fajr:"05:02", Sunrise:"06:30", Dhuhr:"13:07", Asr:"16:43",
-                   Maghrib:"19:33", Isha:"20:54" };
-const BURSA_08 = { Fajr:"05:03", Sunrise:"06:31", Dhuhr:"13:06", Asr:"16:42",
-                   Maghrib:"19:31", Isha:"20:52" };
-const BURSA_09 = { Fajr:"05:04", Sunrise:"06:32", Dhuhr:"13:06", Asr:"16:41",
-                   Maghrib:"19:30", Isha:"20:50" };
-const BURSA_10 = { Fajr:"05:05", Sunrise:"06:33", Dhuhr:"13:05", Asr:"16:40",
-                   Maghrib:"19:28", Isha:"20:48" };
 
-// "DD-MM-YYYY" -> vakitler.  Gerçek API biçimi gibi "(+03)" ekiyle döner.
-const SABIT = {
-  "06-09-2026": BURSA_06,
-  "07-09-2026": BURSA_07,
-  "08-09-2026": BURSA_08,
-  "09-09-2026": BURSA_09,
-  "10-09-2026": BURSA_10
-};
+/* Diğer günler bu çıpadan türetiliyor: gerçeğe yakın günlük kayma.
+   Amaç tam astronomik doğruluk değil, taramayı gerçek aralıklarla denemek. */
+const dk = s => { const p = s.split(":").map(Number); return p[0]*60 + p[1]; };
+const ss = m => String(Math.floor(m/60)).padStart(2,"0") + ":" + String(m%60).padStart(2,"0");
+const KAYMA = { Fajr:+0.9, Sunrise:+0.8, Dhuhr:-0.15, Asr:-0.7, Maghrib:-1.5, Isha:-1.6 };
+
+function gunVakti(fark){                       // fark: 6 Eylül'e göre gün farkı
+  const o = {};
+  for(const k in BURSA_06) o[k] = ss(Math.round(dk(BURSA_06[k]) + KAYMA[k] * fark));
+  return o;
+}
+
+// "DD-MM-YYYY" -> vakitler. 2026 Temmuz–Kasım arası hazır.
+const SABIT = {};
+(function(){
+  const capa = new Date(2026, 8, 6);
+  for(let f = -70; f <= 70; f++){
+    const d = new Date(capa); d.setDate(d.getDate() + f);
+    const anh = String(d.getDate()).padStart(2,"0") + "-" +
+                String(d.getMonth()+1).padStart(2,"0") + "-" + d.getFullYear();
+    SABIT[anh] = gunVakti(f);
+  }
+})();
+
+const BURSA_07 = SABIT["07-09-2026"];
 
 function betigiCikar(){
   const html = fs.readFileSync(path.join(KOK, "index.html"), "utf8");
@@ -120,14 +129,32 @@ function kur(se = {}){
     fetch(url){
       durum.istekler.push(url);
       if(se.ag === false) return Promise.reject(new Error("ağ yok"));
+      const ekle = t => {
+        const o = {};
+        for(const k in t) o[k] = t[k] + " (+03)";       // gerçek API biçimi
+        return o;
+      };
+
+      const takvim = String(url).match(/calendar\/(\d{4})\/(\d{1,2})/);
+      if(takvim){
+        if(se.takvim === false)
+          return Promise.resolve({ ok:false, status:500, json: async () => ({}) });
+        const yil = +takvim[1], ay = +takvim[2];
+        const gunler = [];
+        for(let g = 1; g <= 31; g++){
+          const anh = String(g).padStart(2,"0") + "-" + String(ay).padStart(2,"0") + "-" + yil;
+          if(!tablo[anh]) continue;
+          gunler.push({ date:{ gregorian:{ date: anh } }, timings: ekle(tablo[anh]) });
+        }
+        return Promise.resolve({ ok:true, status:200, json: async () => ({ code:200, data:gunler }) });
+      }
+
       const m = String(url).match(/timings\/(\d{2}-\d{2}-\d{4})/);
       const t = m && tablo[m[1]];
       if(!t) return Promise.resolve({ ok:false, status:404, json: async () => ({}) });
-      const ekli = {};
-      for(const k in t) ekli[k] = t[k] + " (+03)";     // gerçek API biçimi
       return Promise.resolve({
         ok:true, status:200,
-        json: async () => ({ code:200, data:{ timings: ekli, meta:{ timezone:"Europe/Istanbul" } } })
+        json: async () => ({ code:200, data:{ timings: ekle(t), meta:{ timezone:"Europe/Istanbul" } } })
       });
     }
   };
@@ -139,7 +166,9 @@ function kur(se = {}){
   vm.runInContext(betigiCikar() + "\n;globalThis.__IC = { " + [
     "UYG","uygulamaGunu","tarihAnahtar","gunKaydir","saatDate","araliklar",
     "aktifAralik","siradakiAralik","vakitGetir","namazKur","namazCiz","namazIsaretle",
-    "gunKaydi","sureMetni","konumuKullan","konumSor","kaydet","yukle","VAKITLER"
+    "gunKaydi","sureMetni","konumuKullan","konumSor","kaydet","yukle","VAKITLER",
+    "borcTara","kazaCiz","toplamBorc","islenmisMi","borcDegistir","vakitleriHazirla",
+    "ayGetir","baslat"
   ].join(",") + " };", ctx, { filename:"index.html<script>" });
 
   return {

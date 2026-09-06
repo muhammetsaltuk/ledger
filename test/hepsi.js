@@ -217,6 +217,159 @@ await dene("süre metni: 1 sa 28 dk", async () => {
   esit(u.ic.sureMetni(-5000), "0 sn");
 });
 
+/* ---------------------------------------------------------------
+   §5 — Kaza borcu
+   --------------------------------------------------------------- */
+
+const bekleCok = async (u, n) => { for(let i = 0; i < (n || 40); i++) await u.bekle(); };
+
+/** Bir oturum aç, işi bitir, localStorage içeriğini döndür (sonraki oturuma girdi). */
+async function otur(simdi, depo, se){
+  const u = kur(Object.assign({ simdi, depo }, se || {}));
+  await bekleCok(u);
+  return { u, depo: Object.fromEntries(u.durum.depo), veri: u.veri() };
+}
+
+/** İlk kurulum: 6 Eylül 21:00'de açılır, borç sıfırdan başlar. */
+async function ilkKurulum(){
+  const o = await otur("2026-09-06T21:00:00");
+  esit(o.veri.sonKontrol, "2026-09-06", "ilk açılışta sonKontrol bugüne kurulur");
+  esit(Object.values(o.veri.borc).reduce((a,b)=>a+b,0), 0, "ilk açılışta borç sıfır");
+  return o.depo;
+}
+
+bolum("§5 — kaza borcu birikimi");
+
+await dene("ilk açılışta kurulumdan önceki vakitler borç sayılmaz", async () => {
+  await ilkKurulum();
+});
+
+await dene("yatsı işaretlenmeden ertesi imsak geçince borç 1 artar", async () => {
+  const depo = await ilkKurulum();
+  const o = await otur("2026-09-07T06:00:00", depo);
+  esit(o.veri.borc.yatsi, 1);
+  esit(o.veri.borc.sabah, 0, "07 Eylül sabahı henüz kapanmadı");
+});
+
+await dene("aynı gün beş kez açılınca borç yalnızca bir kez artar", async () => {
+  let depo = await ilkKurulum();
+  for(let i = 0; i < 5; i++){
+    const o = await otur("2026-09-07T06:0" + i + ":00", depo);
+    depo = o.depo;
+    esit(o.veri.borc.yatsi, 1, (i+1) + ". açılış");
+  }
+});
+
+await dene("üç gün açılmayınca geçen bütün vakitler doğru hesaplanır", async () => {
+  const depo = await ilkKurulum();
+  const o = await otur("2026-09-10T14:00:00", depo);
+  const b = o.veri.borc;
+  // 06: yatsı · 07/08/09: beş vakit · 10: yalnız sabah (öğle 13:05'te başladı, sürüyor)
+  esit(b.sabah, 4, "sabah");
+  esit(b.ogle, 3, "öğle");
+  esit(b.ikindi, 3, "ikindi");
+  esit(b.aksam, 3, "akşam");
+  esit(b.yatsi, 4, "yatsı");
+  esit(Object.values(b).reduce((a,c)=>a+c,0), 17, "toplam");
+});
+
+await dene("60 günden eskisine bakılmaz", async () => {
+  const depo = await ilkKurulum();
+  const v = JSON.parse(depo["ledger/v1"]);
+  v.sonKontrol = "2026-05-01";                 // dört ay önce
+  depo["ledger/v1"] = JSON.stringify(v);
+  const o = await otur("2026-09-06T21:00:00", depo);
+  const toplam = Object.values(o.veri.borc).reduce((a,b)=>a+b,0);
+  dogru(toplam <= 60 * 5, "tarama 60 günle sınırlı olmalı");
+  dogru(o.veri.islenmisVakitler.every(a => a.split("|")[0] >= "2026-07-07"),
+        "60 günden eski kayıt tutulmamalı");
+});
+
+await dene("geriye dönük tarama gün gün değil ay ay sorar", async () => {
+  const depo = await ilkKurulum();
+  const o = await otur("2026-09-10T14:00:00", depo, {});
+  const takvim = o.u.durum.istekler.filter(i => i.includes("/calendar/")).length;
+  const gunluk = o.u.durum.istekler.filter(i => i.includes("/timings/")).length;
+  dogru(takvim >= 1, "takvim uç noktası kullanılmalı");
+  dogru(gunluk <= 3, "gün gün sorgu 3'ü geçmemeli, geldi: " + gunluk);
+});
+
+await dene("takvim uç noktası bozulursa gün gün sorguya düşer", async () => {
+  const depo = await ilkKurulum();
+  const o = await otur("2026-09-09T14:00:00", depo, { takvim:false });
+  dogru(o.veri.borc.yatsi >= 3, "yedek yolla da borç hesaplanmalı");
+});
+
+bolum("§5 — ödeme ve geri alma");
+
+await dene("kaza kıldım sayacı bir azaltır, sıfırın altına inmez", async () => {
+  const depo = await ilkKurulum();
+  const o = await otur("2026-09-10T14:00:00", depo);
+  esit(o.veri.borc.ikindi, 3);
+  o.u.ic.borcDegistir("ikindi", -1); o.u.ic.kaydet();
+  esit(o.u.veri().borc.ikindi, 2);
+  for(let i = 0; i < 9; i++) o.u.ic.borcDegistir("ikindi", -1);
+  o.u.ic.kaydet();
+  esit(o.u.veri().borc.ikindi, 0, "sıfırın altına inmemeli");
+});
+
+await dene("geçmiş vakti kaza olarak işaretlemek aynı sayacı düşürür", async () => {
+  const depo = await ilkKurulum();
+  const o = await otur("2026-09-07T14:00:00", depo);
+  const once = o.veri.borc.sabah;
+  dogru(once >= 1, "7 Eylül sabahı borca girmiş olmalı");
+  o.u.ic.namazIsaretle("2026-09-07", "sabah", "kaza");
+  esit(o.u.veri().borc.sabah, once - 1);
+  o.u.ic.namazIsaretle("2026-09-07", "sabah", null);        // geri al
+  esit(o.u.veri().borc.sabah, once, "geri alınca sayaç geri gelmeli");
+});
+
+await dene("vakti henüz kapanmamış namazı işaretlemek borcu etkilemez", async () => {
+  const depo = await ilkKurulum();
+  const o = await otur("2026-09-07T14:00:00", depo);
+  const once = JSON.stringify(o.u.veri().borc);
+  o.u.ic.namazIsaretle("2026-09-07", "ogle", "vaktinde");   // öğle sürüyor
+  esit(JSON.stringify(o.u.veri().borc), once);
+});
+
+bolum("§5 — ekranda");
+
+await dene("borç sıfırsa kaza bölümü ekranda hiç görünmez", async () => {
+  const o = await otur("2026-09-06T21:00:00");
+  const k = o.u.ctx.document.getElementById("b-kaza");
+  esit(k.hidden, true);
+  esit(k.innerHTML, "");
+});
+
+await dene("borcu olmayan namaz türü listede görünmez, büyük toplam yazılmaz", async () => {
+  const depo = await ilkKurulum();
+  const o = await otur("2026-09-07T06:00:00", depo);        // yalnız yatsı 1
+  const h = o.u.ctx.document.getElementById("b-kaza").innerHTML;
+  esit(o.u.ctx.document.getElementById("b-kaza").hidden, false);
+  icerir(h, "Yatsı");
+  icermez(h, "Sabah");
+  icermez(h, "İkindi");
+  icermez(h, "toplam");
+  icermez(h, "#A8615C");                                    // kırmızı vurgu yok
+  icerir(h, 'data-ode="yatsi"');                            // tek dokunuşluk ödeme
+});
+
+bolum("§5 — dayanıklılık");
+
+await dene("ağ yokken sonKontrol ilerlemez, bağlantı gelince borç hesaplanır", async () => {
+  const depo = await ilkKurulum();
+  const kesik = await otur("2026-09-09T14:00:00", depo, { ag:false });
+  esit(kesik.veri.sonKontrol, "2026-09-06", "çözülemeyen gün varken ilerlememeli");
+  // Önbellekte verisi olan gün (06 Eylül) çevrimdışıyken de hesaplanır; gerisi bekler.
+  esit(Object.values(kesik.veri.borc).reduce((a,b)=>a+b,0), 1, "yalnız 06 Eylül yatsısı");
+
+  const geri = await otur("2026-09-09T15:00:00", kesik.depo);
+  esit(geri.veri.sonKontrol, "2026-09-09");
+  esit(Object.values(geri.veri.borc).reduce((a,b)=>a+b,0), 12,
+       "06 yatsı + 07/08 beşer + 09 sabah");
+  esit(geri.veri.borc.yatsi, 3, "06, 07, 08 yatsıları");
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 
