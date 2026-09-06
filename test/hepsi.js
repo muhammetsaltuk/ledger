@@ -853,6 +853,133 @@ await dene("profil plan üretimine girdi olur", async () => {
   icerir(c.govde.profil, "10:30");
 });
 
+/* ---------------------------------------------------------------
+   §10 — Sohbet
+   --------------------------------------------------------------- */
+
+bolum("§10 — sohbet");
+
+await dene("soru sorulunca yalnız metin cevap gelir", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{
+    plan:SAHTE_PLAN,
+    chat:{ cevap:"Yatsı 20:56'da giriyor.", planGuncelle:null, etkinlikEkle:null, profilEki:"" } } });
+  const oncekiPlan = JSON.stringify(u.veri().gunler["2026-09-06"].maddeler);
+  await u.ic.sohbetGonder("yatsı kaçta?");
+  esit(u.veri().sohbet.length, 2);
+  esit(u.veri().sohbet[0].kim, "ben");
+  esit(u.veri().sohbet[1].metin, "Yatsı 20:56'da giriyor.");
+  esit(JSON.stringify(u.veri().gunler["2026-09-06"].maddeler), oncekiPlan, "plan değişmemeli");
+  esit(u.veri().profil, "", "profil değişmemeli");
+});
+
+await dene('"koşuyu akşama al" hem planı değiştirir hem profile satır düşer', async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{
+    plan:SAHTE_PLAN,
+    chat:{
+      cevap:"Koşuyu 19:30'a aldım.",
+      planGuncelle:{ tarih:"2026-09-06", maddeler:[
+        { saat:"08:00", sure:10, baslik:"Kalk, perdeyi aç, bir bardak su", tur:"uyku", gerekce:"" },
+        { saat:"09:05", sure:30, baslik:"Kahvaltı", tur:"yemek", gerekce:"" },
+        { saat:"19:30", sure:40, baslik:"Koşu", tur:"spor", gerekce:"" }
+      ], gununNotu:"" },
+      etkinlikEkle:null,
+      profilEki:"Sabah koşusunu yapmıyor, akşamı tercih ediyor."
+    } } });
+
+  await u.ic.sohbetGonder("Sabahları koşamıyorum, akşama alalım.");
+  const m = u.veri().gunler["2026-09-06"].maddeler;
+  dogru(m.some(x => x.baslik === "Koşu" && x.saat === "19:30"), "koşu akşama taşınmalı");
+  icerir(u.veri().profil, "akşamı tercih ediyor");
+  icerir(u.html("b-plan"), "19:30");
+  icerir(u.html("b-ayar"), "akşamı tercih ediyor");
+});
+
+await dene("plan güncellenirken mevcut işaretler ve notlar korunur", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{
+    plan:SAHTE_PLAN,
+    chat:{ cevap:"tamam", planGuncelle:{ tarih:"2026-09-06", maddeler:[
+      { saat:"08:00", sure:10, baslik:"Kalk, perdeyi aç, bir bardak su", tur:"uyku", gerekce:"" },
+      { saat:"11:00", sure:60, baslik:"Yeni madde", tur:"kod", gerekce:"" }
+    ], gununNotu:"" }, etkinlikEkle:null, profilEki:"" } } });
+
+  const ilk = u.veri().gunler["2026-09-06"].maddeler[0];
+  u.ic.maddeIsaretle(ilk.id);
+  u.ic.maddeNot(ilk.id, "suyu içmedim");
+
+  await u.ic.sohbetGonder("kahvaltıyı çıkar, öğlene kod koy");
+  const m = u.veri().gunler["2026-09-06"].maddeler;
+  const kalk = m.find(x => x.baslik === "Kalk, perdeyi aç, bir bardak su");
+  esit(kalk.yapildi, true, "işaret korunmalı");
+  esit(kalk.not, "suyu içmedim", "not korunmalı");
+  esit(kalk.id, ilk.id, "id korunmalı");
+  dogru(m.some(x => x.baslik === "Yeni madde"));
+});
+
+await dene("sohbetten etkinlik eklenir", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{
+    plan:SAHTE_PLAN,
+    chat:{ cevap:"12 Eylül 14:00'e berber ekledim.", planGuncelle:null,
+           etkinlikEkle:{ tarih:"2026-09-12", saat:"14:00", sure:60, baslik:"Berber" },
+           profilEki:"" } } });
+  await u.ic.sohbetGonder("12 Eylül saat 14'te berber randevum var");
+  esit(u.veri().etkinlikler.length, 1);
+  esit(u.veri().etkinlikler[0].baslik, "Berber");
+  icerir(u.html("b-etkinlik"), "12 Eylül");
+});
+
+await dene("sohbet geçmişi son 20 mesajla sınırlı", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{
+    plan:SAHTE_PLAN,
+    chat:{ cevap:"tamam", planGuncelle:null, etkinlikEkle:null, profilEki:"" } } });
+  for(let i = 0; i < 15; i++) await u.ic.sohbetGonder("mesaj " + i);
+  esit(u.veri().sohbet.length, 20);
+  icerir(u.veri().sohbet[0].metin + u.veri().sohbet[1].metin, "mesaj 5");
+});
+
+await dene("modele giden gövdede bugünün planı, profil ve geçmiş var", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{
+    plan:SAHTE_PLAN,
+    chat:{ cevap:"tamam", planGuncelle:null, etkinlikEkle:null, profilEki:"" } } });
+  await u.ic.sohbetGonder("ilk mesaj");
+  await u.ic.sohbetGonder("ikinci mesaj");
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "chat").pop();
+  esit(c.govde.metin, "ikinci mesaj");
+  esit(c.govde.tarih, "2026-09-06");
+  esit(c.govde.gunAdi, "Pazar");
+  dogru(c.govde.plan.length > 0, "bugünün planı gitmeli");
+  dogru(c.govde.vakitler && c.govde.vakitler["Yatsı"], "vakitler gitmeli");
+  dogru(c.govde.sohbet.some(m => m.metin === "ilk mesaj"), "geçmiş gitmeli");
+  dogru(!c.govde.sohbet.some(m => m.metin === "ikinci mesaj"), "yeni mesaj geçmişte olmamalı");
+});
+
+await dene("profil 400 kelimeyi aşarsa en eski satırlar düşer", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{
+    plan:SAHTE_PLAN,
+    chat:{ cevap:"tamam", planGuncelle:null, etkinlikEkle:null,
+           profilEki: Array.from({length:150}, (_,i)=>"k"+i).join(" ") } } });
+  await u.ic.sohbetGonder("bir");
+  await u.ic.sohbetGonder("iki");
+  await u.ic.sohbetGonder("üç");
+  const kelime = u.veri().profil.split(/\s+/).length;
+  dogru(kelime <= 400, "400 kelimeyi aşmamalı, geldi: " + kelime);
+});
+
+await dene("sohbet başarısız olursa kullanıcı görür, mesajı kaybolmaz", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{
+    plan:SAHTE_PLAN, chat:{ durum:502, mesaj:"Model cevap vermedi." } } });
+  u.ic.sohbetAc();
+  await u.ic.sohbetGonder("bir şey");
+  icerir(u.html("b-sohbet"), "Model cevap vermedi");
+  esit(u.veri().sohbet.length, 1, "kullanıcının mesajı kayıtta kalmalı");
+});
+
+await dene("sohbet paneli kapalı başlar", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{ plan:SAHTE_PLAN } });
+  const h = u.html("b-sohbet");
+  icerir(h, 'id="s-ac"');
+  icermez(h, 'id="s-metin"');
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

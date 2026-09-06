@@ -313,6 +313,99 @@ await dene("model boş dönerse 502", async () => {
   esit(c.kod, 502);
 });
 
+/* --------------------------------------------------------------- */
+
+bolum("api/chat — §10");
+
+delete require.cache[require.resolve("../api/chat")];
+const chat = require("../api/chat");
+
+const CHAT_GOVDE = {
+  metin: "Sabahları koşamıyorum, akşama alalım.",
+  tarih: "2026-09-06", gunAdi: "Pazar",
+  kurs: null,
+  vakitler: { Sabah:"05:01–06:29" },
+  plan: [{ saat:"07:30", sure:40, baslik:"Koşu", tur:"spor", yapildi:false, not:"" }],
+  profil: "Koşuyu cumartesi hiç yapmadı.",
+  sohbet: [{ kim:"ben", metin:"dün nasıldı" }, { kim:"model", metin:"iyiydi" }]
+};
+
+await dene("dört alanlı yapılandırılmış çıktı istenir", async () => {
+  const kayit = geminiTaklit(() => ({ metin: JSON.stringify({
+    cevap:"Koşuyu 19:30'a aldım.",
+    planGuncelle:{ tarih:"2026-09-06", maddeler:[
+      { saat:"19:30", sure:40, baslik:"Koşu", tur:"spor", gerekce:"" }], gununNotu:"" },
+    etkinlikEkle:null,
+    profilEki:"Sabah koşusunu yapmıyor, akşamı tercih ediyor."
+  }) }));
+  const c = cevap();
+  await chat(istek(CHAT_GOVDE), c);
+  esit(c.kod, 200);
+  esit(c.veri.cevap, "Koşuyu 19:30'a aldım.");
+  esit(c.veri.planGuncelle.maddeler[0].saat, "19:30");
+  esit(c.veri.etkinlikEkle, null);
+  icerir(c.veri.profilEki, "akşamı tercih ediyor");
+
+  const s = kayit.istekler[0].govde.generationConfig.responseSchema;
+  esit(s.properties.cevap.type, "string");
+  dogru(s.properties.planGuncelle, "planGuncelle şemada olmalı");
+  dogru(s.properties.etkinlikEkle, "etkinlikEkle şemada olmalı");
+  dogru(s.properties.profilEki, "profilEki şemada olmalı");
+});
+
+await dene("isteme bugünün planı, profil ve son konuşma girer", async () => {
+  const kayit = geminiTaklit(() => ({ metin: JSON.stringify({ cevap:"tamam" }) }));
+  await chat(istek(CHAT_GOVDE), cevap());
+  const metin = kayit.istekler[0].govde.contents[0].parts[0].text;
+  icerir(metin, "07:30 Koşu");
+  icerir(metin, "Koşuyu cumartesi hiç yapmadı");
+  icerir(metin, "Kullanıcı: dün nasıldı");
+  icerir(metin, "Sabahları koşamıyorum");
+  icerir(metin, "planın **tamamını** yaz");
+});
+
+await dene("sohbet geçmişi son 20 mesajla sınırlanır", async () => {
+  const uzun = Array.from({ length: 40 }, (_, i) => ({ kim:"ben", metin:"mesaj"+i }));
+  const kayit = geminiTaklit(() => ({ metin: JSON.stringify({ cevap:"tamam" }) }));
+  await chat(istek(Object.assign({}, CHAT_GOVDE, { sohbet: uzun })), cevap());
+  const metin = kayit.istekler[0].govde.contents[0].parts[0].text;
+  icerir(metin, "mesaj39");
+  if(metin.indexOf("mesaj5\n") !== -1) throw new Error("20'den eski mesaj gitmemeli");
+});
+
+await dene("geçmişe düşen veya biçimsiz etkinlik reddedilir", async () => {
+  geminiTaklit(() => ({ metin: JSON.stringify({
+    cevap:"ekledim", etkinlikEkle:{ tarih:"2026-08-01", saat:"14:00", sure:60, baslik:"Berber" } }) }));
+  const c = cevap();
+  await chat(istek(CHAT_GOVDE), c);
+  esit(c.veri.etkinlikEkle, null, "geçmiş tarih kabul edilmemeli");
+
+  geminiTaklit(() => ({ metin: JSON.stringify({
+    cevap:"ekledim", etkinlikEkle:{ tarih:"yarın", baslik:"Berber" } }) }));
+  const c2 = cevap();
+  await chat(istek(CHAT_GOVDE), c2);
+  esit(c2.veri.etkinlikEkle, null, "biçimsiz tarih kabul edilmemeli");
+});
+
+await dene("boş maddeli planGuncelle yok sayılır, plan silinmez", async () => {
+  geminiTaklit(() => ({ metin: JSON.stringify({
+    cevap:"tamam", planGuncelle:{ tarih:"2026-09-06", maddeler:[{ saat:"08:00", baslik:"" }] } }) }));
+  const c = cevap();
+  await chat(istek(CHAT_GOVDE), c);
+  esit(c.veri.planGuncelle, null);
+});
+
+await dene("boş metin 400, boş cevap 502", async () => {
+  const c = cevap();
+  await chat(istek(Object.assign({}, CHAT_GOVDE, { metin:"  " })), c);
+  esit(c.kod, 400);
+
+  geminiTaklit(() => ({ metin: JSON.stringify({ cevap:"" }) }));
+  const c2 = cevap();
+  await chat(istek(CHAT_GOVDE), c2);
+  esit(c2.kod, 502);
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

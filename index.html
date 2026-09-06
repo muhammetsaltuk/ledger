@@ -257,6 +257,19 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .k-ad{ flex:0 0 auto; }
 .k-sayi{ flex:1 1 auto; color:var(--sonuk); }
 
+/* --- §10 Sohbet ---------------------------------------------- */
+.sohbet-liste{ list-style:none; margin:0 0 14px; padding:0; }
+.sohbet-liste > li{
+  padding:9px 0;
+  line-height:1.5;
+  white-space:pre-wrap;
+}
+.sohbet-liste > li + li{ border-top:1px solid var(--cizgi); }
+.sohbet-liste > li.s-ben{ color:var(--metin); }
+.sohbet-liste > li.s-model{ color:var(--sonuk); }
+.s-giris{ display:flex; gap:8px; align-items:center; }
+.s-giris input{ flex:1 1 auto; }
+
 /* --- §9 / §12 Profil ve değerlendirme ------------------------ */
 .deger-metin,.profil-metin{
   margin:0 0 14px;
@@ -931,6 +944,142 @@ $kaza.addEventListener("click", e => {
   kaydet();
   kazaCiz();
 });
+
+/* ===============================================================
+   §10 — Sohbet
+   =============================================================== */
+
+const $sohbet = document.getElementById("b-sohbet");
+const SOHBET_SINIR = 20;                        // son 20 mesaj saklanır (§10)
+let sohbetAcik = false, sohbetMesaj = "";
+
+function sohbetYaz(kim, metin){
+  UYG.veri.sohbet.push({ kim: kim, metin: metin, zaman: Date.now() });
+  if(UYG.veri.sohbet.length > SOHBET_SINIR)
+    UYG.veri.sohbet = UYG.veri.sohbet.slice(-SOHBET_SINIR);
+  kaydet();
+}
+
+async function sohbetGonder(metin){
+  const tarih = uygulamaGunu();
+  sohbetYaz("ben", metin);
+  sohbetMesaj = "";
+  UYG.sohbetBekliyor = true;
+  sohbetCiz();
+
+  try{
+    const g = gunKaydi(tarih);
+    const c = await modelIste("chat", {
+      metin: metin,
+      tarih: tarih,
+      gunAdi: gunAdi(tarih),
+      kurs: kursSaati(tarih),
+      vakitler: bugununVakitleri(),
+      plan: (g.maddeler || []).map(m => ({
+        saat:m.saat, sure:m.sure, baslik:m.baslik, tur:m.tur,
+        yapildi:!!m.yapildi, not:m.not || ""
+      })),
+      profil: UYG.veri.profil || "",
+      sohbet: UYG.veri.sohbet.slice(0, -1)      // az önce yazdığı hariç
+    });
+
+    if(c.planGuncelle && c.planGuncelle.maddeler){
+      // İşaretler ve notlar kaybolmasın: başlığı aynı kalan madde durumunu korur.
+      const eski = new Map((g.maddeler || []).map(m => [m.baslik, m]));
+      g.maddeler = c.planGuncelle.maddeler.map(m => {
+        const o = eski.get(m.baslik);
+        return {
+          id: o ? o.id : yeniId(),
+          saat: m.saat || "", sure: m.sure || null,
+          baslik: m.baslik, tur: m.tur || "bos", gerekce: m.gerekce || "",
+          yapildi: o ? !!o.yapildi : false,
+          not: o ? (o.not || "") : "",
+          etkinlikId: o ? o.etkinlikId : undefined
+        };
+      });
+      if(c.planGuncelle.gununNotu) g.gununNotu = c.planGuncelle.gununNotu;
+      g.planKaynak = "model";
+    }
+
+    if(c.etkinlikEkle) etkinlikKaydet(c.etkinlikEkle);
+
+    if(c.profilEki){
+      const p = (UYG.veri.profil || "").trim();
+      UYG.veri.profil = (p ? p + "\n" : "") + c.profilEki;
+      // 400 kelime sınırı (§9): taşarsa en eski satırlar düşer.
+      let satir = UYG.veri.profil.split("\n");
+      while(satir.join(" ").split(/\s+/).length > 400 && satir.length > 1) satir.shift();
+      UYG.veri.profil = satir.join("\n");
+    }
+
+    sohbetYaz("model", c.cevap);
+    kaydet();
+    planCiz();
+    etkinlikCiz();
+    ayarCiz();
+
+  }catch(e){
+    console.warn("sohbet başarısız", e);
+    sohbetMesaj = hataMetni(e, "Cevap alınamadı.");
+  }finally{
+    UYG.sohbetBekliyor = false;
+    sohbetCiz();
+  }
+}
+
+function sohbetCiz(){
+  const mesajlar = UYG.veri.sohbet || [];
+
+  if(!sohbetAcik){
+    $sohbet.innerHTML =
+      '<button class="dg dg-sonuk" id="s-ac" aria-expanded="false">' +
+        'Sohbet' + (mesajlar.length ? ' · ' + mesajlar.length + ' mesaj' : "") +
+      '</button>';
+    return;
+  }
+
+  const satirlar = mesajlar.map(m =>
+    '<li class="s-' + (m.kim === "ben" ? "ben" : "model") + '">' + kacir(m.metin) + '</li>'
+  ).join("");
+
+  $sohbet.innerHTML =
+    '<h2 class="bolum-bas">Sohbet' +
+      '<button class="dg dg-sonuk" id="s-kapat" style="float:right">kapat</button>' +
+    '</h2>' +
+    (mesajlar.length ? '<ul class="sohbet-liste">' + satirlar + '</ul>'
+                     : '<p class="sonuk">Plan değişikliği, randevu veya soru yazabilirsin.</p>') +
+    (UYG.sohbetBekliyor ? '<p class="sonuk">yazılıyor…</p>' : "") +
+    '<div class="s-giris">' +
+      '<input type="text" id="s-metin" placeholder="Sabahları koşamıyorum, akşama alalım." ' +
+        'autocomplete="off" aria-label="mesaj">' +
+      '<button class="dg" id="s-gonder"' + (UYG.sohbetBekliyor ? " disabled" : "") + '>gönder</button>' +
+    '</div>' +
+    (sohbetMesaj ? '<p class="sonuk" style="margin:8px 0 0">' + kacir(sohbetMesaj) + '</p>' : "");
+}
+
+$sohbet.addEventListener("click", e => {
+  const d = e.target.closest("button");
+  if(!d) return;
+  if(d.id === "s-ac") sohbetAc();
+  else if(d.id === "s-kapat"){ sohbetAcik = false; sohbetCiz(); }
+  else if(d.id === "s-gonder") sohbetGirisGonder();
+});
+$sohbet.addEventListener("keydown", e => {
+  if(e.key === "Enter" && e.target.id === "s-metin"){ e.preventDefault(); sohbetGirisGonder(); }
+});
+function sohbetAc(){
+  sohbetAcik = true;
+  sohbetCiz();
+  const alan = document.getElementById("s-metin");
+  if(alan) alan.focus();
+}
+function sohbetGirisGonder(){
+  const alan = document.getElementById("s-metin");
+  if(!alan || !alan.value.trim() || UYG.sohbetBekliyor) return;
+  const metin = alan.value.trim();
+  alan.value = "";
+  sohbetGonder(metin);
+}
 
 /* ===============================================================
    §9 + §12 — profil ve gün sonu değerlendirmesi (api/review.js)
@@ -1694,6 +1843,7 @@ function baslat(){
   suCiz();
   planCiz();
   etkinlikCiz();
+  sohbetCiz();
   degerCiz();
   ayarCiz();
 
