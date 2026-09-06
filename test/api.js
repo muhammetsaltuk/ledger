@@ -199,6 +199,60 @@ await dene("anahtar hiçbir hata mesajında geçmez", async () => {
   if(yazi.indexOf("test-anahtari") !== -1) throw new Error("anahtar cevaba sızdı");
 });
 
+/* --------------------------------------------------------------- */
+
+bolum("api/parse — §7");
+
+delete require.cache[require.resolve("../api/parse")];
+const parse = require("../api/parse");
+
+await dene("bugünün tarihi ve gün adı isteme girer", async () => {
+  const kayit = geminiTaklit(() => ({
+    metin: JSON.stringify({ tarih:"2026-09-12", saat:"14:00", sure:60, baslik:"Berber" }) }));
+  const c = cevap();
+  await parse(istek({ metin:"12 Eylül saat 14'te berber randevum var", bugun:"2026-09-06" }), c);
+  esit(c.kod, 200);
+  const metin = kayit.istekler[0].govde.contents[0].parts[0].text;
+  icerir(metin, "2026-09-06 Pazar");
+  icerir(metin, "12 Eylül saat 14'te berber");
+  icerir(metin, "Tahmin etme.");
+});
+
+await dene("etkinlik alanları doğrulanır", async () => {
+  geminiTaklit(() => ({
+    metin: JSON.stringify({ tarih:"2026-09-12", saat:"14:00", sure:60, baslik:"Berber" }) }));
+  const c = cevap();
+  await parse(istek({ metin:"12 Eylül 14'te berber", bugun:"2026-09-06" }), c);
+  esit(c.veri.tarih, "2026-09-12");
+  esit(c.veri.saat, "14:00");
+  esit(c.veri.sure, 60);
+  esit(c.veri.baslik, "Berber");
+});
+
+await dene("uydurulmuş biçimler boşaltılır, tahmin kabul edilmez", async () => {
+  geminiTaklit(() => ({
+    metin: JSON.stringify({ tarih:"12 Eylül", saat:"öğleden sonra", sure:-5, baslik:"Berber" }) }));
+  const c = cevap();
+  await parse(istek({ metin:"berber", bugun:"2026-09-06" }), c);
+  esit(c.veri.tarih, "", "biçimsiz tarih boş kalmalı");
+  esit(c.veri.saat, "", "biçimsiz saat boş kalmalı");
+  esit(c.veri.sure, 0);
+});
+
+await dene("geçmişe düşen tarih boşaltılır", async () => {
+  geminiTaklit(() => ({
+    metin: JSON.stringify({ tarih:"2026-08-12", saat:"14:00", sure:0, baslik:"Berber" }) }));
+  const c = cevap();
+  await parse(istek({ metin:"12 Ağustos berber", bugun:"2026-09-06" }), c);
+  esit(c.veri.tarih, "", "geçmiş tarih neredeyse her zaman yanlış çözümdür");
+});
+
+await dene("boş metin 400", async () => {
+  const c = cevap();
+  await parse(istek({ metin:"   ", bugun:"2026-09-06" }), c);
+  esit(c.kod, 400);
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

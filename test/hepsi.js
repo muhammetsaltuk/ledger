@@ -648,6 +648,96 @@ await dene("api/plan.js anahtarı yalnız ortam değişkeninden okur", async () 
   icerir(ortak, "gemini-2.0-flash");
 });
 
+/* ---------------------------------------------------------------
+   §7 — Etkinlikler
+   --------------------------------------------------------------- */
+
+bolum("§7 — etkinlikler");
+
+await dene('"12 Eylül saat 14\'te berber" doğru tarih ve saate çevrilir', async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00",
+    api:{ plan:SAHTE_PLAN, parse:{ tarih:"2026-09-12", saat:"14:00", sure:60, baslik:"Berber" } } });
+  await u.ic.etkinlikCozumle("12 Eylül saat 14'te berber randevum var");
+  const e = u.veri().etkinlikler;
+  esit(e.length, 1);
+  esit(e[0].tarih, "2026-09-12");
+  esit(e[0].saat, "14:00");
+  esit(e[0].baslik, "Berber");
+  const h = u.html("b-etkinlik");
+  icerir(h, "12 Eylül");
+  icerir(h, "Berber");
+});
+
+await dene("çözümlemeye bugünün tarihi gönderilir", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00",
+    api:{ plan:SAHTE_PLAN, parse:{ tarih:"2026-09-07", saat:"", sure:0, baslik:"Kargo" } } });
+  await u.ic.etkinlikCozumle("yarın kargo gelecek");
+  const cagri = u.durum.apiCagrilari.find(c => c.ad === "parse");
+  esit(cagri.govde.bugun, "2026-09-06");
+  esit(cagri.govde.metin, "yarın kargo gelecek");
+});
+
+await dene("model emin değilse kullanıcı doldurur, tahmin edilmez", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00",
+    api:{ plan:SAHTE_PLAN, parse:{ tarih:"", saat:"", sure:0, baslik:"Diş hekimi" } } });
+  await u.ic.etkinlikCozumle("diş hekimine gideceğim");
+  esit(u.veri().etkinlikler.length, 0, "eksik etkinlik kaydedilmemeli");
+  const h = u.html("b-etkinlik");
+  icerir(h, "Eksik kalan yeri doldur");
+  icerir(h, 'id="e-tarih"');
+  icerir(h, "Diş hekimi");
+});
+
+await dene("etkinlik yoksa bölüm görünmez", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
+  esit(u.ctx.document.getElementById("b-etkinlik").hidden, true);
+});
+
+await dene("geçmiş etkinlik listede görünmez", async () => {
+  const u = await ac({ simdi:"2026-09-20T14:00:00",
+    api:{ plan:SAHTE_PLAN, parse:{ tarih:"2026-09-25", saat:"", sure:0, baslik:"İleri" } } });
+  u.ic.etkinlikKaydet({ tarih:"2026-09-12", saat:"14:00", sure:60, baslik:"Geçmiş" });
+  u.ic.etkinlikKaydet({ tarih:"2026-09-25", saat:"", sure:0, baslik:"İleri" });
+  const h = u.html("b-etkinlik");
+  icerir(h, "İleri");
+  icermez(h, "Geçmiş");
+});
+
+await dene("bugüne düşen etkinlik bugünün planına tur:etkinlik olarak girer", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
+  u.ic.etkinlikKaydet({ tarih:"2026-09-06", saat:"16:00", sure:45, baslik:"Berber" });
+  const m = u.veri().gunler["2026-09-06"].maddeler;
+  esit(m.length, 1);
+  esit(m[0].tur, "etkinlik");
+  esit(m[0].saat, "16:00");
+  icerir(u.html("b-plan"), "Berber");
+});
+
+await dene("etkinlik silinince plandaki maddesi de gider", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
+  const e = u.ic.etkinlikKaydet({ tarih:"2026-09-06", saat:"16:00", sure:45, baslik:"Berber" });
+  esit(u.veri().gunler["2026-09-06"].maddeler.length, 1);
+  u.ic.etkinlikSil(e.id);
+  esit(u.veri().gunler["2026-09-06"].maddeler.length, 0);
+  esit(u.veri().etkinlikler.length, 0);
+});
+
+await dene("yaklaşan etkinlikler plan üretimine girdi olur", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{ plan:SAHTE_PLAN } });
+  u.ic.etkinlikKaydet({ tarih:"2026-09-12", saat:"14:00", sure:60, baslik:"Berber" });
+  await u.ic.planUret(true);
+  const cagri = u.durum.apiCagrilari.filter(c => c.ad === "plan").pop();
+  esit(cagri.govde.etkinlikler[0].baslik, "Berber");
+});
+
+await dene("anahtar yokken etkinlik elle eklenebilir", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });     // api yok
+  await u.ic.etkinlikCozumle("12 Eylül berber");
+  icerir(u.html("b-etkinlik"), "Yapay zeka kapalı");
+  icerir(u.html("b-etkinlik"), 'id="e-tarih"');
+  esit(u.durum.apiCagrilari.filter(c => c.ad === "parse").length, 0, "boşuna çağırmamalı");
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

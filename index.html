@@ -257,6 +257,21 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .k-ad{ flex:0 0 auto; }
 .k-sayi{ flex:1 1 auto; color:var(--sonuk); }
 
+/* --- §7 Etkinlikler ------------------------------------------ */
+.etkinlik-liste{ list-style:none; margin:0; padding:0; }
+.etkinlik-liste > li{
+  display:flex; align-items:center; gap:12px;
+  padding:7px 0; min-height:44px;
+}
+.etkinlik-liste > li + li{ border-top:1px solid var(--cizgi); }
+.e-tarih{ flex:0 0 8.6em; color:var(--sonuk); font-size:.9rem; }
+.e-ad{ flex:1 1 auto; }
+.e-giris{ display:flex; gap:8px; align-items:center; margin-top:12px; }
+.e-taslak{ display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+.e-taslak input[type="date"]{ width:9.6em; flex:0 0 auto; }
+.e-taslak input[type="time"]{ width:6.6em; flex:0 0 auto; }
+.e-taslak input[type="text"]{ flex:1 1 8em; }
+
 /* --- §11 Su: ince şerit. Vurgu rengi burada kullanılmaz (§13). --- */
 .su-satir{ display:flex; align-items:center; gap:14px; }
 .su-etiket{ flex:0 0 auto; color:var(--sonuk); font-size:.85rem; }
@@ -910,6 +925,206 @@ $kaza.addEventListener("click", e => {
 });
 
 /* ===============================================================
+   §7 — Etkinlikler
+   =============================================================== */
+
+const AYLAR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
+               "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+
+const $etkinlik = document.getElementById("b-etkinlik");
+let etkinlikTaslak = null;    // model eksik bıraktıysa kullanıcı tamamlar
+let etkinlikMesaj  = "";
+let etkinlikAcik   = false;
+
+function tarihYaz(t){
+  if(!t) return "";
+  const p = t.split("-").map(Number);
+  return p[2] + " " + AYLAR[p[1]-1];
+}
+
+function etkinlikKaydet(e){
+  const kayit = {
+    id: yeniId(),
+    tarih: e.tarih,
+    saat: e.saat || "",
+    sure: e.sure || 0,
+    baslik: e.baslik
+  };
+  UYG.veri.etkinlikler.push(kayit);
+  // Geçmiş etkinlikler birikmesin.
+  const sinir = gunKaydir(uygulamaGunu(), -30);
+  UYG.veri.etkinlikler = UYG.veri.etkinlikler.filter(x => x.tarih >= sinir);
+
+  // Bugüne düşen etkinlik doğrudan bugünün planına girer (§7).
+  if(kayit.tarih === uygulamaGunu()){
+    const g = gunKaydi(kayit.tarih);
+    g.maddeler.push({
+      id: yeniId(), saat: kayit.saat, sure: kayit.sure || null,
+      baslik: kayit.baslik, tur: "etkinlik", gerekce: "",
+      yapildi: false, not: "", etkinlikId: kayit.id
+    });
+  }
+  kaydet();
+  etkinlikCiz();
+  planCiz();
+  return kayit;
+}
+
+function etkinlikSil(id){
+  UYG.veri.etkinlikler = UYG.veri.etkinlikler.filter(e => e.id !== id);
+  for(const t of Object.keys(UYG.veri.gunler)){
+    const g = UYG.veri.gunler[t];
+    if(g.maddeler) g.maddeler = g.maddeler.filter(m => m.etkinlikId !== id);
+  }
+  kaydet();
+  etkinlikCiz();
+  planCiz();
+}
+
+/* Serbest metni api/parse.js ile çevirir. Model emin değilse alanı boş
+   bırakır ve kullanıcı doldurur; tahmin ettirilmez (§7). */
+async function etkinlikCozumle(metin){
+  etkinlikMesaj = "";
+  etkinlikAcik  = true;
+  const bugun = uygulamaGunu();
+
+  if(UYG.veri.ayar.yapayZeka === false){
+    etkinlikTaslak = { tarih:"", saat:"", sure:0, baslik:metin.slice(0,80) };
+    etkinlikMesaj  = "Yapay zeka kapalı; tarihi ve saati elle gir.";
+    etkinlikCiz();
+    return;
+  }
+
+  UYG.etkinlikCozuluyor = true;
+  etkinlikCiz();
+  try{
+    const cevap = await fetch("api/parse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metin: metin, bugun: bugun })
+    });
+    if(cevap.status === 503){ UYG.veri.ayar.yapayZeka = false; kaydet(); throw new Error("anahtar-yok"); }
+    if(!cevap.ok){
+      const h = await cevap.json().catch(() => ({}));
+      const hata = new Error(h.mesaj || "Etkinlik çözümlenemedi."); hata.kullaniciya = true; throw hata;
+    }
+    const e = await cevap.json();
+
+    if(e.tarih && e.baslik){
+      etkinlikKaydet(e);
+      etkinlikTaslak = null;
+      etkinlikAcik = false;
+      etkinlikMesaj = "";
+    }else{
+      etkinlikTaslak = { tarih:e.tarih||"", saat:e.saat||"", sure:e.sure||0,
+                         baslik:e.baslik || metin.slice(0,80) };
+      etkinlikMesaj = "Eksik kalan yeri doldur.";
+    }
+  }catch(err){
+    console.warn("etkinlik çözümlenemedi", err);
+    etkinlikTaslak = { tarih:"", saat:"", sure:0, baslik:metin.slice(0,80) };
+    etkinlikMesaj = err.message === "anahtar-yok"
+      ? "Yapay zeka kapalı; tarihi ve saati elle gir."
+      : (err.kullaniciya ? err.message : "Çözümlenemedi; elle gir.");
+  }finally{
+    UYG.etkinlikCozuluyor = false;
+    etkinlikCiz();
+  }
+}
+
+function etkinlikCiz(){
+  const bugun = uygulamaGunu();
+  const liste = yaklasanEtkinlikler(bugun);
+
+  // Etkinlik yoksa ve giriş kapalıysa bölüm hiç görünmez (§3).
+  if(!liste.length && !etkinlikAcik){
+    $etkinlik.hidden = true;
+    $etkinlik.innerHTML = "";
+    return;
+  }
+  $etkinlik.hidden = false;
+
+  const satirlar = liste.map(e =>
+    '<li>' +
+      '<span class="e-tarih">' + tarihYaz(e.tarih) + (e.saat ? " · " + e.saat : "") + '</span>' +
+      '<span class="e-ad">' + kacir(e.baslik) + '</span>' +
+      '<button class="dg dg-sonuk" data-esil="' + e.id + '">sil</button>' +
+    '</li>').join("");
+
+  const taslak = etkinlikTaslak
+    ? '<div class="e-taslak">' +
+        '<input type="date" id="e-tarih" value="' + kacir(etkinlikTaslak.tarih) + '" aria-label="tarih">' +
+        '<input type="time" id="e-saat" value="' + kacir(etkinlikTaslak.saat) + '" aria-label="saat">' +
+        '<input type="text" id="e-ad" value="' + kacir(etkinlikTaslak.baslik) + '" aria-label="etkinlik" placeholder="ne">' +
+        '<button class="dg" id="e-onay">kaydet</button>' +
+        '<button class="dg dg-sonuk" id="e-vazgec">vazgeç</button>' +
+      '</div>'
+    : etkinlikAcik
+      ? '<div class="e-giris">' +
+          '<input type="text" id="e-metin" placeholder="12 Eylül saat 14\'te berber randevum var" ' +
+            'autocomplete="off" aria-label="etkinlik">' +
+          '<button class="dg" id="e-coz"' + (UYG.etkinlikCozuluyor ? " disabled" : "") + '>' +
+            (UYG.etkinlikCozuluyor ? "çözülüyor…" : "ekle") + '</button>' +
+        '</div>'
+      : "";
+
+  $etkinlik.innerHTML =
+    '<h2 class="bolum-bas">Yaklaşan</h2>' +
+    (liste.length ? '<ul class="etkinlik-liste">' + satirlar + '</ul>' : "") +
+    taslak +
+    (etkinlikMesaj ? '<p class="sonuk" style="margin:8px 0 0">' + kacir(etkinlikMesaj) + '</p>' : "");
+}
+
+$etkinlik.addEventListener("click", e => {
+  const d = e.target.closest("button");
+  if(!d) return;
+  if(d.dataset.esil) etkinlikSil(d.dataset.esil);
+  else if(d.id === "e-coz") etkinlikGirisGonder();
+  else if(d.id === "e-onay") etkinlikTaslakKaydet();
+  else if(d.id === "e-vazgec"){
+    etkinlikTaslak = null; etkinlikAcik = false; etkinlikMesaj = ""; etkinlikCiz();
+  }
+});
+$etkinlik.addEventListener("keydown", e => {
+  if(e.key !== "Enter") return;
+  if(e.target.id === "e-metin"){ e.preventDefault(); etkinlikGirisGonder(); }
+  else if(e.target.id === "e-ad" || e.target.id === "e-tarih" || e.target.id === "e-saat"){
+    e.preventDefault(); etkinlikTaslakKaydet();
+  }
+});
+
+function etkinlikGirisGonder(){
+  const alan = document.getElementById("e-metin");
+  if(!alan || !alan.value.trim()) return;
+  etkinlikCozumle(alan.value.trim());
+}
+function etkinlikTaslakKaydet(){
+  const t = document.getElementById("e-tarih");
+  const s = document.getElementById("e-saat");
+  const a = document.getElementById("e-ad");
+  if(!t || !a) return;
+  if(!t.value || !a.value.trim()){
+    etkinlikMesaj = "Tarih ve ad gerekli.";
+    etkinlikCiz();
+    return;
+  }
+  etkinlikKaydet({ tarih:t.value, saat:s ? s.value : "", sure:etkinlikTaslak.sure,
+                   baslik:a.value.trim() });
+  etkinlikTaslak = null;
+  etkinlikAcik = false;
+  etkinlikMesaj = "";
+  etkinlikCiz();
+}
+function etkinlikGirisAc(){
+  etkinlikAcik = true;
+  etkinlikTaslak = null;
+  etkinlikMesaj = "";
+  etkinlikCiz();
+  const alan = document.getElementById("e-metin");
+  if(alan) alan.focus();
+}
+
+/* ===============================================================
    §11 — Su takibi
    =============================================================== */
 
@@ -1118,6 +1333,7 @@ function planCiz(){
       '<button class="dg dg-sonuk" id="p-uret"' + (UYG.planUretiliyor || hak <= 0 ? " disabled" : "") + '>' +
         (maddeler.length ? "planı yeniden üret" : "plan üret") +
       '</button>' +
+      '<button class="dg dg-sonuk" id="p-etkinlik">etkinlik ekle</button>' +
       (hak < PLAN_SINIR && hak > 0 ? '<span class="sonuk">' + hak + ' hak kaldı</span>' : "") +
       (planMesaj ? '<span class="sonuk">' + kacir(planMesaj) + '</span>' : "") +
     '</div>';
@@ -1137,6 +1353,7 @@ $plan.addEventListener("click", e => {
   }
   else if(d.id === "p-ekle") planEkleGonder();
   else if(d.id === "p-uret") planUret(true);
+  else if(d.id === "p-etkinlik") etkinlikGirisAc();
 });
 
 $plan.addEventListener("change", e => {
@@ -1204,7 +1421,7 @@ function son14Gun(bugun){
   return liste;
 }
 
-/* §7 — bugünden itibaren yaklaşan etkinlikler. Arayüzü adım 6'da. */
+/* §7 — bugünden itibaren yaklaşan etkinlikler. */
 function yaklasanEtkinlikler(bugun){
   return (UYG.veri.etkinlikler || [])
     .filter(e => e && e.tarih >= bugun)
@@ -1338,6 +1555,7 @@ function baslat(){
   kazaCiz();
   suCiz();
   planCiz();
+  etkinlikCiz();
 
   // Plan üretimi vakitleri de gönderir (§6), o yüzden namazKur'dan sonra.
   namazKur().then(borcTara).then(planHazirla);
