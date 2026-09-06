@@ -738,6 +738,121 @@ await dene("anahtar yokken etkinlik elle eklenebilir", async () => {
   esit(u.durum.apiCagrilari.filter(c => c.ad === "parse").length, 0, "boşuna çağırmamalı");
 });
 
+/* ---------------------------------------------------------------
+   §9 / §12 — profil ve gün sonu değerlendirmesi
+   --------------------------------------------------------------- */
+
+/** Son 14 güne veri koy: her gün bir madde, işaret ve not. */
+function kayitliDepo(bitis, gunSayisi){
+  const gunler = {};
+  const g = (t, i) => ({
+    namaz: { sabah: i % 3 ? "vaktinde" : "kaza" },
+    su: 4 + (i % 5),
+    maddeler: [{ id:"m"+i, saat:"08:00", sure:10, baslik:"Kalk", tur:"uyku",
+                 gerekce:"", yapildi: i % 2 === 0, not: i % 2 ? "0"+(8+i%2)+":40'ta kalktım" : "" }]
+  });
+  for(let i = 1; i <= gunSayisi; i++){
+    const t = new Date(bitis + "T12:00:00");
+    t.setDate(t.getDate() - i);
+    const anh = t.toISOString().slice(0,10);
+    gunler[anh] = g(anh, i);
+  }
+  return { "ledger/v1": JSON.stringify({
+    surum:1, konum:null, vakitler:{}, gunler,
+    borc:{sabah:0,ogle:0,ikindi:0,aksam:0,yatsi:0}, islenmisVakitler:[],
+    sonKontrol: bitis, profil:"", etkinlikler:[], sohbet:[], ayar:{}
+  }) };
+}
+
+bolum("§12 — gün sonu değerlendirmesi");
+
+await dene("değerlendirme istenir, güne yazılır", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00", api:{
+    plan:SAHTE_PLAN,
+    review:{ metin:"Kod bloğunu üç gündür 09:30'da başlatıp yarıda bırakıyorsun. Yarın 10:30'da başlat." } } });
+  await u.ic.degerlendir();
+  icerir(u.veri().gunler["2026-09-06"].degerlendirme, "yarıda bırakıyorsun");
+  icerir(u.html("b-degerlendirme"), "Yarın 10:30");
+});
+
+await dene("değerlendirme isteğinde profil ve son 14 gün gider", async () => {
+  const depo = kayitliDepo("2026-09-06", 10);
+  const v = JSON.parse(depo["ledger/v1"]);
+  v.profil = "Koşuyu üç haftadır cumartesi hiç yapmadı.";
+  depo["ledger/v1"] = JSON.stringify(v);
+
+  const u = await ac({ simdi:"2026-09-06T22:00:00", depo,
+                       api:{ plan:SAHTE_PLAN, review:{ metin:"tamam" } } });
+  await u.ic.degerlendir();
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "review").pop();
+  esit(c.govde.tur, "gun");
+  icerir(c.govde.profil, "cumartesi");
+  dogru(c.govde.son14.length >= 5, "son 14 günün kaydı gitmeli");
+  dogru(c.govde.son14.some(g => g.maddeler.some(m => m.not)), "notlar gitmeli");
+});
+
+await dene("değerlendirme alınamazsa sessizce yutulmaz", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00",
+    api:{ plan:SAHTE_PLAN, review:{ durum:429, mesaj:"Ücretsiz katman kotası doldu, biraz sonra dene." } } });
+  await u.ic.degerlendir();
+  icerir(u.html("b-degerlendirme"), "kotası doldu");
+});
+
+bolum("§9 — uzun vadeli profil");
+
+await dene("profil güncellenir ve tarihi işaretlenir", async () => {
+  const depo = kayitliDepo("2026-09-06", 10);
+  const u = await ac({ simdi:"2026-09-06T22:00:00", depo, api:{
+    plan:SAHTE_PLAN,
+    review:{ profil:"08:00 alarmına rağmen ortalama 08:35'te kalkıyor. 08:30 daha gerçekçi." } } });
+  await u.ic.profilGuncelle();
+  icerir(u.veri().profil, "08:35");
+  esit(u.veri().profilGuncelleme, "2026-09-06");
+  icerir(u.html("b-ayar"), "08:35");
+});
+
+await dene("profil isteği tur:profil ile gider", async () => {
+  const depo = kayitliDepo("2026-09-06", 10);
+  const u = await ac({ simdi:"2026-09-06T22:00:00", depo,
+                       api:{ plan:SAHTE_PLAN, review:{ profil:"gözlem" } } });
+  await u.ic.profilGuncelle();
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "review").pop();
+  esit(c.govde.tur, "profil");
+});
+
+await dene("yeterli kayıt yoksa profil kendiliğinden denenmez", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00",
+                       api:{ plan:SAHTE_PLAN, review:{ profil:"gözlem" } } });
+  esit(u.ic.profilZamaniMi(), false);
+  esit(u.durum.apiCagrilari.filter(x => x.ad === "review").length, 0);
+});
+
+await dene("yeterli kayıt varsa haftada bir kendiliğinden güncellenir", async () => {
+  const depo = kayitliDepo("2026-09-06", 10);
+  const u = await ac({ simdi:"2026-09-06T22:00:00", depo,
+                       api:{ plan:SAHTE_PLAN, review:{ profil:"gözlem" } } });
+  esit(u.veri().profil, "gözlem", "açılışta güncellenmeli");
+
+  const y = await ac({ simdi:"2026-09-08T22:00:00", depo:Object.fromEntries(u.durum.depo),
+                       api:{ plan:SAHTE_PLAN, review:{ profil:"ikinci" } } });
+  esit(y.veri().profil, "gözlem", "iki gün sonra tekrar güncellenmemeli");
+
+  const z = await ac({ simdi:"2026-09-14T22:00:00", depo:Object.fromEntries(u.durum.depo),
+                       api:{ plan:SAHTE_PLAN, review:{ profil:"ikinci" } } });
+  esit(z.veri().profil, "ikinci", "sekiz gün sonra güncellenmeli");
+});
+
+await dene("profil plan üretimine girdi olur", async () => {
+  const depo = kayitliDepo("2026-09-06", 10);
+  const v = JSON.parse(depo["ledger/v1"]);
+  v.profil = "Kod bloğunu 10:30'da başlattığında bitiriyor.";
+  v.profilGuncelleme = "2026-09-06";
+  depo["ledger/v1"] = JSON.stringify(v);
+  const u = await ac({ simdi:"2026-09-07T09:00:00", depo, api:{ plan:SAHTE_PLAN } });
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "plan").pop();
+  icerir(c.govde.profil, "10:30");
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

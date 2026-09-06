@@ -257,6 +257,14 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .k-ad{ flex:0 0 auto; }
 .k-sayi{ flex:1 1 auto; color:var(--sonuk); }
 
+/* --- §9 / §12 Profil ve değerlendirme ------------------------ */
+.deger-metin,.profil-metin{
+  margin:0 0 14px;
+  white-space:pre-wrap;
+  line-height:1.55;
+}
+.profil-metin{ color:var(--sonuk); font-size:.95rem; }
+
 /* --- §7 Etkinlikler ------------------------------------------ */
 .etkinlik-liste{ list-style:none; margin:0; padding:0; }
 .etkinlik-liste > li{
@@ -925,6 +933,136 @@ $kaza.addEventListener("click", e => {
 });
 
 /* ===============================================================
+   §9 + §12 — profil ve gün sonu değerlendirmesi (api/review.js)
+   =============================================================== */
+
+const $deger = document.getElementById("b-degerlendirme");
+const $ayar  = document.getElementById("b-ayar");
+let degerMesaj = "", ayarMesaj = "";
+
+async function modelIste(uc, govde){
+  const cevap = await fetch("api/" + uc, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(govde)
+  });
+  if(cevap.status === 503){
+    UYG.veri.ayar.yapayZeka = false; kaydet();
+    throw new Error("anahtar-yok");
+  }
+  if(!cevap.ok){
+    const h = await cevap.json().catch(() => ({}));
+    const hata = new Error(h.mesaj || "Model cevap vermedi.");
+    hata.kullaniciya = true;
+    throw hata;
+  }
+  return cevap.json();
+}
+function hataMetni(e, varsayilan){
+  if(e.message === "anahtar-yok") return "Yapay zeka kapalı (GEMINI_API_KEY tanımlı değil).";
+  return e.kullaniciya ? e.message : varsayilan;
+}
+
+/* --- Gün sonu değerlendirmesi --------------------------------- */
+async function degerlendir(){
+  const tarih = uygulamaGunu();
+  UYG.degerBekliyor = true;
+  degerMesaj = "";
+  degerCiz();
+  try{
+    const c = await modelIste("review", {
+      tur: "gun",
+      tarih: tarih,
+      gunAdi: gunAdi(tarih),
+      profil: UYG.veri.profil || "",
+      son14: son14Gun(gunKaydir(tarih, 1))     // bugünü de kapsasın
+    });
+    const g = gunKaydi(tarih);
+    g.degerlendirme = c.metin || "";
+    kaydet();
+  }catch(e){
+    console.warn("değerlendirme alınamadı", e);
+    degerMesaj = hataMetni(e, "Değerlendirme alınamadı.");
+  }finally{
+    UYG.degerBekliyor = false;
+    degerCiz();
+  }
+}
+
+function degerCiz(){
+  const g = gunKaydi(uygulamaGunu());
+  $deger.innerHTML =
+    '<h2 class="bolum-bas">Gün sonu</h2>' +
+    (g.degerlendirme ? '<p class="deger-metin">' + kacir(g.degerlendirme) + '</p>' : "") +
+    '<div class="plan-alt">' +
+      '<button class="dg dg-sonuk" id="d-uret"' + (UYG.degerBekliyor ? " disabled" : "") + '>' +
+        (UYG.degerBekliyor ? "yazılıyor…" : (g.degerlendirme ? "yeniden değerlendir" : "günü değerlendir")) +
+      '</button>' +
+      (degerMesaj ? '<span class="sonuk">' + kacir(degerMesaj) + '</span>' : "") +
+    '</div>';
+}
+$deger.addEventListener("click", e => {
+  if(e.target.closest("#d-uret")) degerlendir();
+});
+
+/* --- §9 Uzun vadeli profil ------------------------------------ */
+const PROFIL_ARALIK = 7;                       // gün — haftada bir
+
+async function profilGuncelle(){
+  const tarih = uygulamaGunu();
+  UYG.profilBekliyor = true;
+  ayarMesaj = "";
+  ayarCiz();
+  try{
+    const c = await modelIste("review", {
+      tur: "profil",
+      profil: UYG.veri.profil || "",
+      son14: son14Gun(gunKaydir(tarih, 1))
+    });
+    if(c.profil){
+      UYG.veri.profil = c.profil;
+      UYG.veri.profilGuncelleme = tarih;
+      kaydet();
+    }
+  }catch(e){
+    console.warn("profil güncellenemedi", e);
+    ayarMesaj = hataMetni(e, "Profil güncellenemedi.");
+  }finally{
+    UYG.profilBekliyor = false;
+    ayarCiz();
+  }
+}
+
+/* Haftada bir kendiliğinden; yeterli kayıt yoksa hiç denenmez. */
+function profilZamaniMi(){
+  if(UYG.veri.ayar.yapayZeka === false) return false;
+  const tarih = son14Gun(uygulamaGunu());
+  if(tarih.length < 5) return false;            // ortada öğrenilecek bir şey yok
+  const son = UYG.veri.profilGuncelleme;
+  return !son || son <= gunKaydir(uygulamaGunu(), -PROFIL_ARALIK);
+}
+
+function ayarCiz(){
+  const p = UYG.veri.profil;
+  $ayar.innerHTML =
+    '<h2 class="bolum-bas">Profil<span class="yan">modelin sende gördüğü</span></h2>' +
+    (p ? '<p class="profil-metin">' + kacir(p) + '</p>'
+       : '<p class="sonuk" style="margin:0 0 12px">Henüz yeterli kayıt yok. ' +
+         'Maddelere not yazdıkça buraya davranışının özeti çıkar.</p>') +
+    '<div class="plan-alt">' +
+      '<button class="dg dg-sonuk" id="a-profil"' + (UYG.profilBekliyor ? " disabled" : "") + '>' +
+        (UYG.profilBekliyor ? "yazılıyor…" : (p ? "profili yenile" : "profili oluştur")) +
+      '</button>' +
+      (UYG.veri.profilGuncelleme
+        ? '<span class="sonuk">son: ' + tarihYaz(UYG.veri.profilGuncelleme) + '</span>' : "") +
+      (ayarMesaj ? '<span class="sonuk">' + kacir(ayarMesaj) + '</span>' : "") +
+    '</div>';
+}
+$ayar.addEventListener("click", e => {
+  if(e.target.closest("#a-profil")) profilGuncelle();
+});
+
+/* ===============================================================
    §7 — Etkinlikler
    =============================================================== */
 
@@ -1556,9 +1694,13 @@ function baslat(){
   suCiz();
   planCiz();
   etkinlikCiz();
+  degerCiz();
+  ayarCiz();
 
   // Plan üretimi vakitleri de gönderir (§6), o yüzden namazKur'dan sonra.
-  namazKur().then(borcTara).then(planHazirla);
+  namazKur().then(borcTara).then(planHazirla).then(() => {
+    if(profilZamaniMi()) profilGuncelle();          // haftada bir (§9)
+  });
   konumSor(false).then(k => {                   // izin gelirse konuma göre tazele
     if(k && k.kaynak === "cihaz") namazKur(true).then(borcTara);
   });

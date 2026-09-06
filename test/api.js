@@ -253,6 +253,66 @@ await dene("boş metin 400", async () => {
   esit(c.kod, 400);
 });
 
+/* --------------------------------------------------------------- */
+
+bolum("api/review — §12 gün sonu, §9 profil");
+
+delete require.cache[require.resolve("../api/review")];
+const review = require("../api/review");
+
+const REVIEW_GOVDE = {
+  tur: "gun", tarih: "2026-09-06", gunAdi: "Pazar",
+  profil: "Koşuyu üç haftadır cumartesi hiç yapmadı.",
+  son14: [{ tarih:"2026-09-05", gunAdi:"Cumartesi", namaz:"sabah:kaza", su:4,
+            maddeler:[{ saat:"09:30", baslik:"Kod bloğu", yapildi:false,
+                        not:"yarım saatte bıraktım" }] }]
+};
+
+await dene("gün değerlendirmesi düz metin ister, liste yasak", async () => {
+  const kayit = geminiTaklit(() => ({ metin:"Kod bloğunu yarıda bırakıyorsun. Yarın 10:30'da başlat." }));
+  const c = cevap();
+  await review(istek(REVIEW_GOVDE), c);
+  esit(c.kod, 200);
+  icerir(c.veri.metin, "10:30");
+  const g = kayit.istekler[0].govde;
+  dogru(!g.generationConfig.responseSchema, "review şema kullanmaz, düz metin döner");
+  const metin = g.contents[0].parts[0].text;
+  icerir(metin, "En fazla 120 kelime");
+  icerir(metin, "Liste yapma");
+  icerir(metin, "yarım saatte bıraktım");     // notlar girdi
+  icerir(metin, "cumartesi");                 // profil girdi
+});
+
+await dene("120 kelimeyi aşan cevap kesilir", async () => {
+  const uzun = Array.from({ length: 200 }, (_, i) => "kelime" + i).join(" ");
+  geminiTaklit(() => ({ metin: uzun }));
+  const c = cevap();
+  await review(istek(REVIEW_GOVDE), c);
+  const adet = c.veri.metin.split(/\s+/).length;
+  dogru(adet <= 121, "120 kelimeyle sınırlı olmalı, geldi: " + adet);
+});
+
+await dene("profil modu §9'un istemini kullanır ve 400 kelimeyle sınırlı", async () => {
+  const uzun = Array.from({ length: 600 }, (_, i) => "gozlem" + i).join(" ");
+  const kayit = geminiTaklit(() => ({ metin: uzun }));
+  const c = cevap();
+  await review(istek(Object.assign({}, REVIEW_GOVDE, { tur:"profil" })), c);
+  esit(c.kod, 200);
+  dogru(c.veri.profil, "profil alanı dönmeli");
+  dogru(c.veri.profil.split(/\s+/).length <= 401, "400 kelimeyle sınırlı");
+  const metin = kayit.istekler[0].govde.contents[0].parts[0].text;
+  icerir(metin, "Sadece kayıtta kanıtı olan gözlemleri yaz. Tahmin yürütme.");
+  icerir(metin, "En fazla 400 kelime.");
+  icerir(metin, "gözlemlenmiş davranışıdır, hedefleri değil");
+});
+
+await dene("model boş dönerse 502", async () => {
+  geminiTaklit(() => ({ metin: "   " }));
+  const c = cevap();
+  await review(istek(REVIEW_GOVDE), c);
+  esit(c.kod, 502);
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 
