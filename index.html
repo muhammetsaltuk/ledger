@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ledger</title>
+<meta name="description" content="Namaz vakitleri, kaza borcu ve günlük düzen.">
+<meta name="theme-color" content="#0E1318">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ledger">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..600&amp;family=IBM+Plex+Sans:wght@400;500&amp;display=swap">
+
+<style>
+/* ---------------------------------------------------------------
+   §13 — Görsel tasarım. Bu değerler karardır, tercih değil.
+   --------------------------------------------------------------- */
+:root{
+  --zemin:#0E1318;
+  --yuzey:#171D24;
+  --cizgi:#262F39;
+  --metin:#E4E7E4;
+  --sonuk:#7C8A94;
+  --tamam:#6E9C7A;
+  --eksik:#A8615C;
+
+  /* Aktif namaz vaktine göre değişen tek vurgu (§13). */
+  --vakit:#4A5C8C;
+
+  --bas:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif;
+  --gov:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
+
+  --en:520px;
+  --bosluk:20px;
+  --gecis:800ms;
+}
+@media (prefers-reduced-motion: reduce){
+  :root{ --gecis:0ms; }
+  *,*::before,*::after{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+html{ background:var(--zemin); -webkit-text-size-adjust:100%; }
+body{
+  background:var(--zemin);
+  color:var(--metin);
+  font-family:var(--gov);
+  font-size:1rem;
+  line-height:1.5;
+  font-weight:400;
+  overflow-x:hidden;
+  /* Rakamlar hizalı dursun, geri sayım titremesin (§13) */
+  font-variant-numeric:tabular-nums;
+}
+
+h1,h2,h3{ font-family:var(--bas); font-weight:500; margin:0; }
+
+/* --- Düzen: tek sütun, sola hizalı, en fazla 520px (§13) --- */
+.kabuk{
+  max-width:var(--en);
+  margin:0 auto;
+  padding:
+    calc(env(safe-area-inset-top) + 18px)
+    var(--bosluk)
+    calc(env(safe-area-inset-bottom) + 56px);
+}
+
+/* Bölümler karta bölünmez; üstten ince çizgiyle ayrılır (§13) */
+.bolum{
+  padding:22px 0;
+  border-top:1px solid var(--cizgi);
+}
+.bolum:first-of-type{ border-top:0; padding-top:4px; }
+.bolum[hidden]{ display:none; }
+
+.bolum-bas{
+  font-family:var(--bas);
+  font-size:1.15rem;
+  font-weight:500;
+  margin:0 0 14px;
+}
+.bolum-bas .yan{
+  font-family:var(--gov);
+  font-size:.85rem;
+  font-weight:400;
+  color:var(--sonuk);
+  margin-left:8px;
+}
+
+.sonuk{ color:var(--sonuk); font-size:.85rem; }
+
+/* --- Düğmeler: köşe yarıçapı bir karardır, tam yuvarlak (§13) --- */
+button{
+  font-family:inherit;
+  font-size:inherit;
+  color:inherit;
+  background:none;
+  border:0;
+  padding:0;
+  cursor:pointer;
+}
+.dg{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-height:38px;
+  padding:0 16px;
+  border-radius:999px;
+  border:1px solid var(--cizgi);
+  background:transparent;
+  color:var(--metin);
+  font-size:.9rem;
+  line-height:1;
+  transition:border-color 160ms ease,color 160ms ease;
+}
+.dg:hover{ border-color:var(--sonuk); }
+.dg-bir{ border-color:var(--vakit); }
+.dg-sonuk{ color:var(--sonuk); font-size:.85rem; }
+.dg[disabled]{ opacity:.45; cursor:default; }
+
+:where(a,button,input,textarea,summary,[tabindex]):focus-visible{
+  outline:2px solid var(--vakit);
+  outline-offset:2px;
+}
+
+input,textarea{
+  font-family:inherit;
+  font-size:1rem;
+  color:var(--metin);
+  background:var(--yuzey);
+  border:1px solid var(--cizgi);
+  border-radius:0;
+  padding:9px 11px;
+  width:100%;
+}
+input::placeholder,textarea::placeholder{ color:var(--sonuk); }
+input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
+
+/* --- Ray: yalnızca plan ve namaz listelerinde (§13) --- */
+.ray{
+  list-style:none;
+  margin:0;
+  padding:0 0 0 18px;
+  border-left:1px solid var(--cizgi);
+}
+.ray > li{ position:relative; }
+.ray > li::before{
+  content:"";
+  position:absolute;
+  left:-18px;
+  top:var(--tirnak,17px);
+  width:11px;
+  height:1px;
+  background:var(--cizgi);
+}
+
+.yukleniyor{ color:var(--sonuk); font-size:.85rem; }
+
+.gizli{
+  position:absolute; width:1px; height:1px;
+  padding:0; margin:-1px; overflow:hidden;
+  clip:rect(0 0 0 0); white-space:nowrap; border:0;
+}
+</style>
+</head>
+<body>
+<main class="kabuk">
+
+  <!-- §3.1 Namaz vakitleri — en üstte, her zaman görünür -->
+  <section id="b-namaz" class="bolum" aria-label="Namaz vakitleri">
+    <p class="yukleniyor">Vakitler alınıyor…</p>
+  </section>
+
+  <!-- §3.2 Kaza borcu — borç yoksa bölümün tamamı gizli (§5) -->
+  <section id="b-kaza" class="bolum" aria-label="Kaza borcu" hidden></section>
+
+  <!-- §3.3 Su -->
+  <section id="b-su" class="bolum" aria-label="Su"></section>
+
+  <!-- §3.4 Bugünün planı -->
+  <section id="b-plan" class="bolum" aria-label="Bugünün planı"></section>
+
+  <!-- §3.5 Yaklaşan etkinlikler -->
+  <section id="b-etkinlik" class="bolum" aria-label="Yaklaşan etkinlikler" hidden></section>
+
+  <!-- §3.6 Sohbet -->
+  <section id="b-sohbet" class="bolum" aria-label="Sohbet"></section>
+
+  <!-- §3.7 Gün sonu değerlendirmesi -->
+  <section id="b-degerlendirme" class="bolum" aria-label="Gün sonu değerlendirmesi"></section>
+
+  <!-- Ayarlar -->
+  <section id="b-ayar" class="bolum" aria-label="Ayarlar"></section>
+
+</main>
+
+<script>
+"use strict";
+/* ===============================================================
+   Ledger — tek dosya uygulama. Veri telefonda kalır (§2).
+   =============================================================== */
+
+const UYG = {};
+window.__uyg = UYG;
+
+/* --- Depolama ------------------------------------------------- */
+const ANAHTAR = "ledger/v1";
+
+const VARSAYILAN = {
+  surum: 1,
+  konum: null,                                              // {lat,lng,zaman}
+  gunler: {},                                               // "YYYY-MM-DD" -> gün kaydı
+  borc: { sabah:0, ogle:0, ikindi:0, aksam:0, yatsi:0 },    // §5
+  islenmisVakitler: [],                                     // §5 — "tarih|vakit"
+  sonKontrol: null,
+  profil: "",                                               // §9
+  etkinlikler: [],                                          // §7
+  sohbet: [],                                               // §10
+  ayar: {}
+};
+
+function yukle(){
+  try{
+    const ham = localStorage.getItem(ANAHTAR);
+    if(!ham) return structuredClone(VARSAYILAN);
+    return Object.assign(structuredClone(VARSAYILAN), JSON.parse(ham));
+  }catch(e){
+    console.warn("Depo okunamadı, sıfırdan başlanıyor.", e);
+    return structuredClone(VARSAYILAN);
+  }
+}
+function kaydet(){
+  try{ localStorage.setItem(ANAHTAR, JSON.stringify(UYG.veri)); }
+  catch(e){ console.warn("Depoya yazılamadı.", e); }
+}
+
+/* --- Tarih yardımcıları --------------------------------------- */
+const iki = n => String(n).padStart(2,"0");
+const tarihAnahtar = d => d.getFullYear()+"-"+iki(d.getMonth()+1)+"-"+iki(d.getDate());
+
+/* §4 Gece kayması: yerel saat 04:00'ten önceyse hâlâ dünü gösteririz. */
+const GECE_SINIRI = 4;
+function uygulamaGunu(simdi){
+  const d = new Date(simdi || Date.now());
+  if(d.getHours() < GECE_SINIRI) d.setDate(d.getDate() - 1);
+  return tarihAnahtar(d);
+}
+
+/* --- Vurgu rengi (§13) ---------------------------------------- */
+const VAKIT_RENK = {
+  sabah:"#6E7FB8", ogle:"#E8C468", ikindi:"#E09A4F", aksam:"#D46A5C", yatsi:"#4A5C8C"
+};
+let sonRenk = null;
+function vurguyuAyarla(vakitAnahtar){
+  const renk = VAKIT_RENK[vakitAnahtar] || VAKIT_RENK.yatsi;
+  if(renk === sonRenk) return;
+  document.documentElement.style.setProperty("--vakit", renk);
+  sonRenk = renk;
+}
+
+/* --- Açılış --------------------------------------------------- */
+function baslat(){
+  UYG.veri  = yukle();
+  UYG.bugun = uygulamaGunu();
+  vurguyuAyarla("yatsi");
+  console.info("Ledger hazır —", UYG.bugun);
+}
+baslat();
+
+/* --- Servis işçisi -------------------------------------------- */
+if("serviceWorker" in navigator){
+  addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").catch(e => console.warn("sw kaydedilemedi", e));
+  });
+}
+</script>
+</body>
+</html>
