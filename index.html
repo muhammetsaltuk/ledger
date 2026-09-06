@@ -994,7 +994,8 @@ function yeniId(){
   return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 }
 function saatSirala(maddeler){
-  return maddeler.slice().sort((a,b) => String(a.saat||"").localeCompare(String(b.saat||"")));
+  // Saatsiz maddeler sona: boş dize aksi halde 08:00'in önüne geçer.
+  return maddeler.slice().sort((a,b) => (a.saat || "99:99").localeCompare(b.saat || "99:99"));
 }
 function maddeBul(id){
   const g = gunKaydi(uygulamaGunu());
@@ -1094,18 +1095,31 @@ function planCiz(){
   const gununNotu = g.gununNotu
     ? '<p class="sonuk" style="margin:0 0 14px">' + kacir(g.gununNotu) + '</p>' : "";
 
+  const kaynak = g.planKaynak === "kopya" ? "dünün planından"
+               : g.planKaynak === "model" ? "" : "";
+  const hak = planHakki(bugun);
+
   $plan.innerHTML =
     '<h2 class="bolum-bas">Bugün' +
-      (g.planKaynak === "kopya" ? '<span class="yan">dünün planından</span>' : "") +
+      (kaynak ? '<span class="yan">' + kaynak + '</span>' : "") +
     '</h2>' +
     gununNotu +
-    (maddeler.length
-      ? '<ul class="ray plan-liste">' + satirlar + '</ul>'
-      : '<p class="plan-bos">Bugün için madde yok.</p>') +
+    (UYG.planUretiliyor
+      ? '<p class="plan-bos">Plan üretiliyor…</p>'
+      : maddeler.length
+        ? '<ul class="ray plan-liste">' + satirlar + '</ul>'
+        : '<p class="plan-bos">Bugün için madde yok.</p>') +
     '<div class="plan-ekle">' +
       '<input type="time" id="p-saat" aria-label="saat">' +
       '<input type="text" id="p-baslik" aria-label="madde" placeholder="madde ekle" autocomplete="off">' +
       '<button class="dg" id="p-ekle">ekle</button>' +
+    '</div>' +
+    '<div class="plan-alt">' +
+      '<button class="dg dg-sonuk" id="p-uret"' + (UYG.planUretiliyor || hak <= 0 ? " disabled" : "") + '>' +
+        (maddeler.length ? "planı yeniden üret" : "plan üret") +
+      '</button>' +
+      (hak < PLAN_SINIR && hak > 0 ? '<span class="sonuk">' + hak + ' hak kaldı</span>' : "") +
+      (planMesaj ? '<span class="sonuk">' + kacir(planMesaj) + '</span>' : "") +
     '</div>';
 }
 
@@ -1122,6 +1136,7 @@ $plan.addEventListener("click", e => {
     if(alan) alan.focus();
   }
   else if(d.id === "p-ekle") planEkleGonder();
+  else if(d.id === "p-uret") planUret(true);
 });
 
 $plan.addEventListener("change", e => {
@@ -1148,10 +1163,170 @@ function planEkleGonder(){
   if(yeni) yeni.focus();
 }
 
-function planHazirla(){
-  const g = gunKaydi(uygulamaGunu());
-  if(!g.maddeler || !g.maddeler.length) planKopyala();   // boş ekran gösterme (§6)
+/* ===============================================================
+   §6 + §12 — plan üretimi (api/plan.js)
+   =============================================================== */
+
+/* §1 — kurs saatleri sabittir. 0 pazar … 6 cumartesi. */
+const KURS = {
+  1: { bas:"18:00", bit:"22:00" },   // pazartesi
+  2: { bas:"19:00", bit:"22:00" },   // salı
+  3: { bas:"18:00", bit:"22:00" },   // çarşamba
+  4: { bas:"19:00", bit:"22:00" }    // perşembe
+};
+const GUN_ADI = ["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
+
+function gunNesnesi(tarih){
+  const p = tarih.split("-").map(Number);
+  return new Date(p[0], p[1]-1, p[2]);
+}
+function kursSaati(tarih){ return KURS[gunNesnesi(tarih).getDay()] || null; }
+function gunAdi(tarih){ return GUN_ADI[gunNesnesi(tarih).getDay()]; }
+
+/* §9 — kısa vadeli katman: son 14 günün ham kaydı, notlarıyla birlikte. */
+function son14Gun(bugun){
+  const liste = [];
+  for(let i = 14; i >= 1; i--){
+    const t = gunKaydir(bugun, -i);
+    const g = UYG.veri.gunler[t];
+    if(!g) continue;
+    const namaz = Object.keys(g.namaz || {}).map(k => k + ":" + g.namaz[k]).join(" ");
+    liste.push({
+      tarih: t,
+      gunAdi: gunAdi(t),
+      namaz: namaz || "işaretlenmemiş",
+      su: g.su || 0,
+      maddeler: (g.maddeler || []).map(m => ({
+        saat: m.saat, baslik: m.baslik, yapildi: !!m.yapildi, not: m.not || ""
+      }))
+    });
+  }
+  return liste;
+}
+
+/* §7 — bugünden itibaren yaklaşan etkinlikler. Arayüzü adım 6'da. */
+function yaklasanEtkinlikler(bugun){
+  return (UYG.veri.etkinlikler || [])
+    .filter(e => e && e.tarih >= bugun)
+    .sort((a,b) => (a.tarih + (a.saat||"")).localeCompare(b.tarih + (b.saat||"")))
+    .slice(0, 10);
+}
+
+function bugununVakitleri(){
+  const d = UYG.namaz && UYG.namaz.liste;
+  if(!d) return null;
+  const o = {};
+  d.forEach(v => { o[v.ad] = ss(v.bas) + "–" + ss(v.bit); });
+  return o;
+}
+
+/* §12 — aynı gün için plan üretimi günde en fazla üç kez.
+   Sunucu durumsuz olduğu için sayaç istemcide tutulur. */
+const PLAN_SINIR = 3;
+function planHakki(tarih){
+  const s = UYG.veri.ayar.planSayaci || {};
+  return PLAN_SINIR - (s[tarih] || 0);
+}
+function planHakkiDus(tarih){
+  const s = UYG.veri.ayar.planSayaci || (UYG.veri.ayar.planSayaci = {});
+  s[tarih] = (s[tarih] || 0) + 1;
+  for(const k of Object.keys(s)) if(k < gunKaydir(tarih, -7)) delete s[k];
+}
+
+let planMesaj = "";
+
+async function planUret(elle){
+  const tarih = uygulamaGunu();
+  if(planHakki(tarih) <= 0){
+    planMesaj = "Bugün için plan üretme hakkı doldu (günde " + PLAN_SINIR + " kez).";
+    planCiz();
+    return false;
+  }
+
+  UYG.planUretiliyor = true;
+  planMesaj = "";
   planCiz();
+
+  try{
+    const cevap = await fetch("api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tarih: tarih,
+        gunAdi: gunAdi(tarih),
+        kurs: kursSaati(tarih),
+        vakitler: bugununVakitleri(),
+        etkinlikler: yaklasanEtkinlikler(tarih),
+        profil: UYG.veri.profil || "",
+        son14: son14Gun(tarih),
+        borc: UYG.veri.borc
+      })
+    });
+
+    if(cevap.status === 503){                       // anahtar yok (§12)
+      UYG.veri.ayar.yapayZeka = false;
+      kaydet();
+      throw new Error("anahtar-yok");
+    }
+    if(!cevap.ok){
+      const h = await cevap.json().catch(() => ({}));
+      const hata = new Error(h.mesaj || "Plan üretilemedi.");
+      hata.kullaniciya = true;                      // sunucunun kendi cümlesi
+      throw hata;
+    }
+
+    const plan = await cevap.json();
+    planHakkiDus(tarih);
+
+    const g = gunKaydi(tarih);
+    g.maddeler = (plan.maddeler || []).map(m => ({
+      id: yeniId(),
+      saat: m.saat || "", sure: m.sure || null,
+      baslik: m.baslik, tur: m.tur || "bos", gerekce: m.gerekce || "",
+      yapildi: false, not: ""
+    }));
+    g.gununNotu = plan.gununNotu || "";
+    g.planKaynak = "model";
+    UYG.veri.ayar.yapayZeka = true;
+    kaydet();
+    return true;
+
+  }catch(e){
+    console.warn("plan üretilemedi", e);
+
+    // Nedeni her durumda koru: yedeğe düşerken kota/anahtar mesajını yutmayalım.
+    const neden = e.message === "anahtar-yok"
+      ? "Yapay zeka kapalı (GEMINI_API_KEY tanımlı değil)."
+      : (e.kullaniciya ? e.message : "Plan üretilemedi.");
+
+    // Ağ yoksa veya model cevap vermezse son planı kopyala; boş ekran yok (§6).
+    const g = gunKaydi(tarih);
+    if(!g.maddeler || !g.maddeler.length){
+      planMesaj = planKopyala()
+        ? neden + " Dünün planı kopyalandı."
+        : neden + " Maddeleri elle ekleyebilirsin.";
+    }else if(elle){
+      planMesaj = neden;
+    }
+    return false;
+
+  }finally{
+    UYG.planUretiliyor = false;
+    planCiz();
+  }
+}
+
+function planHazirla(){
+  const tarih = uygulamaGunu();
+  const g = gunKaydi(tarih);
+  planCiz();
+  if(g.maddeler && g.maddeler.length) return;       // bugünün planı zaten var
+  if(UYG.veri.ayar.yapayZeka === false){            // anahtar yok, denemeyelim
+    if(planKopyala()) planMesaj = "Dünün planı kopyalandı.";
+    planCiz();
+    return;
+  }
+  planUret(false);
 }
 
 /* --- Açılış --------------------------------------------------- */
@@ -1162,8 +1337,10 @@ function baslat(){
 
   kazaCiz();
   suCiz();
-  planHazirla();
-  namazKur().then(borcTara);                    // önce elde olanla çiz, sonra tara
+  planCiz();
+
+  // Plan üretimi vakitleri de gönderir (§6), o yüzden namazKur'dan sonra.
+  namazKur().then(borcTara).then(planHazirla);
   konumSor(false).then(k => {                   // izin gelirse konuma göre tazele
     if(k && k.kaynak === "cihaz") namazKur(true).then(borcTara);
   });

@@ -119,10 +119,25 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Geliştirme
 
-Derleme yok. Yerelde:
+Derleme yok, bağımlılık yok. Yerelde:
 
 ```bash
 npx serve .          # veya: python -m http.server
 ```
 
-`api/*` fonksiyonları yerelde çalıştırmak için `npx vercel dev` gerekir.
+`api/*` fonksiyonlarını yerelde çalıştırmak için `npx vercel dev` gerekir.
+
+### Test
+
+```bash
+node test/hepsi.js   # uygulama: §14 kabul kriterleri
+node test/api.js     # api/ fonksiyonları
+```
+
+`test/kosum.js` index.html içindeki betiği sahte bir DOM'da çalıştırır; saati
+ileri alabildiği için "üç gün sonra açılınca borç doğru mu", "00:30'da
+işaretlenen yatsı hangi güne yazılıyor" gibi şeyler fiilen denenebiliyor.
+Ağ isteği atılmaz: aladhan ve `api/` uydurulur. Tarayıcı gerekmez.
+
+Şartnamede test istenmiyordu; §0'ın "çalıştır, tarihi ileri al, sınır
+durumlarını dene" maddesini kodu okuyarak yerine getirmenin yolu yoktu.

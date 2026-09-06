@@ -83,6 +83,7 @@ function kur(se = {}){
   const durum = {
     simdi: new Date(se.simdi || "2026-09-06T07:30:00"),
     istekler: [],
+    apiCagrilari: [],
     depo: new Map(Object.entries(se.depo || {})),
     zamanlayicilar: []
   };
@@ -152,9 +153,24 @@ function kur(se = {}){
         }
       }
     },
-    fetch(url){
+    fetch(url, secenek){
       durum.istekler.push(url);
       if(se.ag === false) return Promise.reject(new Error("ağ yok"));
+
+      /* Kendi uç noktalarımız. Varsayılan: anahtar yok — uygulamanın yapay zeka
+         olmadan da çalıştığını her testte doğrulamış oluyoruz (§12). */
+      if(String(url).indexOf("api/") === 0){
+        const ad = String(url).slice(4);
+        durum.apiCagrilari.push({ ad, govde: secenek && JSON.parse(secenek.body || "{}") });
+        const sahte = se.api && se.api[ad];
+        if(!sahte)
+          return Promise.resolve({ ok:false, status:503,
+            json: async () => ({ hata:"anahtar-yok" }) });
+        if(sahte.durum && sahte.durum !== 200)
+          return Promise.resolve({ ok:false, status:sahte.durum,
+            json: async () => ({ hata:"model", mesaj:sahte.mesaj || "hata" }) });
+        return Promise.resolve({ ok:true, status:200, json: async () => sahte });
+      }
       const ekle = t => {
         const o = {};
         for(const k in t) o[k] = t[k] + " (+03)";       // gerçek API biçimi
@@ -194,13 +210,15 @@ function kur(se = {}){
     "aktifAralik","siradakiAralik","vakitGetir","namazKur","namazCiz","namazIsaretle",
     "gunKaydi","sureMetni","konumuKullan","konumSor","kaydet","yukle","VAKITLER",
     "borcTara","kazaCiz","toplamBorc","islenmisMi","borcDegistir","vakitleriHazirla",
-    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","saatSirala","TURLER"
+    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR"
   ].join(",") + " };", ctx, { filename:"index.html<script>" });
 
   return {
     ctx,
     ic: ctx.__IC,
     durum,
+    /** Yalnız aladhan istekleri. */
+    aladhan(){ return durum.istekler.filter(i => i.indexOf("aladhan") !== -1); },
     /** Sahte saati ilerlet. */
     zamanAtla(yeni){ durum.simdi = new Date(yeni); },
     /** Bir elemanın son çizilen HTML'i. */

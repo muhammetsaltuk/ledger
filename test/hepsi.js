@@ -185,7 +185,7 @@ await dene("ağ yokken önbellekteki vakitlerle açılır, çökmez", async () =
   const h = u.html("b-namaz");
   icerir(h, "İkindi");
   icermez(h, "alınamadı");
-  esit(u.durum.istekler.length, 0, "önbellek varken ağa çıkmamalı");
+  esit(u.aladhan().length, 0, "önbellek varken ağa çıkmamalı");
 });
 
 await dene("ağ da önbellek de yokken hata görünür, sessizce yutulmaz", async () => {
@@ -207,7 +207,7 @@ await dene('"05:01 (+03)" biçimi ilk boşluktan bölünür', async () => {
 await dene("method=13 (Diyanet) ile sorgulanır", async () => {
   const u = kur({ simdi:"2026-09-06T14:00:00" });
   for(let i = 0; i < 8; i++) await u.bekle();
-  dogru(u.durum.istekler.every(i => i.includes("method=13")), "her istekte method=13 olmalı");
+  dogru(u.aladhan().every(i => i.includes("method=13")), "her istekte method=13 olmalı");
 });
 
 await dene("süre metni: 1 sa 28 dk", async () => {
@@ -222,6 +222,9 @@ await dene("süre metni: 1 sa 28 dk", async () => {
    --------------------------------------------------------------- */
 
 const bekleCok = async (u, n) => { for(let i = 0; i < (n || 40); i++) await u.bekle(); };
+
+/** Oturumu aç ve açılıştaki bütün eşzamansız işler bitene kadar bekle. */
+const ac = async se => { const u = kur(se); await bekleCok(u, 20); return u; };
 
 /** Bir oturum aç, işi bitir, localStorage içeriğini döndür (sonraki oturuma girdi). */
 async function otur(simdi, depo, se){
@@ -288,8 +291,8 @@ await dene("60 günden eskisine bakılmaz", async () => {
 await dene("geriye dönük tarama gün gün değil ay ay sorar", async () => {
   const depo = await ilkKurulum();
   const o = await otur("2026-09-10T14:00:00", depo, {});
-  const takvim = o.u.durum.istekler.filter(i => i.includes("/calendar/")).length;
-  const gunluk = o.u.durum.istekler.filter(i => i.includes("/timings/")).length;
+  const takvim = o.u.aladhan().filter(i => i.includes("/calendar/")).length;
+  const gunluk = o.u.aladhan().filter(i => i.includes("/timings/")).length;
   dogru(takvim >= 1, "takvim uç noktası kullanılmalı");
   dogru(gunluk <= 3, "gün gün sorgu 3'ü geçmemeli, geldi: " + gunluk);
 });
@@ -419,7 +422,7 @@ await dene("şerit on bölmeli, hedefte kutlama yok", async () => {
 bolum("§6 — plan: elle madde, işaretleme, not");
 
 await dene("madde eklenir, saate göre sıralanır", async () => {
-  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
   u.ic.maddeEkle("09:30", "Kod bloğu");
   u.ic.maddeEkle("08:00", "Kalk, bir bardak su");
   const g = u.veri().gunler["2026-09-06"].maddeler;
@@ -429,7 +432,7 @@ await dene("madde eklenir, saate göre sıralanır", async () => {
 });
 
 await dene("madde işaretlenir ve geri alınır", async () => {
-  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
   u.ic.maddeEkle("08:00", "Kalk");
   const id = u.veri().gunler["2026-09-06"].maddeler[0].id;
   u.ic.maddeIsaretle(id);
@@ -440,7 +443,7 @@ await dene("madde işaretlenir ve geri alınır", async () => {
 });
 
 await dene("maddeye not yazılır ve saklanır", async () => {
-  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
   u.ic.maddeEkle("08:00", "Kalk, bir bardak su");
   const id = u.veri().gunler["2026-09-06"].maddeler[0].id;
   u.ic.maddeNot(id, "Kalktım ama suyu içmedim");
@@ -450,7 +453,7 @@ await dene("maddeye not yazılır ve saklanır", async () => {
 });
 
 await dene("madde silinir", async () => {
-  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
   u.ic.maddeEkle("08:00", "Kalk");
   u.ic.maddeEkle("09:00", "Koşu");
   const id = u.veri().gunler["2026-09-06"].maddeler[0].id;
@@ -460,7 +463,7 @@ await dene("madde silinir", async () => {
 });
 
 await dene("not ve işaret HTML'e kaçırılarak yazılır", async () => {
-  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
   u.ic.maddeEkle("08:00", '<img src=x onerror="alert(1)">');
   icermez(u.html("b-plan"), "<img src=x");
   icerir(u.html("b-plan"), "&lt;img");
@@ -469,7 +472,7 @@ await dene("not ve işaret HTML'e kaçırılarak yazılır", async () => {
 bolum("§6 — plan boş ekran göstermez");
 
 await dene("plan yoksa son planlı gün kopyalanır, işaretler sıfırlanır", async () => {
-  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
   u.ic.maddeEkle("08:00", "Kalk");
   u.ic.maddeEkle("22:00", "Kitap");
   const id = u.veri().gunler["2026-09-06"].maddeler[0].id;
@@ -489,7 +492,7 @@ await dene("plan yoksa son planlı gün kopyalanır, işaretler sıfırlanır", 
 });
 
 await dene("hiç plan yoksa boş ama kullanılabilir ekran çıkar", async () => {
-  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
   await bekleCok(u, 10);
   const h = u.html("b-plan");
   icerir(h, "Bugün için madde yok");
@@ -497,7 +500,7 @@ await dene("hiç plan yoksa boş ama kullanılabilir ekran çıkar", async () =>
 });
 
 await dene("bugünün planı varsa kopyalanmaz", async () => {
-  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
   u.ic.maddeEkle("08:00", "Kalk");
   const depo = Object.fromEntries(u.durum.depo);
   const y = kur({ simdi:"2026-09-06T20:00:00", depo });
@@ -511,6 +514,138 @@ await dene("plan gece kaymasına uyar: 01:00'de eklenen madde dünün planına g
   u.ic.maddeEkle("23:30", "Kitap");
   esit(u.veri().gunler["2026-09-06"].maddeler.length, 1);
   esit(u.veri().gunler["2026-09-07"], undefined);
+});
+
+/* ---------------------------------------------------------------
+   §6 + §12 — plan üretimi
+   --------------------------------------------------------------- */
+
+const SAHTE_PLAN = {
+  tarih: "2026-09-06",
+  maddeler: [
+    { saat:"08:00", sure:10,  baslik:"Kalk, perdeyi aç, bir bardak su", tur:"uyku",
+      gerekce:"Dün 08:40'ta kalkmışsın" },
+    { saat:"08:20", sure:35,  baslik:"Ev sporu", tur:"spor", gerekce:"" },
+    { saat:"09:05", sure:30,  baslik:"Kahvaltı", tur:"yemek", gerekce:"" }
+  ],
+  gununNotu: "Pazar, kurs yok."
+};
+
+bolum("§6 — plan üretimi");
+
+await dene("plan yoksa açılışta model çağrılır ve plan yazılır", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00", api:{ plan:SAHTE_PLAN } });
+  const g = u.veri().gunler["2026-09-06"];
+  esit(g.maddeler.length, 3);
+  esit(g.planKaynak, "model");
+  esit(g.gununNotu, "Pazar, kurs yok.");
+  dogru(g.maddeler[0].id, "her maddeye id verilmeli");
+  esit(g.maddeler[0].yapildi, false);
+});
+
+await dene("modele giden gövde: vakitler, borç, profil, son 14 gün, kurs", async () => {
+  const ilk = await ac({ simdi:"2026-09-05T21:00:00" });
+  ilk.ic.maddeEkle("08:00", "Kalk");
+  ilk.ic.maddeNot(ilk.veri().gunler["2026-09-05"].maddeler[0].id, "geç kalktım");
+  const v = JSON.parse(ilk.durum.depo.get("ledger/v1"));
+  v.profil = "08:00 alarmına rağmen ortalama 08:35'te kalkıyor.";
+  v.borc = { sabah:0, ogle:0, ikindi:2, aksam:0, yatsi:1 };
+  delete v.ayar.yapayZeka;                     // anahtar bu sefer var sayılsın
+  const depo = { "ledger/v1": JSON.stringify(v) };
+
+  const u = await ac({ simdi:"2026-09-07T09:00:00", depo, api:{ plan:SAHTE_PLAN } });
+  const cagri = u.durum.apiCagrilari.find(c => c.ad === "plan");
+  dogru(cagri, "api/plan çağrılmalı");
+  const b = cagri.govde;
+  esit(b.tarih, "2026-09-07");
+  esit(b.gunAdi, "Pazartesi");
+  esit(b.kurs.bas, "18:00", "pazartesi kursu 18:00");
+  dogru(b.vakitler && b.vakitler["Sabah"], "namaz vakitleri gitmeli");
+  dogru(b.borc && b.borc.ikindi >= 2, "kaza borcu gitmeli");   // tarama üstüne eklemiş olabilir
+  icerir(b.profil, "08:35");
+  dogru(b.son14.some(g => g.tarih === "2026-09-05"), "son 14 gün gitmeli");
+  const gun = b.son14.find(g => g.tarih === "2026-09-05");
+  esit(gun.maddeler[0].not, "geç kalktım", "notlar plana girdi olmalı");
+});
+
+await dene("kurs saatleri: salı/perşembe 19:00, cuma-cumartesi-pazar yok", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00" });
+  esit(u.ic.kursSaati("2026-09-08").bas, "19:00", "salı");
+  esit(u.ic.kursSaati("2026-09-10").bas, "19:00", "perşembe");
+  esit(u.ic.kursSaati("2026-09-09").bas, "18:00", "çarşamba");
+  esit(u.ic.kursSaati("2026-09-11"), null, "cuma");
+  esit(u.ic.kursSaati("2026-09-12"), null, "cumartesi");
+  esit(u.ic.kursSaati("2026-09-13"), null, "pazar");
+});
+
+await dene("plan üretimi günde en fazla üç kez", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00", api:{ plan:SAHTE_PLAN } });
+  esit(u.ic.planHakki("2026-09-06"), 2, "açılıştaki üretim bir hak yakar");
+  await u.ic.planUret(true);
+  await u.ic.planUret(true);
+  esit(u.ic.planHakki("2026-09-06"), 0);
+  const oncekiCagri = u.durum.apiCagrilari.length;
+  await u.ic.planUret(true);
+  esit(u.durum.apiCagrilari.length, oncekiCagri, "hak bitince model çağrılmamalı");
+  icerir(u.html("b-plan"), "hakkı doldu");
+});
+
+bolum("§14 — anahtar yokken uygulama çalışır");
+
+await dene("anahtar yoksa plan üretilmez ama uygulama açılır", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00" });     // api yok = 503
+  esit(u.veri().ayar.yapayZeka, false);
+  icerir(u.html("b-namaz"), "05:01");                      // namaz çalışıyor
+  icerir(u.html("b-plan"), "madde ekle");                  // elle madde eklenebilir
+  u.ic.maddeEkle("08:00", "Kalk");
+  esit(u.veri().gunler["2026-09-06"].maddeler.length, 1);
+  u.ic.suDegistir(+1);
+  esit(u.veri().gunler["2026-09-06"].su, 1);
+});
+
+await dene("anahtar yoksa ertesi açılışta tekrar denenmez", async () => {
+  const ilk = await ac({ simdi:"2026-09-06T09:00:00" });
+  ilk.ic.maddeEkle("08:00", "Kalk");            // elle kurulmuş bir plan
+  const depo = Object.fromEntries(ilk.durum.depo);
+  const u = await ac({ simdi:"2026-09-07T09:00:00", depo });
+  esit(u.durum.apiCagrilari.length, 0, "boşuna çağırmamalı");
+  icerir(u.html("b-plan"), "Dünün planı kopyalandı");
+});
+
+await dene("model hata verirse dünün planı kopyalanır", async () => {
+  const ilk = await ac({ simdi:"2026-09-05T21:00:00", api:{ plan:SAHTE_PLAN } });
+  const depo = Object.fromEntries(ilk.durum.depo);
+  const u = await ac({ simdi:"2026-09-06T09:00:00", depo,
+                       api:{ plan:{ durum:502, mesaj:"Model cevap vermedi." } } });
+  const g = u.veri().gunler["2026-09-06"];
+  esit(g.planKaynak, "kopya");
+  esit(g.maddeler.length, 3);
+  icerir(u.html("b-plan"), "Dünün planı kopyalandı");
+});
+
+await dene("kota dolduğunda kullanıcıya söylenir, sessizce yutulmaz", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00",
+                       api:{ plan:{ durum:429, mesaj:"Ücretsiz katman kotası doldu, biraz sonra dene." } } });
+  await u.ic.planUret(true);
+  icerir(u.html("b-plan"), "kota");
+});
+
+bolum("api/ — anahtar istemciye sızmıyor");
+
+await dene("istemci kodunda GEMINI_API_KEY geçmiyor", async () => {
+  const fs = require("fs");
+  const html = fs.readFileSync(require("path").join(__dirname, "..", "index.html"), "utf8");
+  icermez(html, "GEMINI_API_KEY=");
+  icermez(html, "generativelanguage.googleapis.com");
+  icerir(html, 'fetch("api/plan"');
+});
+
+await dene("api/plan.js anahtarı yalnız ortam değişkeninden okur", async () => {
+  const fs = require("fs"), path = require("path");
+  const ortak = fs.readFileSync(path.join(__dirname, "..", "api", "_ortak.js"), "utf8");
+  icerir(ortak, "process.env.GEMINI_API_KEY");
+  icerir(ortak, "responseSchema");
+  icerir(ortak, "gemini-2.0-flash");
 });
 
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
