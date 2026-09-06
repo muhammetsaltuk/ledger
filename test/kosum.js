@@ -194,7 +194,7 @@ function kur(se = {}){
     "aktifAralik","siradakiAralik","vakitGetir","namazKur","namazCiz","namazIsaretle",
     "gunKaydi","sureMetni","konumuKullan","konumSor","kaydet","yukle","VAKITLER",
     "borcTara","kazaCiz","toplamBorc","islenmisMi","borcDegistir","vakitleriHazirla",
-    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI"
+    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","saatSirala","TURLER"
   ].join(",") + " };", ctx, { filename:"index.html<script>" });
 
   return {

@@ -281,6 +281,59 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .su-serit i.dolu{ background:var(--sonuk); }
 .su-sayi{ flex:0 0 auto; color:var(--sonuk); font-size:.85rem; min-width:3.2em; text-align:right; }
 
+/* --- §6 Plan: günün akışını gösteren ray --------------------- */
+/* Izgara: not satırı başlığın altına, tam hizasına düşsün. */
+.plan-liste > li{
+  --tirnak:18px;
+  display:grid;
+  grid-template-columns:26px 3.6em 1fr;
+  column-gap:11px;
+  align-items:start;
+  padding:4px 0 6px;
+}
+.plan-liste > li.yapildi .p-metin{ color:var(--sonuk); text-decoration:line-through; }
+.plan-liste > li.yapildi .p-sure{ text-decoration:none; }
+.p-isaret{
+  grid-column:1; grid-row:1;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:26px; height:34px;
+  margin-left:-4px;
+}
+.p-isaret .nokta{
+  width:12px; height:12px;
+  border-radius:999px;
+  border:1px solid var(--sonuk);
+  transition:background-color 160ms ease, border-color 160ms ease;
+}
+.p-isaret[aria-pressed="true"] .nokta{ background:var(--tamam); border-color:var(--tamam); }
+.p-saat{ grid-column:2; grid-row:1; color:var(--sonuk); font-size:.95rem; padding-top:7px; }
+.p-govde{
+  grid-column:3; grid-row:1;
+  text-align:left;
+  padding:6px 0;
+  line-height:1.35;
+}
+.p-baslik{ display:block; }
+.p-gerekce{ display:block; color:var(--sonuk); font-size:.85rem; margin-top:2px; }
+.p-sure{ color:var(--sonuk); font-size:.85rem; margin-left:6px; }
+
+.p-not{ grid-column:3; grid-row:2; display:flex; align-items:center; gap:10px; margin:2px 0 8px; }
+.p-not input{ flex:1 1 auto; font-size:.9rem; padding:7px 10px; }
+.p-notozet{
+  grid-column:3; grid-row:2;
+  display:block;
+  color:var(--sonuk);
+  font-size:.85rem;
+  margin:1px 0 2px;
+}
+.plan-alt{ display:flex; align-items:center; gap:10px; margin-top:16px; flex-wrap:wrap; }
+.plan-ekle{ display:flex; gap:8px; align-items:center; margin-top:14px; }
+.plan-ekle input[type="time"]{ width:6.6em; flex:0 0 auto; }
+.plan-ekle input[type="text"]{ flex:1 1 auto; }
+.plan-bos{ color:var(--sonuk); font-size:.9rem; margin:0 0 4px; }
+
 .namaz-alt{
   display:flex;
   align-items:center;
@@ -927,6 +980,180 @@ function suCiz(){
   });
 })();
 
+/* ===============================================================
+   §6 — Günlük plan (yapay zeka olmadan çalışan kısmı)
+   =============================================================== */
+
+const TURLER = ["uyku","spor","yemek","kod","kitap","ingilizce","kurs",
+                "etkinlik","namaz","ev","bos"];
+
+const $plan = document.getElementById("b-plan");
+let acikNot = null;                          // not alanı açık olan maddenin id'si
+
+function yeniId(){
+  return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+function saatSirala(maddeler){
+  return maddeler.slice().sort((a,b) => String(a.saat||"").localeCompare(String(b.saat||"")));
+}
+function maddeBul(id){
+  const g = gunKaydi(uygulamaGunu());
+  return (g.maddeler || []).find(m => m.id === id);
+}
+
+/* --- Değişiklikler -------------------------------------------- */
+function maddeEkle(saat, baslik, tur){
+  const g = gunKaydi(uygulamaGunu());
+  g.maddeler.push({
+    id: yeniId(),
+    saat: saat || "",
+    sure: null,
+    baslik: String(baslik || "").trim(),
+    tur: TURLER.indexOf(tur) === -1 ? "bos" : tur,
+    gerekce: "",
+    yapildi: false,
+    not: "",
+    elle: true
+  });
+  kaydet();
+  planCiz();
+}
+function maddeSil(id){
+  const g = gunKaydi(uygulamaGunu());
+  g.maddeler = g.maddeler.filter(m => m.id !== id);
+  if(acikNot === id) acikNot = null;
+  kaydet();
+  planCiz();
+}
+function maddeIsaretle(id){
+  const m = maddeBul(id);
+  if(!m) return;
+  m.yapildi = !m.yapildi;
+  kaydet();
+  planCiz();
+}
+function maddeNot(id, metin){
+  const m = maddeBul(id);
+  if(!m) return;
+  m.not = String(metin || "").trim();
+  kaydet();
+}
+
+/* §6 — Ağ yoksa veya model cevap vermezse son planı kopyala, tarihi güncelle.
+   Boş ekran gösterme. */
+function sonPlanliGun(bugun){
+  const gunler = Object.keys(UYG.veri.gunler)
+    .filter(t => t < bugun && UYG.veri.gunler[t].maddeler && UYG.veri.gunler[t].maddeler.length)
+    .sort();
+  return gunler.length ? gunler[gunler.length - 1] : null;
+}
+function planKopyala(){
+  const bugun = uygulamaGunu();
+  const kaynak = sonPlanliGun(bugun);
+  if(!kaynak) return false;
+  const g = gunKaydi(bugun);
+  g.maddeler = UYG.veri.gunler[kaynak].maddeler.map(m => ({
+    id: yeniId(),
+    saat: m.saat, sure: m.sure, baslik: m.baslik, tur: m.tur,
+    gerekce: "", yapildi: false, not: "", kopya: kaynak
+  }));
+  g.gununNotu = "";
+  g.planKaynak = "kopya";
+  kaydet();
+  return true;
+}
+
+/* --- Çizim ---------------------------------------------------- */
+function planCiz(){
+  const bugun = uygulamaGunu();
+  const g = gunKaydi(bugun);
+  const maddeler = saatSirala(g.maddeler || []);
+
+  const satirlar = maddeler.map(m => {
+    const acik = acikNot === m.id;
+    const sure = m.sure ? '<span class="p-sure">' + m.sure + ' dk</span>' : "";
+    const ger  = m.gerekce ? '<span class="p-gerekce">' + kacir(m.gerekce) + '</span>' : "";
+
+    return '<li class="' + (m.yapildi ? "yapildi" : "") + '">' +
+      '<button class="p-isaret" data-yap="' + m.id + '" aria-pressed="' + (m.yapildi ? "true" : "false") +
+        '" aria-label="' + kacir(m.baslik) + ' — işaretle"><span class="nokta"></span></button>' +
+      '<span class="p-saat">' + kacir(m.saat || "") + '</span>' +
+      '<button class="p-govde" data-ac="' + m.id + '" aria-expanded="' + (acik ? "true" : "false") + '">' +
+        '<span class="p-baslik"><span class="p-metin">' + kacir(m.baslik) + '</span>' + sure + '</span>' + ger +
+      '</button>' +
+      (acik
+        ? '<div class="p-not">' +
+            '<input type="text" data-not="' + m.id + '" value="' + kacir(m.not || "") + '" ' +
+              'placeholder="not: nasıl geçti?" autocomplete="off">' +
+            '<button class="dg dg-sonuk" data-sil="' + m.id + '">sil</button>' +
+          '</div>'
+        : (m.not ? '<span class="p-notozet">' + kacir(m.not) + '</span>' : "")) +
+    '</li>';
+  }).join("");
+
+  const gununNotu = g.gununNotu
+    ? '<p class="sonuk" style="margin:0 0 14px">' + kacir(g.gununNotu) + '</p>' : "";
+
+  $plan.innerHTML =
+    '<h2 class="bolum-bas">Bugün' +
+      (g.planKaynak === "kopya" ? '<span class="yan">dünün planından</span>' : "") +
+    '</h2>' +
+    gununNotu +
+    (maddeler.length
+      ? '<ul class="ray plan-liste">' + satirlar + '</ul>'
+      : '<p class="plan-bos">Bugün için madde yok.</p>') +
+    '<div class="plan-ekle">' +
+      '<input type="time" id="p-saat" aria-label="saat">' +
+      '<input type="text" id="p-baslik" aria-label="madde" placeholder="madde ekle" autocomplete="off">' +
+      '<button class="dg" id="p-ekle">ekle</button>' +
+    '</div>';
+}
+
+/* --- Olaylar -------------------------------------------------- */
+$plan.addEventListener("click", e => {
+  const d = e.target.closest("button");
+  if(!d) return;
+  if(d.dataset.yap) maddeIsaretle(d.dataset.yap);
+  else if(d.dataset.sil) maddeSil(d.dataset.sil);
+  else if(d.dataset.ac){
+    acikNot = (acikNot === d.dataset.ac) ? null : d.dataset.ac;
+    planCiz();
+    const alan = $plan.querySelector("[data-not]");
+    if(alan) alan.focus();
+  }
+  else if(d.id === "p-ekle") planEkleGonder();
+});
+
+$plan.addEventListener("change", e => {
+  if(e.target.dataset && e.target.dataset.not) maddeNot(e.target.dataset.not, e.target.value);
+});
+$plan.addEventListener("keydown", e => {
+  if(e.key !== "Enter") return;
+  if(e.target.dataset && e.target.dataset.not){
+    maddeNot(e.target.dataset.not, e.target.value);
+    acikNot = null;
+    planCiz();
+  }else if(e.target.id === "p-baslik" || e.target.id === "p-saat"){
+    e.preventDefault();
+    planEkleGonder();
+  }
+});
+
+function planEkleGonder(){
+  const saat   = document.getElementById("p-saat");
+  const baslik = document.getElementById("p-baslik");
+  if(!baslik || !baslik.value.trim()) return;
+  maddeEkle(saat ? saat.value : "", baslik.value);
+  const yeni = document.getElementById("p-baslik");
+  if(yeni) yeni.focus();
+}
+
+function planHazirla(){
+  const g = gunKaydi(uygulamaGunu());
+  if(!g.maddeler || !g.maddeler.length) planKopyala();   // boş ekran gösterme (§6)
+  planCiz();
+}
+
 /* --- Açılış --------------------------------------------------- */
 function baslat(){
   UYG.veri  = yukle();
@@ -935,6 +1162,7 @@ function baslat(){
 
   kazaCiz();
   suCiz();
+  planHazirla();
   namazKur().then(borcTara);                    // önce elde olanla çiz, sonra tara
   konumSor(false).then(k => {                   // izin gelirse konuma göre tazele
     if(k && k.kaynak === "cihaz") namazKur(true).then(borcTara);

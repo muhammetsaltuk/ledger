@@ -412,6 +412,107 @@ await dene("şerit on bölmeli, hedefte kutlama yok", async () => {
   // Dolan bölmeler yerinde güncellendiği için tarayıcı tarafında doğrulanıyor.
 });
 
+/* ---------------------------------------------------------------
+   §6 — Plan (yapay zeka olmadan)
+   --------------------------------------------------------------- */
+
+bolum("§6 — plan: elle madde, işaretleme, not");
+
+await dene("madde eklenir, saate göre sıralanır", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  u.ic.maddeEkle("09:30", "Kod bloğu");
+  u.ic.maddeEkle("08:00", "Kalk, bir bardak su");
+  const g = u.veri().gunler["2026-09-06"].maddeler;
+  esit(g.length, 2);
+  const h = u.html("b-plan");
+  dogru(h.indexOf("Kalk") < h.indexOf("Kod bloğu"), "08:00 önce yazılmalı");
+});
+
+await dene("madde işaretlenir ve geri alınır", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  u.ic.maddeEkle("08:00", "Kalk");
+  const id = u.veri().gunler["2026-09-06"].maddeler[0].id;
+  u.ic.maddeIsaretle(id);
+  esit(u.veri().gunler["2026-09-06"].maddeler[0].yapildi, true);
+  icerir(u.html("b-plan"), 'aria-pressed="true"');
+  u.ic.maddeIsaretle(id);
+  esit(u.veri().gunler["2026-09-06"].maddeler[0].yapildi, false);
+});
+
+await dene("maddeye not yazılır ve saklanır", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  u.ic.maddeEkle("08:00", "Kalk, bir bardak su");
+  const id = u.veri().gunler["2026-09-06"].maddeler[0].id;
+  u.ic.maddeNot(id, "Kalktım ama suyu içmedim");
+  esit(u.veri().gunler["2026-09-06"].maddeler[0].not, "Kalktım ama suyu içmedim");
+  u.ic.planCiz();
+  icerir(u.html("b-plan"), "Kalktım ama suyu içmedim");
+});
+
+await dene("madde silinir", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  u.ic.maddeEkle("08:00", "Kalk");
+  u.ic.maddeEkle("09:00", "Koşu");
+  const id = u.veri().gunler["2026-09-06"].maddeler[0].id;
+  u.ic.maddeSil(id);
+  esit(u.veri().gunler["2026-09-06"].maddeler.length, 1);
+  esit(u.veri().gunler["2026-09-06"].maddeler[0].baslik, "Koşu");
+});
+
+await dene("not ve işaret HTML'e kaçırılarak yazılır", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  u.ic.maddeEkle("08:00", '<img src=x onerror="alert(1)">');
+  icermez(u.html("b-plan"), "<img src=x");
+  icerir(u.html("b-plan"), "&lt;img");
+});
+
+bolum("§6 — plan boş ekran göstermez");
+
+await dene("plan yoksa son planlı gün kopyalanır, işaretler sıfırlanır", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  u.ic.maddeEkle("08:00", "Kalk");
+  u.ic.maddeEkle("22:00", "Kitap");
+  const id = u.veri().gunler["2026-09-06"].maddeler[0].id;
+  u.ic.maddeIsaretle(id);
+  u.ic.maddeNot(id, "geç kalktım");
+  const depo = Object.fromEntries(u.durum.depo);
+
+  const y = kur({ simdi:"2026-09-08T10:00:00", depo });
+  await bekleCok(y, 10);
+  const g = y.veri().gunler["2026-09-08"];
+  esit(g.maddeler.length, 2, "kopyalanmalı");
+  esit(g.maddeler[0].yapildi, false, "işaret sıfırlanmalı");
+  esit(g.maddeler[0].not, "", "not sıfırlanmalı");
+  esit(g.planKaynak, "kopya");
+  dogru(g.maddeler[0].id !== id, "yeni id verilmeli");
+  icerir(y.html("b-plan"), "dünün planından");
+});
+
+await dene("hiç plan yoksa boş ama kullanılabilir ekran çıkar", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  await bekleCok(u, 10);
+  const h = u.html("b-plan");
+  icerir(h, "Bugün için madde yok");
+  icerir(h, 'id="p-ekle"');            // elle madde eklenebilir
+});
+
+await dene("bugünün planı varsa kopyalanmaz", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  u.ic.maddeEkle("08:00", "Kalk");
+  const depo = Object.fromEntries(u.durum.depo);
+  const y = kur({ simdi:"2026-09-06T20:00:00", depo });
+  await bekleCok(y, 10);
+  esit(y.veri().gunler["2026-09-06"].maddeler.length, 1);
+  esit(y.veri().gunler["2026-09-06"].planKaynak, undefined);
+});
+
+await dene("plan gece kaymasına uyar: 01:00'de eklenen madde dünün planına girer", async () => {
+  const u = kur({ simdi:"2026-09-07T01:00:00" });
+  u.ic.maddeEkle("23:30", "Kitap");
+  esit(u.veri().gunler["2026-09-06"].maddeler.length, 1);
+  esit(u.veri().gunler["2026-09-07"], undefined);
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 
