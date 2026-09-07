@@ -205,7 +205,7 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .namaz-liste > li.aktif::before{ background:var(--vakit); width:14px; }
 .n-saat{ color:var(--sonuk); font-size:.95rem; min-width:3.4em; }
 .n-ad{ flex:1 1 auto; font-size:1rem; }
-.namaz-liste > li.aktif .n-ad{ color:var(--vakit); }
+.namaz-liste > li.aktif .n-ad{ color:var(--metin); }   /* vurgu tırnakta */
 .namaz-liste > li.gecmis .n-saat,
 .namaz-liste > li.gecmis .n-ad{ color:var(--sonuk); }
 .n-durum{
@@ -215,7 +215,7 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   display:inline-flex;
   align-items:center;
   gap:7px;
-  min-height:34px;
+  min-height:40px;
   padding:0 2px 0 10px;
   background:none;
   border:0;
@@ -327,7 +327,7 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   flex:1 1 auto;
   display:flex;
   gap:3px;
-  padding:14px 0;              /* dokunma alanı; şeridin kendisi ince kalır */
+  padding:18px 0;              /* dokunma alanı; şeridin kendisi ince kalır */
   background:none;
   border:0;
   cursor:pointer;
@@ -404,7 +404,13 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   gap:12px;
   margin-top:14px;
 }
-.hata{ color:var(--eksik); font-size:.85rem; margin:10px 0 0; }
+.hata{
+  color:var(--metin);
+  font-size:.85rem;
+  margin:10px 0 0;
+  padding-left:10px;
+  border-left:2px solid var(--eksik);   /* renk anlamı taşır, metni taşımaz */
+}
 
 .gizli{
   position:absolute; width:1px; height:1px;

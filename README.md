@@ -117,6 +117,54 @@ hesabı gerekmez, APK doğrudan telefona yüklenir. Android 13+ için
 **MacroDroid (§8.3)** — MacroDroid → Yeni makro → Tetikleyici: Webhook (URL) →
 Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak ver.
 
+
+## Kabul kriterleri (§14)
+
+`node test/hepsi.js` ve `node test/api.js` ile fiilen deneniyor; tarayıcı
+kontrolleri headless Edge ile yapıldı.
+
+| Kriter | Durum |
+|---|---|
+| Konum izni verilince o konuma, verilmeyince Bursa'ya göre | ✓ test |
+| 07:30'da "aktif vakit yok, sıradaki Öğle" | ✓ test |
+| Yatsı işaretlenmeden imsak geçince borç 1 artar | ✓ test |
+| Günde beş kez açılınca borç bir kez artar | ✓ test |
+| Üç gün açılmayıp sonra açılınca bütün vakitler doğru | ✓ test |
+| Borç sıfırsa kaza bölümü hiç görünmez | ✓ test |
+| 00:30'da işaretlenen yatsı dünün kaydına yazılır | ✓ test |
+| Maddeye yazılan not ertesi günün plan isteğine girer | ✓ test |
+| "Koşuyu akşama al" hem planı hem profili değiştirir | ✓ test |
+| "12 Eylül saat 14'te berber" doğru çevrilir | ✓ test |
+| Vurgu rengi ikindide turuncuya döner | ✓ test |
+| `GEMINI_API_KEY` yokken uygulama çalışır | ✓ test |
+| Uçak modunda çökmez | ✓ test |
+| Ana ekrana eklenince adres çubuğu görünmez | ✓ manifest |
+| 360 px'de yatay kaydırma yok | ✓ tarayıcı |
+| Klavyeyle gezilebilir, odak halkası görünür | ✓ tarayıcı |
+| Seçilen alarm yöntemi gerçek cihazda denenmiş | ✗ **sende kaldı** |
+| Alarm başarısız olunca kullanıcı görür | ✓ test |
+
+Son iki satır dışında hepsi otomatik denetimde. Alarm intent'i gerçek bir
+Android telefonda denenmedi — bunu ancak sen doğrulayabilirsin: Ayarlar'ın
+üstündeki **Yarın** bölümünde "kur" düğmesine bas, saat uygulamasını aç, alarm
+görünüyor mu bak. Sonucu bu dosyaya yaz.
+
+### Erişilebilirlik ölçümleri
+
+Metin/zemin kontrastı (§13 en az 4.5:1 istiyor):
+
+| Renk | Oran |
+|---|---|
+| `--metin` | 14.98 |
+| `--sonuk` | 5.26 |
+| `--tamam` | 5.95 |
+| `--eksik` | 4.03 — bu yüzden metin rengi olarak kullanılmıyor, yalnız kenar çizgisi |
+
+Vurgu rengi (`--vakit`) 2,6 rem'lik aktif vakit adında kullanılıyor. Öğle
+(11.14), İkindi (7.92), Akşam (5.35) ve Sabah (4.79) sınırı geçiyor; **Yatsı
+(#4A5C8C) 2.85'te kalıyor.** §13 hem paleti hem 4.5:1 kuralını sabitlediği
+için bu ikisi aynı anda tutmuyor; şartname değeri olduğu gibi bırakıldı.
+
 ## Geliştirme
 
 Derleme yok, bağımlılık yok. Yerelde:

@@ -1147,6 +1147,69 @@ await dene("ntfy kurulmamışsa uygulama normal çalışır", async () => {
   icerir(u.html("b-namaz"), "05:01");
 });
 
+/* ---------------------------------------------------------------
+   §14 — kalan kabul kriterleri
+   --------------------------------------------------------------- */
+
+bolum("§14 — kalan kriterler");
+
+await dene("bir maddeye yazılan not ertesi günün plan isteğine dahil edilir", async () => {
+  const ilk = await ac({ simdi:"2026-09-06T09:00:00", api:{ plan:SAHTE_PLAN } });
+  const m = ilk.veri().gunler["2026-09-06"].maddeler[0];
+  ilk.ic.maddeNot(m.id, "20 dakika koştum, nefesim yetmedi");
+
+  const y = await ac({ simdi:"2026-09-07T09:00:00",
+                       depo:Object.fromEntries(ilk.durum.depo),
+                       api:{ plan:SAHTE_PLAN } });
+  const c = y.durum.apiCagrilari.filter(x => x.ad === "plan").pop();
+  const dun = c.govde.son14.find(g => g.tarih === "2026-09-06");
+  dogru(dun, "dünün kaydı gitmeli");
+  dogru(dun.maddeler.some(x => x.not === "20 dakika koştum, nefesim yetmedi"),
+        "not plan isteğine girmeli");
+});
+
+await dene("aynı not gün sonu değerlendirmesine de girer", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00",
+                       api:{ plan:SAHTE_PLAN, review:{ metin:"tamam" } } });
+  const m = u.veri().gunler["2026-09-06"].maddeler[0];
+  u.ic.maddeNot(m.id, "yarıda bıraktım");
+  await u.ic.degerlendir();
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "review").pop();
+  dogru(JSON.stringify(c.govde.son14).indexOf("yarıda bıraktım") !== -1,
+        "bugünün notu değerlendirmeye girmeli");
+});
+
+await dene("manifest ana ekran için standalone", async () => {
+  const fs = require("fs"), path = require("path");
+  const m = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "manifest.json"), "utf8"));
+  esit(m.display, "standalone", "adres çubuğu görünmemeli");
+  esit(m.start_url, "./");
+  esit(m.background_color, "#0E1318");
+  dogru(m.icons.some(i => i.sizes === "192x192"), "192 ikon gerekli");
+  dogru(m.icons.some(i => i.purpose === "maskable"), "maskable ikon gerekli");
+});
+
+await dene("hiçbir metin kullanıcıyı övmüyor, emoji yok", async () => {
+  const fs = require("fs"), path = require("path");
+  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  for(const yasak of ["harika", "tebrik", "muhteşem", "bravo", "seri bozuldu", "🎉", "🔥", "💪"]){
+    if(html.toLowerCase().indexOf(yasak) !== -1)
+      throw new Error("arayüzde geçmemeli: " + yasak);
+  }
+});
+
+await dene("vurgu rengi yalnız §13'ün izin verdiği yerlerde", async () => {
+  const fs = require("fs"), path = require("path");
+  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  const kullanim = (css.match(/var\(--vakit\)/g) || []).length;
+  // aktif vakit adı, kalan süre çubuğu, aktif vakit tırnağı, aktif satır adı,
+  // birincil düğme kenarlığı, odak halkası, giriş odağı
+  dogru(kullanim <= 8, "vurgu rengi dağılmamalı, kullanım: " + kullanim);
+  const suSerit = css.slice(css.indexOf(".su-serit"), css.indexOf(".su-serit") + 400);
+  if(suSerit.indexOf("--vakit") !== -1) throw new Error("su şeridinde vurgu rengi olmamalı");
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 
