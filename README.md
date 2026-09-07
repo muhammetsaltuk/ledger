@@ -70,15 +70,39 @@ api/push.js     ntfy'ye bildirim gönderir
 
 ## Yayına alma
 
-1. Bu repoyu GitHub'a it.
-2. vercel.com → Add New Project → repo → Framework: **Other** → Deploy.
-3. Settings → Environment Variables → `GEMINI_API_KEY` → Redeploy.
-   Anahtar ücretsiz: <https://aistudio.google.com/apikey>
-4. Telefonda adresi aç → paylaş → **Ana ekrana ekle**.
+**Canlı:** <https://ledger-muhammetsaltuks-projects.vercel.app>
+
+Vercel projesi `muhammetsaltuks-projects/ledger`. Dağıtım koruması kapalı, yani
+telefondan giriş yapmadan açılıyor.
+
+Telefonda: adresi aç → paylaş → **Ana ekrana ekle**.
+
+### Yeniden dağıtmak
+
+Repo Vercel'e git ile bağlı **değil** — bağlamak için GitHub tarafında
+[Vercel uygulamasının](https://github.com/apps/vercel) `ledger` reposuna kurulu
+olması gerekiyor. Kurulduktan sonra `npx vercel git connect` bir kez çalıştırılır
+ve her push kendiliğinden dağıtılır. O zamana kadar elle:
+
+```bash
+npx vercel deploy --prod
+```
+
+### Gemini anahtarı
+
+```bash
+npx vercel env add GEMINI_API_KEY production
+npx vercel deploy --prod
+```
+
+Anahtar ücretsiz, kredi kartı istemiyor: <https://aistudio.google.com/apikey>
+→ "Create API key". Komut anahtarı soracak, terminale yapıştırırsın; kodda ve
+git geçmişinde yer almaz.
 
 `GEMINI_API_KEY` tanımlı olmasa da uygulama çalışır: namaz vakitleri, kaza borcu,
 su, plan işaretleme ve notlar yapay zekâ olmadan işler. Sadece plan üretimi,
-değerlendirme, sohbet ve etkinlik çözümleme devre dışı kalır.
+değerlendirme, sohbet ve etkinlik çözümleme devre dışı kalır — arayüzde
+"Yapay zeka kapalı (GEMINI_API_KEY tanımlı değil)" yazar.
 
 ### İsteğe bağlı — ntfy (§8.2)
 
