@@ -84,6 +84,8 @@ function kur(se = {}){
     simdi: new Date(se.simdi || "2026-09-06T07:30:00"),
     istekler: [],
     apiCagrilari: [],
+    bildirimler: [],
+    gidilenAdres: null,
     depo: new Map(Object.entries(se.depo || {})),
     zamanlayicilar: []
   };
@@ -132,7 +134,11 @@ function kur(se = {}){
     isNaN, parseInt, parseFloat, encodeURIComponent, decodeURIComponent,
     Date: SahteTarih,
     document: belge,
-    location: { origin: "https://ledger.test", href: "https://ledger.test/" },
+    location: {
+      origin: "https://ledger.test",
+      get href(){ return durum.gidilenAdres || "https://ledger.test/"; },
+      set href(v){ durum.gidilenAdres = v; }        // intent:// navigasyonu
+    },
     matchMedia: () => ({ matches:false, addEventListener(){}, addListener(){} }),
     addEventListener(){},
     setTimeout(f, ms){ const h = { f, ms }; durum.zamanlayicilar.push(h); return h; },
@@ -145,7 +151,12 @@ function kur(se = {}){
       removeItem: k => durum.depo.delete(k),
       clear: () => durum.depo.clear()
     },
+    Intl, URL, URLSearchParams,
+    crypto: { getRandomValues(d){ for(let i=0;i<d.length;i++) d[i] = (i*37+11) % 256; return d; } },
     navigator: {
+      userAgent: se.cihaz === "masaustu"
+        ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        : "Mozilla/5.0 (Linux; Android 14) Chrome/126",
       geolocation: se.konum === "yok" ? undefined : {
         getCurrentPosition(basarili, hata){
           if(se.konum === "izinli") basarili({ coords:{ latitude:41.0082, longitude:28.9784 } });
@@ -200,6 +211,16 @@ function kur(se = {}){
       });
     }
   };
+  // §8.6 bildirim izni: varsayılan "default" — ilk açılışta izin istenmiyor.
+  if(se.bildirim !== "yok"){
+    class SahteBildirim {
+      constructor(baslik, ayar){ durum.bildirimler.push({ baslik, govde:(ayar||{}).body, tag:(ayar||{}).tag }); }
+      static permission = se.bildirim || "default";
+      static async requestPermission(){ return SahteBildirim.permission; }
+    }
+    ctx.Notification = SahteBildirim;
+  }
+
   ctx.window = ctx;
   ctx.globalThis = ctx;
   ctx.self = ctx;
@@ -210,13 +231,17 @@ function kur(se = {}){
     "aktifAralik","siradakiAralik","vakitGetir","namazKur","namazCiz","namazIsaretle",
     "gunKaydi","sureMetni","konumuKullan","konumSor","kaydet","yukle","VAKITLER",
     "borcTara","kazaCiz","toplamBorc","islenmisMi","borcDegistir","vakitleriHazirla",
-    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR","etkinlikCozumle","etkinlikKaydet","etkinlikSil","etkinlikCiz","tarihYaz","degerlendir","degerCiz","profilGuncelle","profilZamaniMi","ayarCiz","modelIste","sohbetGonder","sohbetCiz","sohbetYaz","sohbetAc","SOHBET_SINIR"
+    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR","etkinlikCozumle","etkinlikKaydet","etkinlikSil","etkinlikCiz","tarihYaz","degerlendir","degerCiz","profilGuncelle","profilZamaniMi","ayarCiz","modelIste","sohbetGonder","sohbetCiz","sohbetYaz","sohbetAc","SOHBET_SINIR","intentAdresi","kalkisSaati","yarininImsagi","alarmKur","alarmKuruldu","alarmCiz","icsUret","bildirimTara","bildirimGonder","bildirimDurumu","topicUret","cronAdresi","ayarlarCiz","SU_ARALIK","CIKISA_KALA"
   ].join(",") + " };", ctx, { filename:"index.html<script>" });
 
   return {
     ctx,
     ic: ctx.__IC,
     durum,
+    /** §8.1 intent adresine gidildi mi. */
+    adres(){ return durum.gidilenAdres; },
+    /** §8.6 gönderilen bildirimler. */
+    bildirim(){ return durum.bildirimler; },
     /** Yalnız aladhan istekleri. */
     aladhan(){ return durum.istekler.filter(i => i.indexOf("aladhan") !== -1); },
     /** Sahte saati ilerlet. */

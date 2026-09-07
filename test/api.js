@@ -406,6 +406,110 @@ await dene("boş metin 400, boş cevap 502", async () => {
   esit(c2.kod, 502);
 });
 
+/* --------------------------------------------------------------- */
+
+bolum("api/push — §8.2 ntfy");
+
+delete require.cache[require.resolve("../api/push")];
+const push = require("../api/push");
+
+/** aladhan + ntfy taklidi; ntfy'ye gidenleri saklar. */
+function pushTaklit(vakitler){
+  const kayit = { ntfy: [], aladhan: [] };
+  global.fetch = async (url, secenek) => {
+    if(String(url).indexOf("ntfy.sh") !== -1){
+      const g = JSON.parse(secenek.body);
+      kayit.ntfy.push({ url, topic:g.topic, baslik:g.title, oncelik:g.priority, govde:g.message });
+      return { ok:true, status:200, text: async () => "ok" };
+    }
+    kayit.aladhan.push(url);
+    return { ok:true, status:200, json: async () => ({ data:{
+      timings: vakitler || { Fajr:"05:01", Sunrise:"06:29", Dhuhr:"13:07",
+                             Asr:"16:44", Maghrib:"19:35", Isha:"20:56" },
+      meta:{ timezone:"Europe/Istanbul" } } }) };
+  };
+  return kayit;
+}
+
+/** Şimdiyi sabitle: yerelZaman Intl kullandığı için Date'i taklit ediyoruz. */
+function zamanSabitle(utcIso){
+  const Gercek = Date;
+  global.Date = class extends Gercek {
+    constructor(...a){ if(!a.length) super(utcIso); else super(...a); }
+    static now(){ return new Gercek(utcIso).getTime(); }
+  };
+  return () => { global.Date = Gercek; };
+}
+
+await dene("topic yoksa 400", async () => {
+  const c = cevap();
+  await push({ url:"/api/push", query:{} }, c);
+  esit(c.kod, 400);
+});
+
+await dene("vakit girdiği pencerede ntfy'ye gider", async () => {
+  const kayit = pushTaklit();
+  const geri = zamanSabitle("2026-09-06T13:59:00Z");     // Istanbul 16:59 → ikindi 16:44+15? hayır
+  const c = cevap();
+  await push({ url:"/api/push?topic=t&tz=Europe/Istanbul&pencere=5", query:{} }, c);
+  geri();
+  esit(c.kod, 200);
+  esit(c.veri.saat, "16:59");
+  esit(kayit.ntfy.length, 0, "16:59 hiçbir vaktin ilk 5 dakikası değil");
+});
+
+await dene("ikindi 16:44'te, penceredeyken tam bir kez gönderilir", async () => {
+  const kayit = pushTaklit();
+  const geri = zamanSabitle("2026-09-06T13:46:00Z");     // Istanbul 16:46
+  const c = cevap();
+  await push({ url:"/api/push?topic=gizli&tz=Europe/Istanbul&pencere=5", query:{} }, c);
+  geri();
+  esit(kayit.ntfy.length, 1);
+  esit(kayit.ntfy[0].baslik, "İkindi namazı", "Türkçe başlık bozulmadan gitmeli");
+  esit(kayit.ntfy[0].topic, "gizli");
+  icerir(kayit.ntfy[0].govde, "Vakit girdi, çıkmasına");
+  esit(c.veri.gonderilen[0], "ikindi");
+});
+
+await dene("sabah namazı en yüksek öncelikle gider", async () => {
+  const kayit = pushTaklit();
+  const geri = zamanSabitle("2026-09-06T02:02:00Z");     // Istanbul 05:02
+  await push({ url:"/api/push?topic=t&tz=Europe/Istanbul&pencere=5", query:{} }, cevap());
+  geri();
+  esit(kayit.ntfy.length, 1);
+  esit(kayit.ntfy[0].oncelik, 5, "sabah namazı öncelik 5 olmalı");
+});
+
+await dene("yatsının bitişi için ertesi günün imsağı çekilir", async () => {
+  const kayit = pushTaklit();
+  const geri = zamanSabitle("2026-09-06T17:57:00Z");     // Istanbul 20:57
+  const c = cevap();
+  await push({ url:"/api/push?topic=t&tz=Europe/Istanbul&pencere=5", query:{} }, c);
+  geri();
+  esit(c.veri.gonderilen[0], "yatsi");
+  esit(kayit.aladhan.length, 2, "bugün ve yarın çekilmeli");
+  icerir(kayit.ntfy[0].govde, "saat");
+});
+
+await dene("deneme bildirimi doğrudan gider, aladhan'a çıkmaz", async () => {
+  const kayit = pushTaklit();
+  const c = cevap();
+  await push({ url:"/api/push?topic=t&deneme=1", query:{} }, c);
+  esit(c.kod, 200);
+  esit(kayit.aladhan.length, 0);
+  esit(kayit.ntfy.length, 1);
+  icerir(kayit.ntfy[0].govde, "kurulum tamam");
+});
+
+await dene("aladhan çökerse 502, topic hata mesajında geçmez", async () => {
+  global.fetch = async () => ({ ok:false, status:500, json: async () => ({}) });
+  const c = cevap();
+  await push({ url:"/api/push?topic=gizli-topic-adi&tz=Europe/Istanbul", query:{} }, c);
+  esit(c.kod, 502);
+  if(JSON.stringify(c.veri).indexOf("gizli-topic-adi") !== -1)
+    throw new Error("topic cevaba sızdı");
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

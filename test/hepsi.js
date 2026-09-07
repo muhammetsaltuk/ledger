@@ -980,6 +980,173 @@ await dene("sohbet paneli kapalı başlar", async () => {
   icermez(h, 'id="s-metin"');
 });
 
+/* ---------------------------------------------------------------
+   §8 — Alarm
+   --------------------------------------------------------------- */
+
+bolum("§8.1 — Android intent");
+
+await dene("yarının sabah namazı için SET_ALARM intent'i kurulur", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00" });
+  u.ic.alarmKur("namaz");
+  const adres = u.adres();
+  icerir(adres, "intent://");
+  icerir(adres, "action=android.intent.action.SET_ALARM");
+  icerir(adres, "i.android.intent.extra.alarm.HOUR=5");
+  icerir(adres, "i.android.intent.extra.alarm.MINUTES=2");   // 7 Eylül imsağı 05:02
+  icerir(adres, "B.android.intent.extra.alarm.SKIP_UI=true");
+  icerir(adres, "MESSAGE=Sabah%20namaz");
+});
+
+await dene("kalkış alarmı ayrı kurulur ve saati değiştirilebilir", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00" });
+  u.ic.alarmKur("kalkis");
+  icerir(u.adres(), "HOUR=8");                                // varsayılan 08:00
+  icerir(u.adres(), "MINUTES=0");
+
+  u.ic.UYG.veri.ayar.kalkis = "07:15"; u.ic.kaydet();
+  u.ic.alarmKur("kalkis");
+  icerir(u.adres(), "HOUR=7");
+  icerir(u.adres(), "MINUTES=15");
+});
+
+await dene("kalkış saati plandaki uyku maddesinden gelir", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00" });
+  u.ic.maddeEkle("08:30", "Kalk, perdeyi aç");
+  const m = u.veri().gunler["2026-09-06"].maddeler[0];
+  u.ic.UYG.veri.gunler["2026-09-06"].maddeler[0].tur = "uyku";
+  esit(u.ic.kalkisSaati(), "08:30");
+});
+
+await dene("kurulduğu gün kaydedilir, aynı gün için ikinci kez kurulmuş sayılmaz", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00" });
+  esit(u.ic.alarmKuruldu("namaz"), false);
+  u.ic.alarmKur("namaz");
+  esit(u.ic.alarmKuruldu("namaz"), true);
+  esit(u.veri().ayar.alarmKuruldu.namaz, "2026-09-07");
+  icerir(u.html("b-alarm"), "yeniden kur");
+});
+
+await dene("Android değilse sessizce başarısız olmaz, saati gösterip elle kur der", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"masaustu" });
+  u.ic.alarmKur("namaz");
+  esit(u.adres(), null, "intent'e gidilmemeli");
+  const h = u.html("b-alarm");
+  icerir(h, "Elle kur");
+  icerir(h, "05:02");
+});
+
+await dene("alarm bölümünde iki saat de yazılı", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00" });
+  const h = u.html("b-alarm");
+  icerir(h, "05:02");        // yarının imsağı
+  icerir(h, "Sabah namazı");
+  icerir(h, "08:00");
+  icerir(h, "Kalk");
+  icerir(h, "7 Eylül");
+});
+
+bolum("§8.5 — iOS: alarm değil, takvim bildirimi");
+
+await dene(".ics VALARM ile üretilir ve alarm olmadığı yazılı", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00" });
+  const ics = u.ic.icsUret();
+  icerir(ics, "BEGIN:VCALENDAR");
+  icerir(ics, "BEGIN:VALARM");
+  icerir(ics, "SUMMARY:Sabah namazı");
+  icerir(ics, "SUMMARY:Kalk");
+  icerir(u.html("b-alarm"), ".ics dosyası alarm değildir");
+});
+
+bolum("§8.6 — uygulama içi bildirim");
+
+await dene("ilk açılışta bildirim izni istenmez", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
+  esit(u.ic.bildirimDurumu(), "default");
+  esit(u.bildirim().length, 0);
+  icerir(u.html("b-ayarlar"), "bildirimlere izin ver");     // düğmenin arkasında
+});
+
+await dene("izin yokken bildirim gönderilmez", async () => {
+  const u = await ac({ simdi:"2026-09-06T20:56:30" });
+  u.ic.bildirimTara();
+  esit(u.bildirim().length, 0);
+});
+
+await dene("vakit girdiğinde bildirim düşer, iki kez düşmez", async () => {
+  const u = await ac({ simdi:"2026-09-06T20:56:30", bildirim:"granted" });
+  u.ic.bildirimTara();
+  const b = u.bildirim();
+  esit(b.length, 1);
+  esit(b[0].baslik, "Yatsı");
+  icerir(b[0].govde, "Vakit girdi");
+  u.ic.bildirimTara();
+  esit(u.bildirim().length, 1, "aynı vakit için ikinci bildirim olmamalı");
+});
+
+await dene("vakit çıkmasına 20 dakika kala uyarır, kılınmışsa uyarmaz", async () => {
+  const u = await ac({ simdi:"2026-09-06T16:30:00", bildirim:"granted" });
+  u.ic.bildirimTara();                            // öğle 16:44'te çıkıyor
+  dogru(u.bildirim().some(b => b.baslik === "Öğle" && b.govde.indexOf("Çıkmasına") === 0),
+        "çıkışa yakın uyarı gelmeli");
+
+  const y = await ac({ simdi:"2026-09-06T16:30:00", bildirim:"granted" });
+  y.ic.namazIsaretle("2026-09-06", "ogle", "vaktinde");
+  y.ic.bildirimTara();
+  dogru(!y.bildirim().some(b => b.govde && b.govde.indexOf("Çıkmasına") === 0),
+        "kılınmış namaz için uyarı olmamalı");
+});
+
+await dene("su hatırlatması 08:00-21:00 arası, gece yok", async () => {
+  const gunduz = await ac({ simdi:"2026-09-06T09:30:00", bildirim:"granted" });
+  gunduz.ic.bildirimTara();
+  dogru(gunduz.bildirim().some(b => b.baslik === "Su"), "gündüz hatırlatmalı");
+
+  const gece = await ac({ simdi:"2026-09-07T02:00:00", bildirim:"granted" });
+  gece.ic.bildirimTara();
+  dogru(!gece.bildirim().some(b => b.baslik === "Su"), "gece hatırlatmamalı");
+});
+
+await dene("hedefe ulaşınca su hatırlatması kesilir", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:30:00", bildirim:"granted" });
+  for(let i = 0; i < 10; i++) u.ic.suDegistir(+1);
+  u.ic.bildirimTara();
+  dogru(!u.bildirim().some(b => b.baslik === "Su"));
+});
+
+await dene("plandaki madde başlarken bildirim düşer", async () => {
+  const u = await ac({ simdi:"2026-09-06T10:30:30", bildirim:"granted" });
+  u.ic.maddeEkle("10:30", "Kod bloğu");
+  u.ic.bildirimTara();
+  dogru(u.bildirim().some(b => b.baslik === "Kod bloğu"), "madde bildirimi gelmeli");
+});
+
+bolum("§8.2 — ntfy");
+
+await dene("topic rastgele üretilir, tahmin edilebilir değil", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
+  const t = u.ic.topicUret();
+  icerir(t, "ledger-");
+  dogru(t.length >= 20, "en az 20 karakter olmalı");
+});
+
+await dene("cron adresi topic, konum ve saat dilimini taşır", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
+  u.ic.UYG.veri.ayar.ntfy = "ledger-gizlibirsey";
+  u.ic.kaydet();
+  const adres = u.ic.cronAdresi();
+  icerir(adres, "/api/push?topic=ledger-gizlibirsey");
+  icerir(adres, "lat=40.1826");
+  icerir(adres, "pencere=5");
+});
+
+await dene("ntfy kurulmamışsa uygulama normal çalışır", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00" });
+  esit(u.veri().ayar.ntfy, undefined);
+  esit(u.ic.cronAdresi(), "");
+  icerir(u.html("b-namaz"), "05:01");
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

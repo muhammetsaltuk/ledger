@@ -257,6 +257,33 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .k-ad{ flex:0 0 auto; }
 .k-sayi{ flex:1 1 auto; color:var(--sonuk); }
 
+/* --- §8 Alarm ve ayarlar ------------------------------------- */
+.alarm-liste{ list-style:none; margin:0 0 14px; padding:0; }
+.alarm-liste > li{
+  display:flex; align-items:center; gap:12px;
+  padding:7px 0; min-height:46px;
+}
+.alarm-liste > li + li{ border-top:1px solid var(--cizgi); }
+.al-saat{ flex:0 0 auto; font-family:var(--bas); font-size:1.25rem; min-width:3.4em; }
+.al-ad{ flex:1 1 auto; color:var(--sonuk); font-size:.95rem; }
+
+.ay-blok{ padding:16px 0; }
+.ay-blok + .ay-blok{ border-top:1px solid var(--cizgi); }
+.ay-bas{ margin:0 0 6px; }
+.ay-satir{ display:flex; gap:8px; align-items:center; }
+.ay-kod{
+  display:block;
+  margin-top:6px;
+  padding:9px 11px;
+  background:var(--yuzey);
+  border:1px solid var(--cizgi);
+  color:var(--sonuk);
+  font-size:.78rem;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  overflow-x:auto;
+  white-space:nowrap;
+}
+
 /* --- §10 Sohbet ---------------------------------------------- */
 .sohbet-liste{ list-style:none; margin:0 0 14px; padding:0; }
 .sohbet-liste > li{
@@ -412,8 +439,14 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   <!-- §3.7 Gün sonu değerlendirmesi -->
   <section id="b-degerlendirme" class="bolum" aria-label="Gün sonu değerlendirmesi"></section>
 
+  <!-- §8 Yarının alarmları -->
+  <section id="b-alarm" class="bolum" aria-label="Yarının alarmları"></section>
+
+  <!-- Profil -->
+  <section id="b-ayar" class="bolum" aria-label="Profil"></section>
+
   <!-- Ayarlar -->
-  <section id="b-ayar" class="bolum" aria-label="Ayarlar"></section>
+  <section id="b-ayarlar" class="bolum" aria-label="Ayarlar"></section>
 
 </main>
 
@@ -813,6 +846,7 @@ async function namazKur(yeniden){
     }
   }
   namazCiz();
+  alarmCiz();          // yarının imsağı vakitler gelince belli olur
   if(!yeniden) namazSaati();
 }
 
@@ -832,6 +866,7 @@ function namazSaati(){
     const son = UYG.namaz.liste[UYG.namaz.liste.length - 1];
     if(new Date() >= son.bit){ namazKur(true); return; }
     namazCiz();
+    if(new Date().getSeconds() % 30 === 0) bildirimTara();   // §8.6
   }, 1000);
 }
 
@@ -944,6 +979,368 @@ $kaza.addEventListener("click", e => {
   kaydet();
   kazaCiz();
 });
+
+/* ===============================================================
+   §8 — Alarm
+   Seçilen birincil yöntem: 8.1 Android intent. Yanında 8.6 uygulama içi
+   bildirim ve isteğe bağlı 8.2 ntfy. Gerekçesi README'de.
+   =============================================================== */
+
+const $alarm = document.getElementById("b-alarm");
+let alarmMesaj = "";
+
+/* --- 8.1 Android intent --------------------------------------- */
+function intentAdresi(saat, dakika, mesaj){
+  return "intent://#Intent;" +
+    "action=android.intent.action.SET_ALARM;" +
+    "i.android.intent.extra.alarm.HOUR=" + saat + ";" +
+    "i.android.intent.extra.alarm.MINUTES=" + dakika + ";" +
+    "S.android.intent.extra.alarm.MESSAGE=" + encodeURIComponent(mesaj) + ";" +
+    "B.android.intent.extra.alarm.SKIP_UI=true;" +
+    "end";
+}
+function androidMi(){ return /Android/i.test(navigator.userAgent || ""); }
+
+/* Kalkış saati: yarının planı yoksa bugünün uyku maddesinden, o da yoksa 08:00.
+   Kullanıcı elle değiştirebilir; değiştirdiği saat saklanır. */
+function kalkisSaati(){
+  if(UYG.veri.ayar.kalkis) return UYG.veri.ayar.kalkis;
+  const yarin = UYG.veri.gunler[gunKaydir(uygulamaGunu(), 1)];
+  const bugun = UYG.veri.gunler[uygulamaGunu()];
+  for(const g of [yarin, bugun]){
+    if(!g || !g.maddeler) continue;
+    const uyku = saatSirala(g.maddeler.filter(m => m.tur === "uyku" && m.saat));
+    if(uyku.length) return uyku[0].saat;
+  }
+  return "08:00";
+}
+
+/* Yarının sabah namazı: bugünün listesindeki yatsının bitişi zaten yarının
+   imsağıdır, o yüzden ek istek gerekmez. */
+function yarininImsagi(){
+  const l = UYG.namaz && UYG.namaz.liste;
+  if(!l || !l.length) return null;
+  return l[l.length - 1].bit;      // yatsının bitişi = ertesi günün Fajr'ı
+}
+
+function alarmKuruldu(tur){
+  const k = UYG.veri.ayar.alarmKuruldu || {};
+  return k[tur] === gunKaydir(uygulamaGunu(), 1);
+}
+function alarmIsaretle(tur){
+  const k = UYG.veri.ayar.alarmKuruldu || (UYG.veri.ayar.alarmKuruldu = {});
+  k[tur] = gunKaydir(uygulamaGunu(), 1);         // hangi gün için kurulduğu
+  for(const a of Object.keys(k)) if(k[a] < uygulamaGunu()) delete k[a];
+  kaydet();
+}
+
+function alarmKur(tur){
+  const imsak = yarininImsagi();
+  let saat, dakika, mesaj;
+  if(tur === "namaz"){
+    if(!imsak){ alarmMesaj = "Vakitler henüz gelmedi."; alarmCiz(); return; }
+    saat = imsak.getHours(); dakika = imsak.getMinutes(); mesaj = "Sabah namazı";
+  }else{
+    const p = kalkisSaati().split(":");
+    saat = +p[0]; dakika = +p[1]; mesaj = "Kalk";
+  }
+
+  if(!androidMi()){
+    // Sessizce başarısız olma: saati göster, elle kurmasını söyle (§8.1).
+    alarmMesaj = "Bu cihazda alarm kurulamıyor. Elle kur: " +
+      iki(saat) + ":" + iki(dakika) + " — " + mesaj;
+    alarmCiz();
+    return;
+  }
+
+  alarmIsaretle(tur);
+  alarmMesaj = "Saat uygulamasında " + iki(saat) + ":" + iki(dakika) +
+    " alarmı görünmüyorsa elle kur.";
+  alarmCiz();
+  location.href = intentAdresi(saat, dakika, mesaj);
+}
+
+/* --- 8.5 iOS: alarm değil, takvim bildirimi ------------------- */
+function icsUret(){
+  const imsak = yarininImsagi();
+  if(!imsak) return null;
+  const z = d => d.getUTCFullYear() + iki(d.getUTCMonth()+1) + iki(d.getUTCDate()) +
+                 "T" + iki(d.getUTCHours()) + iki(d.getUTCMinutes()) + "00Z";
+  const p = kalkisSaati().split(":");
+  const yarin = gunKaydir(uygulamaGunu(), 1);
+  const kalkis = saatDate(yarin, kalkisSaati());
+
+  const olay = (bas, ad) =>
+    "BEGIN:VEVENT\r\n" +
+    "UID:" + ad.replace(/\s/g,"") + "-" + z(bas) + "@ledger\r\n" +
+    "DTSTAMP:" + z(new Date()) + "\r\n" +
+    "DTSTART:" + z(bas) + "\r\n" +
+    "DURATION:PT15M\r\n" +
+    "SUMMARY:" + ad + "\r\n" +
+    "BEGIN:VALARM\r\nTRIGGER:PT0M\r\nACTION:DISPLAY\r\nDESCRIPTION:" + ad + "\r\nEND:VALARM\r\n" +
+    "END:VEVENT\r\n";
+
+  return "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Ledger//TR\r\n" +
+    olay(imsak, "Sabah namazı") + olay(kalkis, "Kalk") +
+    "END:VCALENDAR\r\n";
+}
+function icsIndir(){
+  const metin = icsUret();
+  if(!metin){ alarmMesaj = "Vakitler henüz gelmedi."; alarmCiz(); return; }
+  const b = new Blob([metin], { type:"text/calendar;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(b);
+  a.download = "ledger-yarin.ics";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+function alarmCiz(){
+  const imsak  = yarininImsagi();
+  const kalkis = kalkisSaati();
+  const yarin  = gunKaydir(uygulamaGunu(), 1);
+
+  const satir = (tur, saat, ad) =>
+    '<li>' +
+      '<span class="al-saat">' + saat + '</span>' +
+      '<span class="al-ad">' + ad + '</span>' +
+      (alarmKuruldu(tur)
+        ? '<button class="dg dg-sonuk" data-alarm="' + tur + '">yeniden kur</button>'
+        : '<button class="dg dg-bir" data-alarm="' + tur + '">kur</button>') +
+    '</li>';
+
+  $alarm.innerHTML =
+    '<h2 class="bolum-bas">Yarın<span class="yan">' + tarihYaz(yarin) + '</span></h2>' +
+    '<ul class="alarm-liste">' +
+      (imsak ? satir("namaz", ss(imsak), "Sabah namazı") : "") +
+      satir("kalkis", kalkis, "Kalk") +
+    '</ul>' +
+    '<div class="plan-alt">' +
+      '<label class="sonuk" for="al-kalkis">kalkış</label>' +
+      '<input type="time" id="al-kalkis" value="' + kalkis + '" ' +
+        'style="width:6.6em" aria-label="kalkış saati">' +
+      '<button class="dg dg-sonuk" id="al-ics">takvime ekle (.ics)</button>' +
+    '</div>' +
+    '<p class="sonuk" style="margin:10px 0 0">' +
+      'Alarm telefonun kendi saat uygulamasına kurulur; sessiz modda da çalar. ' +
+      '.ics dosyası alarm değildir, yalnız takvim bildirimi verir.' +
+    '</p>' +
+    (alarmMesaj ? '<p class="sonuk" style="margin:8px 0 0">' + kacir(alarmMesaj) + '</p>' : "");
+}
+
+$alarm.addEventListener("click", e => {
+  const d = e.target.closest("button");
+  if(!d) return;
+  if(d.dataset.alarm) alarmKur(d.dataset.alarm);
+  else if(d.id === "al-ics") icsIndir();
+});
+$alarm.addEventListener("change", e => {
+  if(e.target.id === "al-kalkis" && e.target.value){
+    UYG.veri.ayar.kalkis = e.target.value;
+    kaydet();
+    alarmCiz();
+  }
+});
+
+/* ===============================================================
+   §8.6 — Uygulama içi bildirim
+   İzin ilk açılışta istenmez; bir düğmenin arkasında durur.
+   =============================================================== */
+
+const SU_ARALIK   = 90;      // dakika (§11)
+const SU_BAS      = 8, SU_BIT = 21;
+const CIKISA_KALA = 20;      // dakika (§8.6)
+
+function bildirimDurumu(){
+  if(!("Notification" in window)) return "yok";
+  return Notification.permission;             // "default" | "granted" | "denied"
+}
+async function bildirimIzniIste(){
+  if(!("Notification" in window)) return "yok";
+  const s = await Notification.requestPermission();
+  ayarlarCiz();
+  return s;
+}
+function bildirimGonder(baslik, govde, anahtar){
+  if(bildirimDurumu() !== "granted") return false;
+  const gonderilen = UYG.veri.ayar.bildirimler || (UYG.veri.ayar.bildirimler = {});
+  if(gonderilen[anahtar]) return false;
+  gonderilen[anahtar] = 1;
+  // Liste şişmesin: yalnız bugünün ve dünün anahtarları kalsın.
+  const dun = gunKaydir(uygulamaGunu(), -1);
+  for(const a of Object.keys(gonderilen)) if(a.slice(0,10) < dun) delete gonderilen[a];
+  kaydet();
+  try{
+    new Notification(baslik, { body: govde, tag: anahtar, icon: "icons/icon-192.png" });
+  }catch(e){ console.warn("bildirim gönderilemedi", e); return false; }
+  return true;
+}
+
+/* Tek zamanlayıcı: vakit girişi, vakit çıkışına 20 dk, su, plan maddesi. */
+function bildirimTara(){
+  if(bildirimDurumu() !== "granted") return;
+  const an    = new Date();
+  const bugun = uygulamaGunu();
+  const l     = UYG.namaz && UYG.namaz.liste;
+
+  if(l){
+    for(const v of l){
+      const girdi = an - v.bas;
+      if(girdi >= 0 && girdi < 120000)
+        bildirimGonder(v.ad, "Vakit girdi, çıkmasına " + sureMetni(v.bit - an),
+                       bugun + "|giris|" + v.a);
+      const kalan = v.bit - an;
+      if(kalan > 0 && kalan <= CIKISA_KALA * 60000 && an >= v.bas &&
+         !(gunKaydi(bugun).namaz || {})[v.a])
+        bildirimGonder(v.ad, "Çıkmasına " + sureMetni(kalan), bugun + "|cikis|" + v.a);
+    }
+  }
+
+  // Su: 08:00–21:00 arası 90 dakikada bir. Gece hatırlatma yok (§11).
+  const dk = an.getHours() * 60 + an.getMinutes();
+  if(an.getHours() >= SU_BAS && an.getHours() < SU_BIT){
+    const yuva = Math.floor((dk - SU_BAS * 60) / SU_ARALIK);
+    const hedef = SU_BAS * 60 + yuva * SU_ARALIK;
+    if(dk - hedef < 2 && (gunKaydi(bugun).su || 0) < SU_HEDEFI)
+      bildirimGonder("Su", "Bir bardak.", bugun + "|su|" + yuva);
+  }
+
+  // Plandaki madde başlarken.
+  for(const m of gunKaydi(bugun).maddeler || []){
+    if(!m.saat || m.yapildi) continue;
+    const bas = saatDate(bugun, m.saat);
+    const fark = an - bas;
+    if(fark >= 0 && fark < 120000)
+      bildirimGonder(m.baslik, m.saat + (m.sure ? " · " + m.sure + " dk" : ""),
+                     bugun + "|madde|" + m.id);
+  }
+}
+
+/* ===============================================================
+   §8.2 — ntfy (isteğe bağlı ikinci katman)
+   =============================================================== */
+
+function topicUret(){
+  const harf = "abcdefghijkmnopqrstuvwxyz23456789";
+  let s = "ledger-";
+  const r = new Uint8Array(16);
+  (crypto && crypto.getRandomValues) ? crypto.getRandomValues(r)
+    : r.forEach((_, i) => r[i] = Math.floor(Math.random() * 256));
+  for(let i = 0; i < 16; i++) s += harf[r[i] % harf.length];
+  return s;
+}
+
+function cronAdresi(){
+  const t = UYG.veri.ayar.ntfy;
+  if(!t) return "";
+  const k = konumuKullan();
+  return location.origin + "/api/push?topic=" + encodeURIComponent(t) +
+    "&lat=" + k.lat + "&lng=" + k.lng +
+    "&tz=" + encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Istanbul") +
+    "&pencere=5";
+}
+
+async function ntfyDene(){
+  const t = UYG.veri.ayar.ntfy;
+  if(!t) return;
+  ayarlarMesaj = "gönderiliyor…";
+  ayarlarCiz();
+  try{
+    const c = await fetch("api/push?" + new URLSearchParams({ topic:t, deneme:"1" }));
+    const j = await c.json().catch(() => ({}));
+    ayarlarMesaj = c.ok ? "Deneme bildirimi gönderildi; telefonuna düşmesi gerekiyor."
+                        : (j.mesaj || "Gönderilemedi.");
+  }catch(e){
+    ayarlarMesaj = "Gönderilemedi: ağ yok.";
+  }
+  ayarlarCiz();
+}
+
+/* ===============================================================
+   Ayarlar bölümü
+   =============================================================== */
+
+const $ayarlar = document.getElementById("b-ayarlar");
+let ayarlarMesaj = "";
+
+function ayarlarCiz(){
+  const durum = bildirimDurumu();
+  const topic = UYG.veri.ayar.ntfy || "";
+
+  const bildirimSatiri =
+    durum === "granted" ? '<span class="sonuk">bildirim izni verildi</span>'
+  : durum === "denied"  ? '<span class="sonuk">bildirim izni reddedildi; tarayıcı ayarlarından açabilirsin</span>'
+  : durum === "yok"     ? '<span class="sonuk">bu tarayıcıda bildirim yok</span>'
+  : '<button class="dg" id="ay-izin">bildirimlere izin ver</button>';
+
+  $ayarlar.innerHTML =
+    '<h2 class="bolum-bas">Ayarlar</h2>' +
+
+    '<div class="ay-blok">' +
+      '<p class="ay-bas">Uygulama içi bildirim</p>' +
+      '<p class="sonuk" style="margin:0 0 10px">Vakit girdiğinde, çıkmasına ' +
+        CIKISA_KALA + ' dakika kala, su zamanında ve plandaki madde başlarken. ' +
+        'Uygulama açık veya arka plandayken çalışır; alarm yerine geçmez.</p>' +
+      bildirimSatiri +
+    '</div>' +
+
+    '<div class="ay-blok">' +
+      '<p class="ay-bas">ntfy <span class="sonuk">isteğe bağlı</span></p>' +
+      '<p class="sonuk" style="margin:0 0 10px">Telefona ntfy uygulamasını kurup ' +
+        'aşağıdaki topic\'e abone ol. Topic adı gizli anahtar gibidir; ' +
+        'tahmin edilebilir bir şey yazma.</p>' +
+      '<div class="ay-satir">' +
+        '<input type="text" id="ay-topic" value="' + kacir(topic) + '" ' +
+          'placeholder="topic adı" autocomplete="off" aria-label="ntfy topic">' +
+        '<button class="dg dg-sonuk" id="ay-uret">rastgele üret</button>' +
+      '</div>' +
+      (topic
+        ? '<p class="sonuk" style="margin:10px 0 0">cron-job.org adresi:</p>' +
+          '<code class="ay-kod">' + kacir(cronAdresi()) + '</code>' +
+          '<div class="ay-satir" style="margin-top:10px">' +
+            '<button class="dg dg-sonuk" id="ay-dene">deneme bildirimi gönder</button>' +
+          '</div>'
+        : "") +
+    '</div>' +
+
+    '<div class="ay-blok">' +
+      '<p class="ay-bas">Veri</p>' +
+      '<p class="sonuk" style="margin:0 0 10px">Her şey bu telefonda duruyor; ' +
+        'hesap ve sunucu yok. Tarayıcı verisini silersen kayıt da gider.</p>' +
+      '<button class="dg dg-sonuk" id="ay-disari">yedeği indir</button>' +
+    '</div>' +
+
+    (ayarlarMesaj ? '<p class="sonuk" style="margin:12px 0 0">' + kacir(ayarlarMesaj) + '</p>' : "");
+}
+
+$ayarlar.addEventListener("click", e => {
+  const d = e.target.closest("button");
+  if(!d) return;
+  if(d.id === "ay-izin") bildirimIzniIste();
+  else if(d.id === "ay-uret"){
+    UYG.veri.ayar.ntfy = topicUret();
+    kaydet(); ayarlarMesaj = ""; ayarlarCiz();
+  }
+  else if(d.id === "ay-dene") ntfyDene();
+  else if(d.id === "ay-disari") yedegiIndir();
+});
+$ayarlar.addEventListener("change", e => {
+  if(e.target.id === "ay-topic"){
+    UYG.veri.ayar.ntfy = e.target.value.trim();
+    kaydet(); ayarlarCiz();
+  }
+});
+
+function yedegiIndir(){
+  const b = new Blob([JSON.stringify(UYG.veri, null, 1)], { type:"application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(b);
+  a.download = "ledger-" + uygulamaGunu() + ".json";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
 
 /* ===============================================================
    §10 — Sohbet
@@ -1845,7 +2242,9 @@ function baslat(){
   etkinlikCiz();
   sohbetCiz();
   degerCiz();
+  alarmCiz();
   ayarCiz();
+  ayarlarCiz();
 
   // Plan üretimi vakitleri de gönderir (§6), o yüzden namazKur'dan sonra.
   namazKur().then(borcTara).then(planHazirla).then(() => {
