@@ -998,8 +998,9 @@ bolum("§8.1 — Android intent");
 
 await dene("yarının sabah namazı için SET_ALARM intent'i kurulur", async () => {
   const u = await ac({ simdi:"2026-09-06T22:00:00" });
-  u.ic.alarmKur("namaz");
-  const adres = u.adres();
+  const b = u.ic.alarmBilgisi("namaz");
+  const adres = u.ic.intentAdresi(b.saat, b.dakika, b.mesaj);
+  icerir(u.html("b-alarm"), "href=\"intent://");        // düğme gerçek bağlantı
   icerir(adres, "intent://");
   icerir(adres, "action=android.intent.action.SET_ALARM");
   icerir(adres, "i.android.intent.extra.alarm.HOUR=5");
@@ -1010,14 +1011,13 @@ await dene("yarının sabah namazı için SET_ALARM intent'i kurulur", async () 
 
 await dene("kalkış alarmı ayrı kurulur ve saati değiştirilebilir", async () => {
   const u = await ac({ simdi:"2026-09-06T22:00:00" });
-  u.ic.alarmKur("kalkis");
-  icerir(u.adres(), "HOUR=8");                                // varsayılan 08:00
-  icerir(u.adres(), "MINUTES=0");
+  const adres = t => { const b = u.ic.alarmBilgisi(t); return u.ic.intentAdresi(b.saat, b.dakika, b.mesaj); };
+  icerir(adres("kalkis"), "HOUR=8");                          // varsayılan 08:00
+  icerir(adres("kalkis"), "MINUTES=0");
 
   u.ic.UYG.veri.ayar.kalkis = "07:15"; u.ic.kaydet();
-  u.ic.alarmKur("kalkis");
-  icerir(u.adres(), "HOUR=7");
-  icerir(u.adres(), "MINUTES=15");
+  icerir(adres("kalkis"), "HOUR=7");
+  icerir(adres("kalkis"), "MINUTES=15");
 });
 
 await dene("kalkış saati plandaki uyku maddesinden gelir", async () => {
@@ -1037,13 +1037,16 @@ await dene("kurulduğu gün kaydedilir, aynı gün için ikinci kez kurulmuş sa
   icerir(u.html("b-alarm"), "yeniden kur");
 });
 
-await dene("Android değilse sessizce başarısız olmaz, saati gösterip elle kur der", async () => {
+await dene("kurma denemesi tarayıcı kimliğine bakıp reddedilmez", async () => {
   const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"masaustu" });
+  // "Masaüstü sitesi iste" açık bir Android telefon da masaüstü görünür;
+  // denemeyi engellememeli, bağlantı yine kurulmalı.
+  icerir(u.html("b-alarm"), "href=\"intent://");
   u.ic.alarmKur("namaz");
-  esit(u.adres(), null, "intent'e gidilmemeli");
   const h = u.html("b-alarm");
-  icerir(h, "Elle kur");
+  icerir(h, "elle kur");
   icerir(h, "05:02");
+  icerir(h, "Android görünmüyor");        // yine de uyarıyor
 });
 
 await dene("alarm bölümünde iki saat de yazılı", async () => {

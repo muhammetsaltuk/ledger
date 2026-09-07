@@ -120,6 +120,7 @@ button{
   color:var(--metin);
   font-size:.9rem;
   line-height:1;
+  text-decoration:none;                /* .dg bir <a> da olabilir */
   transition:border-color 160ms ease,color 160ms ease;
 }
 .dg:hover{ border-color:var(--sonuk); }
@@ -1042,30 +1043,29 @@ function alarmIsaretle(tur){
   kaydet();
 }
 
-function alarmKur(tur){
-  const imsak = yarininImsagi();
-  let saat, dakika, mesaj;
+/** Bir alarmın saati, dakikası ve etiketi. Vakitler gelmediyse null. */
+function alarmBilgisi(tur){
   if(tur === "namaz"){
-    if(!imsak){ alarmMesaj = "Vakitler henüz gelmedi."; alarmCiz(); return; }
-    saat = imsak.getHours(); dakika = imsak.getMinutes(); mesaj = "Sabah namazı";
-  }else{
-    const p = kalkisSaati().split(":");
-    saat = +p[0]; dakika = +p[1]; mesaj = "Kalk";
+    const imsak = yarininImsagi();
+    if(!imsak) return null;
+    return { saat: imsak.getHours(), dakika: imsak.getMinutes(), mesaj: "Sabah namazı" };
   }
+  const p = kalkisSaati().split(":");
+  return { saat: +p[0], dakika: +p[1], mesaj: "Kalk" };
+}
 
-  if(!androidMi()){
-    // Sessizce başarısız olma: saati göster, elle kurmasını söyle (§8.1).
-    alarmMesaj = "Bu cihazda alarm kurulamıyor. Elle kur: " +
-      iki(saat) + ":" + iki(dakika) + " — " + mesaj;
-    alarmCiz();
-    return;
-  }
-
+/* Kurma işini <a href="intent://..."> yapıyor; burada yalnız kayıt tutulup
+   ne olduğu yazılıyor. Tarayıcı kimliğine bakıp denemeyi reddetmiyoruz:
+   "masaüstü sitesi iste" açıkken Android telefon da masaüstü görünüyor,
+   ve denemenin maliyeti yok. Olmadığında saat zaten ekranda duruyor (§8.1). */
+function alarmKur(tur){
+  const b = alarmBilgisi(tur);
+  if(!b){ alarmMesaj = "Vakitler henüz gelmedi."; alarmCiz(); return; }
   alarmIsaretle(tur);
-  alarmMesaj = "Saat uygulamasında " + iki(saat) + ":" + iki(dakika) +
-    " alarmı görünmüyorsa elle kur.";
+  alarmMesaj = iki(b.saat) + ":" + iki(b.dakika) + " için saat uygulaması açılmadıysa " +
+    "alarm kurulmamıştır; o saati elle kur." +
+    (androidMi() ? "" : " (Bu tarayıcı Android görünmüyor, muhtemelen kurulmadı.)");
   alarmCiz();
-  location.href = intentAdresi(saat, dakika, mesaj);
 }
 
 /* --- 8.5 iOS: alarm değil, takvim bildirimi ------------------- */
@@ -1109,14 +1109,18 @@ function alarmCiz(){
   const kalkis = kalkisSaati();
   const yarin  = gunKaydir(uygulamaGunu(), 1);
 
-  const satir = (tur, saat, ad) =>
-    '<li>' +
+  const satir = (tur, saat, ad) => {
+    const b = alarmBilgisi(tur);
+    const adres = b ? intentAdresi(b.saat, b.dakika, b.mesaj) : "";
+    return '<li>' +
       '<span class="al-saat">' + saat + '</span>' +
       '<span class="al-ad">' + ad + '</span>' +
-      (alarmKuruldu(tur)
-        ? '<button class="dg dg-sonuk" data-alarm="' + tur + '">yeniden kur</button>'
-        : '<button class="dg dg-bir" data-alarm="' + tur + '">kur</button>') +
+      '<a class="dg ' + (alarmKuruldu(tur) ? "dg-sonuk" : "dg-bir") + '" ' +
+        'href="' + kacir(adres) + '" data-alarm="' + tur + '">' +
+        (alarmKuruldu(tur) ? "yeniden kur" : "kur") +
+      '</a>' +
     '</li>';
+  };
 
   $alarm.innerHTML =
     '<h2 class="bolum-bas">Yarın<span class="yan">' + tarihYaz(yarin) + '</span></h2>' +
@@ -1138,10 +1142,11 @@ function alarmCiz(){
 }
 
 $alarm.addEventListener("click", e => {
-  const d = e.target.closest("button");
+  const d = e.target.closest("[data-alarm],#al-ics");
   if(!d) return;
-  if(d.dataset.alarm) alarmKur(d.dataset.alarm);
-  else if(d.id === "al-ics") icsIndir();
+  if(d.id === "al-ics"){ icsIndir(); return; }
+  // Bağlantının kendi gezinmesini engellemiyoruz; intent onu açacak.
+  alarmKur(d.dataset.alarm);
 });
 $alarm.addEventListener("change", e => {
   if(e.target.id === "al-kalkis" && e.target.value){
