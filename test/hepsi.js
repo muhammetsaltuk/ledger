@@ -1064,10 +1064,58 @@ await dene("iPhone'da intent bağlantısı hiç basılmaz", async () => {
   esit(u.ic.platform(), "ios");
   const h = u.html("b-alarm");
   icermez(h, "intent://");                  // Safari "adres geçersiz" derdi
-  icerir(h, "saat uygulamasına elle");
   icerir(h, "05:02");                       // saat yine de ekranda
-  icerir(h, "web sayfası alarm kuramaz");
-  icerir(h, "çalar saat gibi çalmaz");      // .ics'in ne olmadığı yazılı
+});
+
+bolum("§8.7 — iOS: Kısayollar ile gerçek alarm");
+
+await dene("iPhone'da kısayol bağlantısı basılır ve saati taşır", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  const h = u.html("b-alarm");
+  icerir(h, 'href="shortcuts://x-callback-url/run-shortcut');
+  icerir(h, "name=Ledger%20Alarm");
+  icerir(h, "input=text");
+  icerir(h, "text=05%3A02");                // yarının imsağı, kısayola giden metin
+  icerir(h, "text=08%3A00");                // kalkış
+  icerir(h, "kur");
+});
+
+await dene("kısayol adresi Android'de hiç kullanılmaz", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00" });
+  const h = u.html("b-alarm");
+  icermez(h, "shortcuts://");
+  icerir(h, 'href="intent://');
+});
+
+await dene("kurulum yönergesi yalnız iPhone'da ve düğmenin altında", async () => {
+  const ios = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  const h = ios.html("b-alarm");
+  icerir(h, "bir kerelik kurulum");
+  icerir(h, "Alarm Oluştur");               // hangi eylem olduğu yazılı
+  icerir(h, "Metinden Tarih Al");
+  icerir(h, "sessiz modda çalar");          // neden alarm olduğu yazılı
+  const and = await ac({ simdi:"2026-09-06T22:00:00" });
+  icermez(and.html("b-alarm"), "bir kerelik kurulum");
+});
+
+await dene("kısayol adı değiştirilince bağlantı da değişir", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  esit(u.ic.kisayolAdi(), "Ledger Alarm");
+  u.degistir("al-kisayol", "Sabah");
+  esit(u.veri().ayar.kisayol, "Sabah");
+  icerir(u.html("b-alarm"), "name=Sabah");
+  u.degistir("al-kisayol", "   ");           // boş bırakılırsa varsayılana döner
+  esit(u.veri().ayar.kisayol, "Ledger Alarm");
+});
+
+await dene("kısayol açılmadıysa uygulama sessizce başarılı saymaz", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  u.ic.alarmKur("namaz");
+  const h = u.html("b-alarm");
+  icerir(h, "Kısayollar açılmadıysa");
+  icerir(h, "kısayolu yok");
+  icerir(h, "doğrula");
+  icerir(h, "yeniden kur");                  // kurulduğu yine de işaretlenir
 });
 
 bolum("§8.5 — iOS: alarm değil, takvim bildirimi");

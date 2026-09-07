@@ -2,23 +2,33 @@
 
 ## Alarm yöntemi
 
-**Seçilen:** §8.1 — Android `intent://` ile telefonun kendi saat uygulamasına alarm
-kurmak. Yanında iki destek katmanı: §8.6 uygulama içi bildirim (uygulama açık veya
-arka plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
+**Seçilen:** Cihaza göre iki dal; ikisi de aynı işi yapar — telefonun kendi saat
+uygulamasına **gerçek alarm** kurar, bildirim göndermez.
+
+- **Android → §8.1** `intent://` ile `SET_ALARM`.
+- **iPhone → §8.7** Kısayollar. Saat uygulamasının açık bir URL şeması yok, ama
+  Kısayollar'ın `Alarm Oluştur` eylemi var ve bir kısayol `shortcuts://` ile
+  dışarıdan çalıştırılabiliyor. Uygulama kısayola yalnız `SS:DD` metnini geçirir.
+
+Yanında iki destek katmanı: §8.6 uygulama içi bildirim (uygulama açık veya arka
+plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
 
 **Gerekçe:** §8'in dört ölçütü sırayla:
 
 1. *Kullanıcı gerçekten uyanabiliyor mu?* Intent, bildirim göstermez — telefonun
    **gerçek alarmını** kurar. Sessiz modda çalar, ses seviyesi alarm kanalındadır,
    Rahatsız Etmeyin'i standart olarak deler. Web bildirimi bunların hiçbirini yapmaz.
-2. *Kurulum maliyeti?* Sıfır. Uygulama kurulmuyor, hesap açılmıyor, cron
-   ayarlanmıyor. Bir düğmeye basılıyor.
+2. *Kurulum maliyeti?* Android'de sıfır: bir düğmeye basılıyor. iPhone'da bir
+   kerelik dört adımlık kısayol — iki eylem sürükleniyor, isim yazılıyor. İkisinde
+   de uygulama kurulmuyor, hesap açılmıyor, cron ayarlanmıyor, sunucu gerekmiyor.
+   Kısayollar iOS'ta zaten yüklü geliyor.
 3. *Kaç hareketli parça?* Bir: tarayıcı → saat uygulaması. ntfy'de dört
    (cron-job.org → Vercel → ntfy sunucusu → ntfy uygulaması); zincirin herhangi bir
    halkası sessizce kopabilir.
 4. *Bozulduğunda fark edilir mi?* Evet. Alarm kurma dokunuşu kullanıcının kendi
-   hareketidir ve saat uygulaması onay verir. Intent açılmazsa uygulama saatleri
-   ekranda gösterip "elle kur" der — sessizce başarısız olmaz.
+   hareketidir ve saat uygulaması onay verir. Intent ya da kısayol açılmazsa
+   uygulama saatleri ekranda gösterip ne yapılacağını yazar — sessizce başarısız
+   olmaz.
 
 **Elenenler ve nedeni:**
 
@@ -34,8 +44,9 @@ arka plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
   kapalıyken çalar). Android Studio + JDK kurulumu, gradle sürüm hataları, her
   değişiklikte yeniden derleme gerekiyor. Ölçüt 2 bunu eliyor. Uygulama olgunlaşır
   ve alarm intent'i yetmezse doğru sonraki adım budur; kurulumu aşağıda.
-- **§8.5 iOS** — kullanıcının cihazı Android. `.ics` üretimi yine de var, ama
-  arayüzde "bu bir alarm değil, takvim bildirimi" diye yazıyor.
+- **§8.5 iOS `.ics`** — birincil olamaz: takvim bildirimi alarm değildir, sessiz
+  modda susar ve tek uyarıyla geçer. §8.7 çıkınca ikincil katmana düştü; üretimi
+  duruyor, arayüzde "bu bir alarm değil, takvim bildirimi" diye yazıyor.
 
 **Bu yöntem şu durumda bozulur:**
 
@@ -45,14 +56,24 @@ arka plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
   dokunuş daha ister.
 - Uygulama ana ekrandan (standalone) açıldığında intent'i işleyen tarayıcı bağlamı
   değişebilir. Bu durumda uygulama saatleri gösterip elle kurmayı önerir.
+- **iPhone'a özel:** kısayol hiç kurulmadıysa ya da adı uygulamadaki adla
+  tutmuyorsa `shortcuts://` yalnız Kısayollar'ı açar, alarm kurulmaz. Uygulama
+  bunu göremez; "kur"dan sonra "Kısayollar açılmadıysa kısayol yok ya da adı
+  tutmuyor" uyarısını basar ve saat ekranda kalır. Kısayolun adı arayüzden
+  değiştirilebilir.
+- Kısayol URL'den ilk çalıştırıldığında iOS bir kez onay sorar; kullanıcı bunu
+  kısayolun ayarlarından kapatmazsa her seferinde bir dokunuş daha ister.
 - **Sessizce bozulmaz** ama **geriye dönük de çalışmaz:** alarm bir kez kurulur,
   kurulduktan sonra uygulama onu silemez veya güncelleyemez. Plan değişirse
   kullanıcının alarmı saat uygulamasından kendi düzeltmesi gerekir.
 
-> **Doğrulama durumu:** Intent akışı masaüstünde ve Android Chrome kullanıcı
-> aracısıyla test edildi; **gerçek bir Android cihazda henüz denenmedi** — bunu
-> ancak telefonunla sen doğrulayabilirsin. §14'ün "gerçek bir cihazda denenmiş"
-> maddesi bu yüzden açık duruyor. Denedikten sonra sonucu buraya yaz.
+> **Doğrulama durumu:** Her iki akış da sahte DOM'da, kendi cihaz kimlikleriyle
+> test edildi (§8.1 intent adresi, §8.7 kısayol adresi, kurulum yönergesinin yalnız
+> iPhone'da çıkması, kısayol adının bağlantıya taşınması). **Gerçek bir cihazda
+> henüz denenmedi** — özellikle iOS'ta `Alarm Oluştur` eyleminin saat alanının
+> `Metinden Tarih Al` çıktısını kabul ettiğini ancak telefonda görebilirsin.
+> §14'ün "gerçek bir cihazda denenmiş" maddesi bu yüzden açık duruyor. Denedikten
+> sonra sonucu buraya yaz.
 
 ## Yapı
 

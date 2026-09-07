@@ -270,6 +270,11 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .al-saat{ flex:0 0 auto; font-family:var(--bas); font-size:1.25rem; min-width:3.4em; }
 .al-ad{ flex:1 1 auto; color:var(--sonuk); font-size:.95rem; }
 
+.kisayol{ margin-top:14px; }
+.kisayol > summary{ cursor:pointer; min-height:44px; display:flex; align-items:center; }
+.kisayol-adim{ margin:6px 0 0; padding-left:1.3em; }
+.kisayol-adim > li{ margin:5px 0; }
+
 .ay-blok{ padding:16px 0; }
 .ay-blok + .ay-blok{ border-top:1px solid var(--cizgi); }
 .ay-bas{ margin:0 0 6px; }
@@ -991,8 +996,10 @@ $kaza.addEventListener("click", e => {
 
 /* ===============================================================
    §8 — Alarm
-   Seçilen birincil yöntem: 8.1 Android intent. Yanında 8.6 uygulama içi
-   bildirim ve isteğe bağlı 8.2 ntfy. Gerekçesi README'de.
+   Birincil yöntem cihaza göre değişir: Android'de 8.1 intent, iPhone'da 8.7
+   Kısayollar. İkisi de telefonun kendi saat uygulamasına gerçek alarm kurar —
+   bildirim değil. Yanında 8.6 uygulama içi bildirim ve isteğe bağlı 8.2 ntfy.
+   Gerekçesi README'de.
    =============================================================== */
 
 const $alarm = document.getElementById("b-alarm");
@@ -1016,6 +1023,30 @@ function iosMu(){
          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 function platform(){ return iosMu() ? "ios" : androidMi() ? "android" : "bilinmiyor"; }
+
+/* --- 8.7 iOS: Kısayollar ile gerçek alarm --------------------- */
+/* Saat uygulamasının açık bir URL şeması yok, ama Kısayollar'ın "Alarm Oluştur"
+   eylemi var ve bir kısayol shortcuts:// ile dışarıdan çalıştırılabiliyor.
+   Kurulan şey intent'le aynı cinstendir: Saat uygulamasında gerçek bir alarm,
+   sessiz modda çalar, Rahatsız Etmeyin'i deler. Farkı, bir kerelik kısayol
+   kurulumu istemesi — bu yüzden yönerge düğmenin hemen altında duruyor.
+   Kısayola giden metin yalnız "SS:DD"; etiket kısayolun içinde sabit, çünkü
+   ayrıştırma her eklenen eylemde kurulum maliyetini artırıyor (§8 ölçüt 2). */
+const KISAYOL_VARSAYILAN = "Ledger Alarm";
+function kisayolAdi(){ return UYG.veri.ayar.kisayol || KISAYOL_VARSAYILAN; }
+function kisayolAdresi(saat, dakika){
+  return "shortcuts://x-callback-url/run-shortcut" +
+    "?name=" + encodeURIComponent(kisayolAdi()) +
+    "&input=text" +
+    "&text=" + encodeURIComponent(iki(saat) + ":" + iki(dakika)) +
+    "&x-success=" + encodeURIComponent(location.href.split("#")[0]);
+}
+/** Cihaza uygun alarm bağlantısı. Bilinmeyen cihazda intent denenir (§8.1). */
+function alarmAdresi(b){
+  if(!b) return "";
+  return platform() === "ios" ? kisayolAdresi(b.saat, b.dakika)
+                              : intentAdresi(b.saat, b.dakika, b.mesaj);
+}
 
 /* Kalkış saati: yarının planı yoksa bugünün uyku maddesinden, o da yoksa 08:00.
    Kullanıcı elle değiştirebilir; değiştirdiği saat saklanır. */
@@ -1061,17 +1092,21 @@ function alarmBilgisi(tur){
   return { saat: +p[0], dakika: +p[1], mesaj: "Kalk" };
 }
 
-/* Kurma işini <a href="intent://..."> yapıyor; burada yalnız kayıt tutulup
-   ne olduğu yazılıyor. Tarayıcı kimliğine bakıp denemeyi reddetmiyoruz:
-   "masaüstü sitesi iste" açıkken Android telefon da masaüstü görünüyor,
-   ve denemenin maliyeti yok. Olmadığında saat zaten ekranda duruyor (§8.1). */
+/* Kurma işini bağlantının kendisi yapıyor (intent:// veya shortcuts://);
+   burada yalnız kayıt tutulup ne olduğu yazılıyor. Tarayıcı kimliğine bakıp
+   denemeyi reddetmiyoruz: "masaüstü sitesi iste" açıkken telefon da masaüstü
+   görünüyor ve denemenin maliyeti yok. Olmadığında saat zaten ekranda (§8.1). */
 function alarmKur(tur){
   const b = alarmBilgisi(tur);
   if(!b){ alarmMesaj = "Vakitler henüz gelmedi."; alarmCiz(); return; }
   alarmIsaretle(tur);
-  alarmMesaj = iki(b.saat) + ":" + iki(b.dakika) + " için saat uygulaması açılmadıysa " +
-    "alarm kurulmamıştır; o saati elle kur." +
-    (androidMi() ? "" : " (Bu tarayıcı Android görünmüyor, muhtemelen kurulmadı.)");
+  const saat = iki(b.saat) + ":" + iki(b.dakika);
+  alarmMesaj = platform() === "ios"
+    ? saat + " için Kısayollar açılmadıysa “" + kisayolAdi() + "” kısayolu yok " +
+      "ya da adı tutmuyor; aşağıdaki kurulumu bir kez yap. Açıldıysa Saat " +
+      "uygulamasında alarmın göründüğünü doğrula."
+    : saat + " için saat uygulaması açılmadıysa alarm kurulmamıştır; o saati elle kur." +
+      (androidMi() ? "" : " (Bu tarayıcı Android görünmüyor, muhtemelen kurulmadı.)");
   alarmCiz();
 }
 
@@ -1111,24 +1146,46 @@ function icsIndir(){
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
+/* Kısayol bir kez kurulur. Kurulmadan "kur" yalnız Kısayollar'ı açar, o yüzden
+   yönerge ayarlara gömülmüyor — düğmenin hemen altında, kapalı duruyor. */
+function kisayolKurulumu(){
+  const ad = kacir(kisayolAdi());
+  return '<details class="kisayol">' +
+    '<summary class="sonuk">bir kerelik kurulum — “' + ad + '” kısayolu</summary>' +
+    '<ol class="sonuk kisayol-adim">' +
+      '<li>Kısayollar uygulamasını aç, sağ üstteki + ile yeni kısayol yap.</li>' +
+      '<li><b>Metinden Tarih Al</b> eylemini ekle; girdisi <b>Kısayol Girdisi</b> olsun.</li>' +
+      '<li><b>Alarm Oluştur</b> eylemini ekle; saatine bir önceki adımın ' +
+        '<b>Tarih</b> değişkenini koy, etiketine ne istersen yaz.</li>' +
+      '<li>Kısayolun adını <b>' + ad + '</b> yap ve kaydet.</li>' +
+    '</ol>' +
+    '<div class="plan-alt">' +
+      '<label class="sonuk" for="al-kisayol">kısayol adı</label>' +
+      '<input type="text" id="al-kisayol" value="' + ad + '" ' +
+        'style="width:10em" aria-label="kısayol adı">' +
+    '</div>' +
+    '<p class="sonuk" style="margin:10px 0 0">' +
+      'Kurulan şey gerçek alarmdır: Saat uygulamasında görünür, sessiz modda çalar, ' +
+      'Rahatsız Etmeyin’i deler. Kısayol ilk çalışmada bir kez onay ister; ' +
+      'onayı kısayolun ayarlarından kapatabilirsin.' +
+    '</p>' +
+  '</details>';
+}
+
 function alarmCiz(){
   const imsak  = yarininImsagi();
   const kalkis = kalkisSaati();
   const yarin  = gunKaydir(uygulamaGunu(), 1);
 
   const satir = (tur, saat, ad) => {
-    const b = alarmBilgisi(tur);
-    let eylem;
-    if(platform() === "ios"){
-      // Safari intent:// şemasını tanımıyor; bağlantıyı hiç basmıyoruz (§8.5).
-      eylem = '<span class="sonuk">saat uygulamasına elle</span>';
-    }else{
-      const adres = b ? intentAdresi(b.saat, b.dakika, b.mesaj) : "";
-      eylem = '<a class="dg ' + (alarmKuruldu(tur) ? "dg-sonuk" : "dg-bir") + '" ' +
-        'href="' + kacir(adres) + '" data-alarm="' + tur + '">' +
-        (alarmKuruldu(tur) ? "yeniden kur" : "kur") +
+    // Safari intent:// şemasını tanımıyor ("adres geçersiz"), Android da
+    // shortcuts:// bilmiyor; her cihaza kendi şeması basılıyor (§8.1, §8.7).
+    const adres = alarmAdresi(alarmBilgisi(tur));
+    const eylem =
+      '<a class="dg ' + (alarmKuruldu(tur) ? "dg-sonuk" : "dg-bir") + '" ' +
+      'href="' + kacir(adres) + '" data-alarm="' + tur + '">' +
+      (alarmKuruldu(tur) ? "yeniden kur" : "kur") +
       '</a>';
-    }
     return '<li>' +
       '<span class="al-saat">' + saat + '</span>' +
       '<span class="al-ad">' + ad + '</span>' + eylem +
@@ -1148,14 +1205,11 @@ function alarmCiz(){
       '<button class="dg dg-sonuk" id="al-ics">takvime ekle (.ics)</button>' +
     '</div>' +
     '<p class="sonuk" style="margin:10px 0 0">' +
-      (platform() === "ios"
-        ? "iPhone'da web sayfası alarm kuramaz. Yukarıdaki saatleri Saat " +
-          "uygulamasına elle gir. .ics dosyası alarm değildir; takvim bildirimi " +
-          "verir, sessiz modda susar ve çalar saat gibi çalmaz."
-        : "Alarm telefonun kendi saat uygulamasına kurulur; sessiz modda da çalar. " +
-          ".ics dosyası alarm değildir, yalnız takvim bildirimi verir.") +
+      "Alarm telefonun kendi saat uygulamasına kurulur; sessiz modda da çalar. " +
+      ".ics dosyası alarm değildir, yalnız takvim bildirimi verir." +
     '</p>' +
-    (alarmMesaj ? '<p class="sonuk" style="margin:8px 0 0">' + kacir(alarmMesaj) + '</p>' : "");
+    (alarmMesaj ? '<p class="sonuk" style="margin:8px 0 0">' + kacir(alarmMesaj) + '</p>' : "") +
+    (platform() === "ios" ? kisayolKurulumu() : "");
 }
 
 $alarm.addEventListener("click", e => {
@@ -1168,6 +1222,12 @@ $alarm.addEventListener("click", e => {
 $alarm.addEventListener("change", e => {
   if(e.target.id === "al-kalkis" && e.target.value){
     UYG.veri.ayar.kalkis = e.target.value;
+    kaydet();
+    alarmCiz();
+  }
+  if(e.target.id === "al-kisayol"){
+    const ad = (e.target.value || "").trim();
+    UYG.veri.ayar.kisayol = ad || KISAYOL_VARSAYILAN;
     kaydet();
     alarmCiz();
   }

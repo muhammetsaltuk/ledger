@@ -235,7 +235,7 @@ function kur(se = {}){
     "aktifAralik","siradakiAralik","vakitGetir","namazKur","namazCiz","namazIsaretle",
     "gunKaydi","sureMetni","konumuKullan","konumSor","kaydet","yukle","VAKITLER",
     "borcTara","kazaCiz","toplamBorc","islenmisMi","borcDegistir","vakitleriHazirla",
-    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR","etkinlikCozumle","etkinlikKaydet","etkinlikSil","etkinlikCiz","tarihYaz","degerlendir","degerCiz","profilGuncelle","profilZamaniMi","ayarCiz","modelIste","sohbetGonder","sohbetCiz","sohbetYaz","sohbetAc","SOHBET_SINIR","intentAdresi","alarmBilgisi","iosMu","platform","kalkisSaati","yarininImsagi","alarmKur","alarmKuruldu","alarmCiz","icsUret","bildirimTara","bildirimGonder","bildirimDurumu","topicUret","cronAdresi","ayarlarCiz","SU_ARALIK","CIKISA_KALA"
+    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR","etkinlikCozumle","etkinlikKaydet","etkinlikSil","etkinlikCiz","tarihYaz","degerlendir","degerCiz","profilGuncelle","profilZamaniMi","ayarCiz","modelIste","sohbetGonder","sohbetCiz","sohbetYaz","sohbetAc","SOHBET_SINIR","intentAdresi","kisayolAdresi","kisayolAdi","alarmAdresi","alarmBilgisi","iosMu","platform","kalkisSaati","yarininImsagi","alarmKur","alarmKuruldu","alarmCiz","icsUret","bildirimTara","bildirimGonder","bildirimDurumu","topicUret","cronAdresi","ayarlarCiz","SU_ARALIK","CIKISA_KALA"
   ].join(",") + " };", ctx, { filename:"index.html<script>" });
 
   return {
@@ -254,6 +254,16 @@ function kur(se = {}){
     html(id){ return belge.getElementById(id).innerHTML; },
     /** localStorage'daki uygulama verisi. */
     veri(){ return JSON.parse(durum.depo.get("ledger/v1") || "{}"); },
+    /** Bir girdiye değer yazıp change olayını tetikler.
+        Dinleyiciler bölüm elemanına bağlı ve e.target.id'ye bakıyor; gerçek
+        DOM'da olay oraya kabarıyor, burada elle taşınıyor. */
+    degistir(id, deger){
+      const hedef = { id, value: deger, closest(){ return null; } };
+      let calisti = false;
+      for(const e of belge._elemanlar.values())
+        for(const f of e.dinleyiciler.change || []){ f({ target: hedef }); calisti = true; }
+      if(!calisti) throw new Error("change dinleyicisi yok: " + id);
+    },
     /** Kayıtlı setInterval geri çağrılarını bir kez çalıştır. */
     tik(){ durum.zamanlayicilar.filter(z => z.aralik).forEach(z => z.f()); },
     bekle(){ return new Promise(r => setImmediate(r)); }
