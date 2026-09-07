@@ -1009,6 +1009,13 @@ function intentAdresi(saat, dakika, mesaj){
     "end";
 }
 function androidMi(){ return /Android/i.test(navigator.userAgent || ""); }
+function iosMu(){
+  const ua = navigator.userAgent || "";
+  // iPadOS 13+ kendini Mac gibi tanıtıyor; dokunma noktasından ayırt ediliyor.
+  return /iPad|iPhone|iPod/.test(ua) ||
+         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+function platform(){ return iosMu() ? "ios" : androidMi() ? "android" : "bilinmiyor"; }
 
 /* Kalkış saati: yarının planı yoksa bugünün uyku maddesinden, o da yoksa 08:00.
    Kullanıcı elle değiştirebilir; değiştirdiği saat saklanır. */
@@ -1111,14 +1118,20 @@ function alarmCiz(){
 
   const satir = (tur, saat, ad) => {
     const b = alarmBilgisi(tur);
-    const adres = b ? intentAdresi(b.saat, b.dakika, b.mesaj) : "";
-    return '<li>' +
-      '<span class="al-saat">' + saat + '</span>' +
-      '<span class="al-ad">' + ad + '</span>' +
-      '<a class="dg ' + (alarmKuruldu(tur) ? "dg-sonuk" : "dg-bir") + '" ' +
+    let eylem;
+    if(platform() === "ios"){
+      // Safari intent:// şemasını tanımıyor; bağlantıyı hiç basmıyoruz (§8.5).
+      eylem = '<span class="sonuk">saat uygulamasına elle</span>';
+    }else{
+      const adres = b ? intentAdresi(b.saat, b.dakika, b.mesaj) : "";
+      eylem = '<a class="dg ' + (alarmKuruldu(tur) ? "dg-sonuk" : "dg-bir") + '" ' +
         'href="' + kacir(adres) + '" data-alarm="' + tur + '">' +
         (alarmKuruldu(tur) ? "yeniden kur" : "kur") +
-      '</a>' +
+      '</a>';
+    }
+    return '<li>' +
+      '<span class="al-saat">' + saat + '</span>' +
+      '<span class="al-ad">' + ad + '</span>' + eylem +
     '</li>';
   };
 
@@ -1135,8 +1148,12 @@ function alarmCiz(){
       '<button class="dg dg-sonuk" id="al-ics">takvime ekle (.ics)</button>' +
     '</div>' +
     '<p class="sonuk" style="margin:10px 0 0">' +
-      'Alarm telefonun kendi saat uygulamasına kurulur; sessiz modda da çalar. ' +
-      '.ics dosyası alarm değildir, yalnız takvim bildirimi verir.' +
+      (platform() === "ios"
+        ? "iPhone'da web sayfası alarm kuramaz. Yukarıdaki saatleri Saat " +
+          "uygulamasına elle gir. .ics dosyası alarm değildir; takvim bildirimi " +
+          "verir, sessiz modda susar ve çalar saat gibi çalmaz."
+        : "Alarm telefonun kendi saat uygulamasına kurulur; sessiz modda da çalar. " +
+          ".ics dosyası alarm değildir, yalnız takvim bildirimi verir.") +
     '</p>' +
     (alarmMesaj ? '<p class="sonuk" style="margin:8px 0 0">' + kacir(alarmMesaj) + '</p>' : "");
 }

@@ -1059,6 +1059,17 @@ await dene("alarm bölümünde iki saat de yazılı", async () => {
   icerir(h, "7 Eylül");
 });
 
+await dene("iPhone'da intent bağlantısı hiç basılmaz", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  esit(u.ic.platform(), "ios");
+  const h = u.html("b-alarm");
+  icermez(h, "intent://");                  // Safari "adres geçersiz" derdi
+  icerir(h, "saat uygulamasına elle");
+  icerir(h, "05:02");                       // saat yine de ekranda
+  icerir(h, "web sayfası alarm kuramaz");
+  icerir(h, "çalar saat gibi çalmaz");      // .ics'in ne olmadığı yazılı
+});
+
 bolum("§8.5 — iOS: alarm değil, takvim bildirimi");
 
 await dene(".ics VALARM ile üretilir ve alarm olmadığı yazılı", async () => {
