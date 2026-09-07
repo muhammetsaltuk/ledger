@@ -1,11 +1,5 @@
 # Ledger
 
-Namaz vakitleri, kaza borcu ve günlük düzen için tek kullanıcılık bir PWA.
-Derleme adımı yok — düz HTML/CSS/JS. Veri telefonda, `localStorage`'da kalır.
-
-İsim, uygulamanın ne yaptığından geliyor: bir sicil defteri. Puan vermez, rozet
-dağıtmaz, seri tutmaz. Sadece ne olduğunu yazar ve ertesi gün onu okur.
-
 ## Alarm yöntemi
 
 **Seçilen:** §8.1 — Android `intent://` ile telefonun kendi saat uygulamasına alarm
