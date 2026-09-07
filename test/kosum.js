@@ -76,6 +76,7 @@ function eleman(id, belge){
  *   se.simdi   — başlangıç zamanı (Date veya "2026-09-06T07:30:00")
  *   se.depo    — başlangıç localStorage içeriği (nesne)
  *   se.konum   — "izinli" | "izinsiz" | "yok"
+ *   se.anaEkran— true: uygulama ana ekrandan açılmış (standalone)
  *   se.ag      — true: aladhan cevap verir, false: uçak modu
  *   se.vakitler— DD-MM-YYYY -> vakit tablosu (varsayılan SABIT)
  */
@@ -139,7 +140,10 @@ function kur(se = {}){
       get href(){ return durum.gidilenAdres || "https://ledger.test/"; },
       set href(v){ durum.gidilenAdres = v; }        // intent:// navigasyonu
     },
-    matchMedia: () => ({ matches:false, addEventListener(){}, addListener(){} }),
+    matchMedia: sorgu => ({
+      matches: se.anaEkran === true && /standalone/.test(String(sorgu || "")),
+      addEventListener(){}, addListener(){}
+    }),
     addEventListener(){},
     setTimeout(f, ms){ const h = { f, ms }; durum.zamanlayicilar.push(h); return h; },
     clearTimeout(){},
@@ -160,6 +164,7 @@ function kur(se = {}){
         ? "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 Version/18.2 Mobile/15E148 Safari/604.1"
         : "Mozilla/5.0 (Linux; Android 14) Chrome/126",
       platform: se.cihaz === "ios" ? "iPhone" : "Win32",
+      standalone: se.anaEkran === true ? true : undefined,   // iOS ana ekran bayrağı
       maxTouchPoints: se.cihaz === "ios" ? 5 : 0,
       geolocation: se.konum === "yok" ? undefined : {
         getCurrentPosition(basarili, hata){
@@ -235,7 +240,7 @@ function kur(se = {}){
     "aktifAralik","siradakiAralik","vakitGetir","namazKur","namazCiz","namazIsaretle",
     "gunKaydi","sureMetni","konumuKullan","konumSor","kaydet","yukle","VAKITLER",
     "borcTara","kazaCiz","toplamBorc","islenmisMi","borcDegistir","vakitleriHazirla",
-    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR","etkinlikCozumle","etkinlikKaydet","etkinlikSil","etkinlikCiz","tarihYaz","degerlendir","degerCiz","profilGuncelle","profilZamaniMi","ayarCiz","modelIste","sohbetGonder","sohbetCiz","sohbetYaz","sohbetAc","SOHBET_SINIR","intentAdresi","kisayolAdresi","kisayolAdi","alarmAdresi","alarmBilgisi","iosMu","platform","kalkisSaati","yarininImsagi","alarmKur","alarmKuruldu","alarmCiz","icsUret","bildirimTara","bildirimGonder","bildirimDurumu","topicUret","cronAdresi","ayarlarCiz","SU_ARALIK","CIKISA_KALA"
+    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR","etkinlikCozumle","etkinlikKaydet","etkinlikSil","etkinlikCiz","tarihYaz","degerlendir","degerCiz","profilGuncelle","profilZamaniMi","ayarCiz","modelIste","sohbetGonder","sohbetCiz","sohbetYaz","sohbetAc","SOHBET_SINIR","intentAdresi","kisayolAdresi","kisayolAdi","anaEkrandaMi","alarmAdresi","alarmBilgisi","iosMu","platform","kalkisSaati","yarininImsagi","alarmKur","alarmKuruldu","alarmCiz","icsUret","bildirimTara","bildirimGonder","bildirimDurumu","topicUret","cronAdresi","ayarlarCiz","SU_ARALIK","CIKISA_KALA"
   ].join(",") + " };", ctx, { filename:"index.html<script>" });
 
   return {

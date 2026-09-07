@@ -1080,6 +1080,21 @@ await dene("iPhone'da kısayol bağlantısı basılır ve saati taşır", async 
   icerir(h, "kur");
 });
 
+await dene("ana ekrandan açılınca x-success verilmez", async () => {
+  // Safari'de x-success sayfaya geri getiriyor; ana ekranda ise iOS aynı https
+  // adresini Safari'de açıp kullanıcıyı uygulamanın tarayıcı kopyasına düşürüyor.
+  const tarayici = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  esit(tarayici.ic.anaEkrandaMi(), false);
+  icerir(tarayici.html("b-alarm"), "x-success=");
+
+  const anaEkran = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios", anaEkran:true });
+  esit(anaEkran.ic.anaEkrandaMi(), true);
+  const h = anaEkran.html("b-alarm");
+  icermez(h, "x-success");
+  icerir(h, "shortcuts://x-callback-url/run-shortcut");   // kısayol yine çalışıyor
+  icerir(h, "text=05%3A02");
+});
+
 await dene("kısayol adresi Android'de hiç kullanılmaz", async () => {
   const u = await ac({ simdi:"2026-09-06T22:00:00" });
   const h = u.html("b-alarm");
@@ -1132,6 +1147,56 @@ await dene("adın birebir eşleşmesi gerektiği kurulumda yazılı", async () =
   icerir(h, "adı başkaysa");                 // yeniden adlandırma şart değil
 });
 
+await dene("kalkış ayrı, tekrarlı kısayolu kullanır", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  esit(u.ic.kisayolAdi("kalkis"), "Ledger Kalkış");
+  esit(u.ic.kisayolAdi("namaz"), "Ledger Alarm");
+  const h = u.html("b-alarm");
+  icerir(h, "name=Ledger%20Kalk");            // kalkış satırı ikinci kısayola gidiyor
+  icerir(h, "name=Ledger%20Alarm");
+  icerir(h, "Kalk · her gün");                // satırda tekrarlı olduğu yazılı
+  u.degistir("al-kisayol-kalkis", "Uyan");
+  esit(u.veri().ayar.kisayolKalkis, "Uyan");
+  icerir(u.html("b-alarm"), "name=Uyan");
+  u.degistir("al-kisayol-kalkis", "");        // boşsa varsayılana döner
+  esit(u.veri().ayar.kisayolKalkis, "Ledger Kalkış");
+});
+
+await dene("kalkış alarmı güne değil saate bağlı kurulu sayılır", async () => {
+  // Tekrarlı alarm bir kez kurulur; ertesi gün yeniden kurmak Saat
+  // uygulamasında ikinci bir alarm bırakırdı.
+  const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  esit(u.ic.alarmKuruldu("kalkis"), false);
+  u.ic.alarmKur("kalkis");
+  esit(u.ic.alarmKuruldu("kalkis"), true);
+  esit(u.veri().ayar.alarmKuruldu.kalkis, "08:00");   // gün değil, saat
+  icerir(u.html("b-alarm"), "her gün tekrarlıyor");
+  icerir(u.html("b-alarm"), "ikinci bir alarm");
+
+  u.ic.UYG.veri.ayar.kalkis = "07:15";                // saat değişti
+  esit(u.ic.alarmKuruldu("kalkis"), false);           // yeniden kurulmalı
+});
+
+await dene("kalkış kaydı ertesi güne geçince silinmez", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  u.ic.alarmKur("kalkis");
+  u.ic.alarmKur("namaz");
+  const v = await ac({ simdi:"2026-09-08T22:00:00", cihaz:"ios",
+                       depo: Object.fromEntries(u.durum.depo) });
+  esit(v.ic.alarmKuruldu("kalkis"), true);            // tekrarlı, duruyor
+  esit(v.ic.alarmKuruldu("namaz"), false);            // tek seferlik, düştü
+});
+
+await dene("kurulum ikinci kısayolu ve tekrar ayarını anlatıyor", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  const h = u.html("b-alarm");
+  icerir(h, "Çoğalt");
+  icerir(h, "Duplicate");
+  icerir(h, "Tekrarla");
+  icerir(h, "Every Day");
+  icerir(h, "Ledger Kalkış");
+});
+
 bolum("§8.5 — iOS: alarm değil, takvim bildirimi");
 
 await dene(".ics VALARM ile üretilir ve alarm olmadığı yazılı", async () => {
@@ -1141,6 +1206,9 @@ await dene(".ics VALARM ile üretilir ve alarm olmadığı yazılı", async () =
   icerir(ics, "BEGIN:VALARM");
   icerir(ics, "SUMMARY:Sabah namazı");
   icerir(ics, "SUMMARY:Kalk");
+  // Kalkış her gün tekrarlı, imsak değil: imsak vakti her gün kayıyor.
+  icerir(ics, "RRULE:FREQ=DAILY");
+  esit((ics.match(/RRULE:FREQ=DAILY/g) || []).length, 1);
   icerir(u.html("b-alarm"), ".ics dosyası alarm değildir");
 });
 

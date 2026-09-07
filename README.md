@@ -10,6 +10,24 @@ uygulamasına **gerçek alarm** kurar, bildirim göndermez.
   Kısayollar'ın `Alarm Oluştur` eylemi var ve bir kısayol `shortcuts://` ile
   dışarıdan çalıştırılabiliyor. Uygulama kısayola yalnız `SS:DD` metnini geçirir.
 
+**iPhone'da iki kısayol var, bir değil.** Tekrar ayarı kısayolun içinde duruyor ve
+dışarıdan verilemiyor:
+
+| Kısayol | Tekrar | Neden |
+|---|---|---|
+| `Ledger Alarm` | tek seferlik | İmsak her gün kayıyor; tekrarlı bir alarm birkaç hafta sonra yanlış saatte çalardı. Ertesi gün yenisi kurulur. |
+| `Ledger Kalkış` | her gün | Kalkış saati kullanıcının kendi seçtiği sabit saat. Bir kez kurulur, her sabah çalar. |
+
+Tek kısayolda ayırmak için metni bölüp koşula sokmak gerekirdi — kurulum maliyeti
+iki katına çıkardı (ölçüt 2). İkinci kısayol, birincinin **Çoğalt**'ı: ad değişir,
+`Tekrarla → Her Gün` seçilir.
+
+Kalkış alarmı tekrarlı olduğu için uygulama onu **güne değil saate** bağlı
+işaretliyor: kullanıcı kalkış saatini değiştirmedikçe "kurulu" sayılıyor ve
+düğmeye ikinci kez basılması istenmiyor — basılsaydı Saat uygulamasında ikinci bir
+tekrarlı alarm kalırdı. Saat değişirse işaret düşüyor ve arayüz eskisini silmeyi
+söylüyor.
+
 Yanında iki destek katmanı: §8.6 uygulama içi bildirim (uygulama açık veya arka
 plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
 
@@ -50,6 +68,9 @@ plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
 
 **Bu yöntem şu durumda bozulur:**
 
+- **Android'de tekrarlı alarm yok:** `SET_ALARM`'ın `DAYS` ek bilgisi
+  `ArrayList<Integer>` ve `intent:` URI şemasında dizi yazılamıyor. Orada kalkış
+  alarmı da tek seferlik kurulur, her akşam yeniden basmak gerekir.
 - Kullanıcı Chrome dışında bir tarayıcı kullanırsa (Firefox `intent://` desteklemez).
 - Cihaz üreticisi `SET_ALARM` intent'ini kısıtlarsa; bazı Xiaomi/Huawei ROM'larında
   `SKIP_UI` yok sayılır ve saat uygulaması açılır — alarm yine kurulur ama bir
@@ -67,19 +88,25 @@ plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
   kurulduktan sonra uygulama onu silemez veya güncelleyemez. Plan değişirse
   kullanıcının alarmı saat uygulamasından kendi düzeltmesi gerekir.
 
-> **Doğrulama durumu:** Her iki akış da sahte DOM'da, kendi cihaz kimlikleriyle
-> test edildi (§8.1 intent adresi, §8.7 kısayol adresi, kurulum yönergesinin yalnız
-> iPhone'da çıkması, kısayol adının bağlantıya taşınması).
+> **Doğrulama durumu — §8.7 gerçek bir iPhone'da baştan sona çalıştı.** Zincirin
+> tamamı denendi: uygulamadaki bağlantı Safari'den Kısayollar'a geçti, `name`
+> parametresindeki kısayolu buldu, `SS:DD` metnini `Get Dates from Input` ile
+> tarihe çevirdi, `Create Alarm` o tarihte Saat uygulamasında **gerçek bir alarm
+> kurdu**. §14'ün "gerçek bir cihazda denenmiş" maddesi iOS tarafında kapandı.
 >
-> **Gerçek iPhone'da doğrulanan:** `shortcuts://x-callback-url/run-shortcut`
-> bağlantısı Safari'den açılıyor, Kısayollar uygulaması devralıyor ve `name`
-> parametresindeki adı arıyor — kısayol yokken "kısayol bulunamadı" hatası
-> veriyor. Yani şema ve ad geçişi çalışıyor.
+> Yol boyunca çıkan üç şey ve çözümleri:
 >
-> **Hâlâ doğrulanmadı:** `Alarm Oluştur` eyleminin saat alanının
-> `Metinden Tarih Al` çıktısını kabul edip Saat uygulamasında gerçekten alarm
-> kurması. §14'ün "gerçek bir cihazda denenmiş" maddesi bu yüzden açık duruyor.
-> Android intent akışı da gerçek cihazda hiç denenmedi.
+> - Kısayol yokken Kısayollar "could not find the shortcut" diyor. Uyarı metni
+>   "Kısayollar açılmadıysa" diyerek kullanıcıyı yanlış yere bakmaya gönderiyordu;
+>   artık üç hâl ayrı yazılı.
+> - Eylem adları cihazın diline göre değişiyor; Türkçe adlarla yazılmış yönerge
+>   İngilizce telefonda aranamıyordu. İkisi de yazılıyor.
+> - `x-success` kullanıcıyı ana ekrandaki uygulamadan Safari'ye atıyordu; artık
+>   yalnız tarayıcıdayken veriliyor.
+>
+> **Hâlâ doğrulanmadı:** `Ledger Kalkış` kısayolunun `Her Gün` tekrarı ve
+> **Android intent akışının tamamı** — elde Android telefon yok. §8.1 için §14
+> maddesi açık duruyor.
 
 ## Yapı
 

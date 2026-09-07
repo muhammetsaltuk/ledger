@@ -1032,19 +1032,41 @@ function platform(){ return iosMu() ? "ios" : androidMi() ? "android" : "bilinmi
    kurulumu istemesi — bu yüzden yönerge düğmenin hemen altında duruyor.
    Kısayola giden metin yalnız "SS:DD"; etiket kısayolun içinde sabit, çünkü
    ayrıştırma her eklenen eylemde kurulum maliyetini artırıyor (§8 ölçüt 2). */
-const KISAYOL_VARSAYILAN = "Ledger Alarm";
-function kisayolAdi(){ return UYG.veri.ayar.kisayol || KISAYOL_VARSAYILAN; }
-function kisayolAdresi(saat, dakika){
+/* İki ayrı kısayol, çünkü tekrar ayarı kısayolun içinde duruyor ve dışarıdan
+   verilemiyor: namaz alarmı tek seferlik (imsak her gün kayıyor, ertesi gün
+   yenisi kurulur), kalkış alarmı her gün tekrarlı. Tek kısayolda ayırmak için
+   metni bölüp koşula sokmak gerekirdi — kurulum maliyeti iki katına çıkardı. */
+const KISAYOL_VARSAYILAN        = "Ledger Alarm";     // tek seferlik
+const KISAYOL_KALKIS_VARSAYILAN = "Ledger Kalkış";    // her gün tekrarlı
+function kisayolAdi(tur){
+  return tur === "kalkis"
+    ? (UYG.veri.ayar.kisayolKalkis || KISAYOL_KALKIS_VARSAYILAN)
+    : (UYG.veri.ayar.kisayol || KISAYOL_VARSAYILAN);
+}
+/** Uygulama ana ekrandan mı açıldı (tarayıcı kabuğu yok). */
+function anaEkrandaMi(){
+  if(navigator.standalone === true) return true;      // iOS'un kendi bayrağı
+  return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+}
+/* x-success yalnız tarayıcıdayken veriliyor. Ana ekrandan açıldığında iOS o
+   https adresini Safari'de açıyor ve kullanıcıyı uygulamanın tarayıcı
+   kopyasına düşürüyor — alarm kuruluyor ama yanlış uygulamada uyanıyorsun.
+   Parametre yokken kısayol bitince Kısayollar'da kalınıyor; geri dönüş bir
+   kaydırma, yanlış uygulamaya atılmaktan iyi. */
+function kisayolAdresi(saat, dakika, tur){
   return "shortcuts://x-callback-url/run-shortcut" +
-    "?name=" + encodeURIComponent(kisayolAdi()) +
+    "?name=" + encodeURIComponent(kisayolAdi(tur)) +
     "&input=text" +
     "&text=" + encodeURIComponent(iki(saat) + ":" + iki(dakika)) +
-    "&x-success=" + encodeURIComponent(location.href.split("#")[0]);
+    (anaEkrandaMi() ? "" : "&x-success=" + encodeURIComponent(location.href.split("#")[0]));
 }
-/** Cihaza uygun alarm bağlantısı. Bilinmeyen cihazda intent denenir (§8.1). */
-function alarmAdresi(b){
+/** Cihaza uygun alarm bağlantısı. Bilinmeyen cihazda intent denenir (§8.1).
+    Android'de tekrar yok: SET_ALARM'ın DAYS ek bilgisi ArrayList<Integer> ve
+    intent URI şemasında dizi yazılamıyor — orada kalkış da tek seferlik. */
+function alarmAdresi(tur){
+  const b = alarmBilgisi(tur);
   if(!b) return "";
-  return platform() === "ios" ? kisayolAdresi(b.saat, b.dakika)
+  return platform() === "ios" ? kisayolAdresi(b.saat, b.dakika, tur)
                               : intentAdresi(b.saat, b.dakika, b.mesaj);
 }
 
@@ -1070,14 +1092,21 @@ function yarininImsagi(){
   return l[l.length - 1].bit;      // yatsının bitişi = ertesi günün Fajr'ı
 }
 
+/* Namaz alarmı yarın için kurulur ve orada biter; kaydı da o güne bağlı.
+   Kalkış alarmı her gün tekrarladığı için güne değil saate bağlı: kullanıcı
+   kalkış saatini değiştirmedikçe "kurulu" sayılır. İkinci kez kurmak Saat
+   uygulamasında ikinci bir tekrarlı alarm bırakırdı. */
 function alarmKuruldu(tur){
   const k = UYG.veri.ayar.alarmKuruldu || {};
+  if(tur === "kalkis") return k.kalkis === kalkisSaati();
   return k[tur] === gunKaydir(uygulamaGunu(), 1);
 }
 function alarmIsaretle(tur){
   const k = UYG.veri.ayar.alarmKuruldu || (UYG.veri.ayar.alarmKuruldu = {});
+  if(tur === "kalkis"){ k.kalkis = kalkisSaati(); kaydet(); return; }
   k[tur] = gunKaydir(uygulamaGunu(), 1);         // hangi gün için kurulduğu
-  for(const a of Object.keys(k)) if(k[a] < uygulamaGunu()) delete k[a];
+  for(const a of Object.keys(k))
+    if(a !== "kalkis" && k[a] < uygulamaGunu()) delete k[a];
   kaydet();
 }
 
@@ -1121,18 +1150,21 @@ function icsUret(){
   const yarin = gunKaydir(uygulamaGunu(), 1);
   const kalkis = saatDate(yarin, kalkisSaati());
 
-  const olay = (bas, ad) =>
+  /* Kalkış her gün tekrarlı (§8.7), imsak değil: imsak vakti her gün kayıyor,
+     tekrarlı bir olay birkaç hafta sonra yanlış saati gösterirdi. */
+  const olay = (bas, ad, hergun) =>
     "BEGIN:VEVENT\r\n" +
     "UID:" + ad.replace(/\s/g,"") + "-" + z(bas) + "@ledger\r\n" +
     "DTSTAMP:" + z(new Date()) + "\r\n" +
     "DTSTART:" + z(bas) + "\r\n" +
+    (hergun ? "RRULE:FREQ=DAILY\r\n" : "") +
     "DURATION:PT15M\r\n" +
     "SUMMARY:" + ad + "\r\n" +
     "BEGIN:VALARM\r\nTRIGGER:PT0M\r\nACTION:DISPLAY\r\nDESCRIPTION:" + ad + "\r\nEND:VALARM\r\n" +
     "END:VEVENT\r\n";
 
   return "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Ledger//TR\r\n" +
-    olay(imsak, "Sabah namazı") + olay(kalkis, "Kalk") +
+    olay(imsak, "Sabah namazı", false) + olay(kalkis, "Kalk", true) +
     "END:VCALENDAR\r\n";
 }
 function icsIndir(){
@@ -1150,9 +1182,10 @@ function icsIndir(){
 /* Kısayol bir kez kurulur. Kurulmadan "kur" yalnız Kısayollar'ı açar, o yüzden
    yönerge ayarlara gömülmüyor — düğmenin hemen altında, kapalı duruyor. */
 function kisayolKurulumu(){
-  const ad = kacir(kisayolAdi());
+  const ad     = kacir(kisayolAdi());
+  const adKalk = kacir(kisayolAdi("kalkis"));
   return '<details class="kisayol">' +
-    '<summary class="sonuk">bir kerelik kurulum — “' + ad + '” kısayolu</summary>' +
+    '<summary class="sonuk">bir kerelik kurulum — iki kısayol</summary>' +
     '<ol class="sonuk kisayol-adim">' +
       '<li>Kısayollar (<i>Shortcuts</i>) uygulamasını aç, sağ üstteki + ile ' +
         'yeni kısayol yap.</li>' +
@@ -1163,19 +1196,30 @@ function kisayolKurulumu(){
         'istersen yaz.</li>' +
       '<li>Kısayolun adını <b>' + ad + '</b> yap ve kaydet. Ad buradakiyle ' +
         'birebir aynı olmalı — Kısayollar adı harfi harfine arıyor.</li>' +
+      '<li>Kalkış için ikincisi: bu kısayola uzun bas → <b>Çoğalt</b> ' +
+        '(<i>Duplicate</i>), adını <b>' + adKalk + '</b> yap, içindeki ' +
+        '<b>Alarm Oluştur</b> eyleminde <b>Tekrarla</b> (<i>Repeat</i>) → ' +
+        '<b>Her Gün</b> (<i>Every Day</i>) seç.</li>' +
     '</ol>' +
     '<div class="plan-alt">' +
-      '<label class="sonuk" for="al-kisayol">kısayol adı</label>' +
+      '<label class="sonuk" for="al-kisayol">namaz kısayolu</label>' +
       '<input type="text" id="al-kisayol" value="' + ad + '" ' +
-        'style="width:10em" aria-label="kısayol adı">' +
+        'style="width:10em" aria-label="namaz kısayolunun adı">' +
+    '</div>' +
+    '<div class="plan-alt" style="margin-top:8px">' +
+      '<label class="sonuk" for="al-kisayol-kalkis">kalkış kısayolu</label>' +
+      '<input type="text" id="al-kisayol-kalkis" value="' + adKalk + '" ' +
+        'style="width:10em" aria-label="kalkış kısayolunun adı">' +
     '</div>' +
     '<p class="sonuk" style="margin:10px 0 0">' +
       'Kurulan şey gerçek alarmdır: Saat uygulamasında görünür, sessiz modda çalar, ' +
       'Rahatsız Etmeyin’i deler. Kısayol ilk çalışmada bir kez onay ister; ' +
       'onayı kısayolun ayarlarından (<i>Ask Before Running</i>) kapatabilirsin. ' +
-      'Kısayolunun adı başkaysa yukarıdaki kutuya onu yaz; kısayolu yeniden ' +
-      'adlandırman gerekmez. Eylem adları telefonun diline göre değişir, ' +
-      'yukarıda ikisi de yazılı.' +
+      'Kısayollarının adı başkaysa yukarıdaki kutulara onları yaz; kısayolları ' +
+      'yeniden adlandırman gerekmez. Eylem adları telefonun diline göre değişir, ' +
+      'yukarıda ikisi de yazılı. Alarm kurulduktan sonra: Safari’den açtıysan ' +
+      'sayfaya kendiliğinden dönersin, ana ekrandaki uygulamadan açtıysan ' +
+      'Kısayollar’da kalırsın — Ledger’a geçmen yeter.' +
     '</p>' +
   '</details>';
 }
@@ -1188,7 +1232,7 @@ function alarmCiz(){
   const satir = (tur, saat, ad) => {
     // Safari intent:// şemasını tanımıyor ("adres geçersiz"), Android da
     // shortcuts:// bilmiyor; her cihaza kendi şeması basılıyor (§8.1, §8.7).
-    const adres = alarmAdresi(alarmBilgisi(tur));
+    const adres = alarmAdresi(tur);
     const eylem =
       '<a class="dg ' + (alarmKuruldu(tur) ? "dg-sonuk" : "dg-bir") + '" ' +
       'href="' + kacir(adres) + '" data-alarm="' + tur + '">' +
@@ -1204,7 +1248,7 @@ function alarmCiz(){
     '<h2 class="bolum-bas">Yarın<span class="yan">' + tarihYaz(yarin) + '</span></h2>' +
     '<ul class="alarm-liste">' +
       (imsak ? satir("namaz", ss(imsak), "Sabah namazı") : "") +
-      satir("kalkis", kalkis, "Kalk") +
+      satir("kalkis", kalkis, "Kalk · her gün") +
     '</ul>' +
     '<div class="plan-alt">' +
       '<label class="sonuk" for="al-kalkis">kalkış</label>' +
@@ -1214,8 +1258,17 @@ function alarmCiz(){
     '</div>' +
     '<p class="sonuk" style="margin:10px 0 0">' +
       "Alarm telefonun kendi saat uygulamasına kurulur; sessiz modda da çalar. " +
+      "Kalkış alarmı her gün tekrarlar, sabah namazı alarmı tek seferliktir — " +
+      "imsak her gün kaydığı için ertesi gün yeniden kurulur. " +
       ".ics dosyası alarm değildir, yalnız takvim bildirimi verir." +
     '</p>' +
+    (alarmKuruldu("kalkis")
+      ? '<p class="sonuk" style="margin:8px 0 0">' +
+          "Kalkış alarmı " + kacir(kalkis) + " için kurulu ve her gün tekrarlıyor; " +
+          "yeniden kurman gerekmiyor. Kurarsan Saat uygulamasında ikinci bir alarm " +
+          "olur. Saati değiştirirsen eskisini Saat uygulamasından sil." +
+        '</p>'
+      : "") +
     (alarmMesaj ? '<p class="sonuk" style="margin:8px 0 0">' + kacir(alarmMesaj) + '</p>' : "") +
     (platform() === "ios" ? kisayolKurulumu() : "");
 }
@@ -1236,6 +1289,12 @@ $alarm.addEventListener("change", e => {
   if(e.target.id === "al-kisayol"){
     const ad = (e.target.value || "").trim();
     UYG.veri.ayar.kisayol = ad || KISAYOL_VARSAYILAN;
+    kaydet();
+    alarmCiz();
+  }
+  if(e.target.id === "al-kisayol-kalkis"){
+    const ad = (e.target.value || "").trim();
+    UYG.veri.ayar.kisayolKalkis = ad || KISAYOL_KALKIS_VARSAYILAN;
     kaydet();
     alarmCiz();
   }
