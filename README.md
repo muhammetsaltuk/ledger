@@ -68,6 +68,13 @@ api/parse.js    Gemini — serbest metni etkinliğe çevirir
 api/push.js     ntfy'ye bildirim gönderir
 ```
 
+## Model
+
+§12 `gemini-2.0-flash` diyordu; o model emekliye ayrıldı ve API 404 ile
+`models/gemini-3.6-flash` kullanılmasını söylüyor. Google'ın gösterdiği halefe
+geçildi — `api/_ortak.js` içinde tek satır. Yapılandırılmış çıktı ve ücretsiz
+katman aynı şekilde çalışıyor.
+
 ## Yayına alma
 
 **Canlı:** <https://ledger-muhammetsaltuks-projects.vercel.app>

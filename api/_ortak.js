@@ -4,7 +4,11 @@
    GEMINI_API_KEY hiçbir koşulda istemciye gitmez: anahtar yalnız burada,
    sunucu tarafında okunur. */
 
-const MODEL = "gemini-2.0-flash";
+/* §12 "gemini-2.0-flash" diyordu ama o model emekliye ayrıldı; API artık
+   404 ile "models/gemini-3.6-flash kullanın" diyor. Google'ın kendi
+   gösterdiği halefe geçildi. Yapılandırılmış çıktı (responseSchema) ve
+   ücretsiz katman aynı şekilde çalışıyor. */
+const MODEL = "gemini-3.6-flash";
 const TABAN = "https://generativelanguage.googleapis.com/v1beta/models/";
 
 /* §12 — ortak sistem promptu. Dört fonksiyon da bununla başlar. */

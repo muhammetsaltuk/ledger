@@ -132,13 +132,13 @@ await dene("sistem promptu §12'deki kurallarla gider", async () => {
   icerir(sis, "suçlayıcı veya utandırıcı");
 });
 
-await dene("yapılandırılmış çıktı zorunlu, model gemini-2.0-flash", async () => {
+await dene("yapılandırılmış çıktı zorunlu, model gemini-3.6-flash", async () => {
   const kayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
   await plan(istek(ORNEK_GOVDE), cevap());
   const g = kayit.istekler[0].govde;
   esit(g.generationConfig.responseMimeType, "application/json");
   dogru(g.generationConfig.responseSchema, "responseSchema gitmeli");
-  icerir(kayit.istekler[0].url, "gemini-2.0-flash:generateContent");
+  icerir(kayit.istekler[0].url, "gemini-3.6-flash:generateContent");
   icerir(kayit.istekler[0].url, "key=test-anahtari");
 });
 
