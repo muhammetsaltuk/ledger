@@ -1093,6 +1093,10 @@ await dene("kurulum yönergesi yalnız iPhone'da ve düğmenin altında", async 
   icerir(h, "bir kerelik kurulum");
   icerir(h, "Alarm Oluştur");               // hangi eylem olduğu yazılı
   icerir(h, "Metinden Tarih Al");
+  // Telefon İngilizceyse eylem Türkçe adıyla aranmıyor; ikisi de yazılı olmalı.
+  icerir(h, "Create Alarm");
+  icerir(h, "Get Dates from Input");
+  icerir(h, "Shortcut Input");
   icerir(h, "sessiz modda çalar");          // neden alarm olduğu yazılı
   const and = await ac({ simdi:"2026-09-06T22:00:00" });
   icermez(and.html("b-alarm"), "bir kerelik kurulum");

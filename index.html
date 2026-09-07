@@ -1154,10 +1154,13 @@ function kisayolKurulumu(){
   return '<details class="kisayol">' +
     '<summary class="sonuk">bir kerelik kurulum — “' + ad + '” kısayolu</summary>' +
     '<ol class="sonuk kisayol-adim">' +
-      '<li>Kısayollar uygulamasını aç, sağ üstteki + ile yeni kısayol yap.</li>' +
-      '<li><b>Metinden Tarih Al</b> eylemini ekle; girdisi <b>Kısayol Girdisi</b> olsun.</li>' +
-      '<li><b>Alarm Oluştur</b> eylemini ekle; saatine bir önceki adımın ' +
-        '<b>Tarih</b> değişkenini koy, etiketine ne istersen yaz.</li>' +
+      '<li>Kısayollar (<i>Shortcuts</i>) uygulamasını aç, sağ üstteki + ile ' +
+        'yeni kısayol yap.</li>' +
+      '<li><b>Metinden Tarih Al</b> (<i>Get Dates from Input</i>) eylemini ekle; ' +
+        'girdisi <b>Kısayol Girdisi</b> (<i>Shortcut Input</i>) olsun.</li>' +
+      '<li><b>Alarm Oluştur</b> (<i>Create Alarm</i>) eylemini ekle; saatine bir ' +
+        'önceki adımın <b>Tarih</b> (<i>Dates</i>) değişkenini koy, etiketine ne ' +
+        'istersen yaz.</li>' +
       '<li>Kısayolun adını <b>' + ad + '</b> yap ve kaydet. Ad buradakiyle ' +
         'birebir aynı olmalı — Kısayollar adı harfi harfine arıyor.</li>' +
     '</ol>' +
@@ -1169,8 +1172,10 @@ function kisayolKurulumu(){
     '<p class="sonuk" style="margin:10px 0 0">' +
       'Kurulan şey gerçek alarmdır: Saat uygulamasında görünür, sessiz modda çalar, ' +
       'Rahatsız Etmeyin’i deler. Kısayol ilk çalışmada bir kez onay ister; ' +
-      'onayı kısayolun ayarlarından kapatabilirsin. Kısayolunun adı başkaysa ' +
-      'yukarıdaki kutuya onu yaz; kısayolu yeniden adlandırman gerekmez.' +
+      'onayı kısayolun ayarlarından (<i>Ask Before Running</i>) kapatabilirsin. ' +
+      'Kısayolunun adı başkaysa yukarıdaki kutuya onu yaz; kısayolu yeniden ' +
+      'adlandırman gerekmez. Eylem adları telefonun diline göre değişir, ' +
+      'yukarıda ikisi de yazılı.' +
     '</p>' +
   '</details>';
 }
