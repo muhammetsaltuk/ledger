@@ -68,6 +68,17 @@ api/parse.js    Gemini — serbest metni etkinliğe çevirir
 api/push.js     ntfy'ye bildirim gönderir
 ```
 
+## Canlı doğrulama
+
+Dört yapay zeka fonksiyonu da üretimde, gerçek anahtarla denendi:
+
+| Uç nokta | Sonuç |
+|---|---|
+| `api/parse` | "12 Eylül saat 14te berber" → `2026-09-12 / 14:00 / Berber` |
+| `api/chat` | "Sabahları koşamıyorum" → koşu 16:30'a taşındı, kahvaltı korundu, profile satır düştü |
+| `api/review` | 120 kelime altı düz metin, somut gözlem + tek ölçülebilir öneri, liste yok |
+| `api/plan` | Kurs sabit ve akşam namazı için bölünmüş, kurs günü uyku iki parçalı, kahvaltı spordan 40 dk sonra, kod bloğu profildeki kanıta göre 10:30, ikindi borcuna karşılık bir kaza namazı, yatmadan 20 dk kitap |
+
 ## Model
 
 §12 `gemini-2.0-flash` diyordu; o model emekliye ayrıldı ve API 404 ile
