@@ -69,11 +69,17 @@ plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
 
 > **Doğrulama durumu:** Her iki akış da sahte DOM'da, kendi cihaz kimlikleriyle
 > test edildi (§8.1 intent adresi, §8.7 kısayol adresi, kurulum yönergesinin yalnız
-> iPhone'da çıkması, kısayol adının bağlantıya taşınması). **Gerçek bir cihazda
-> henüz denenmedi** — özellikle iOS'ta `Alarm Oluştur` eyleminin saat alanının
-> `Metinden Tarih Al` çıktısını kabul ettiğini ancak telefonda görebilirsin.
-> §14'ün "gerçek bir cihazda denenmiş" maddesi bu yüzden açık duruyor. Denedikten
-> sonra sonucu buraya yaz.
+> iPhone'da çıkması, kısayol adının bağlantıya taşınması).
+>
+> **Gerçek iPhone'da doğrulanan:** `shortcuts://x-callback-url/run-shortcut`
+> bağlantısı Safari'den açılıyor, Kısayollar uygulaması devralıyor ve `name`
+> parametresindeki adı arıyor — kısayol yokken "kısayol bulunamadı" hatası
+> veriyor. Yani şema ve ad geçişi çalışıyor.
+>
+> **Hâlâ doğrulanmadı:** `Alarm Oluştur` eyleminin saat alanının
+> `Metinden Tarih Al` çıktısını kabul edip Saat uygulamasında gerçekten alarm
+> kurması. §14'ün "gerçek bir cihazda denenmiş" maddesi bu yüzden açık duruyor.
+> Android intent akışı da gerçek cihazda hiç denenmedi.
 
 ## Yapı
 

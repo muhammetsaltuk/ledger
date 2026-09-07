@@ -1102,8 +1102,9 @@ function alarmKur(tur){
   alarmIsaretle(tur);
   const saat = iki(b.saat) + ":" + iki(b.dakika);
   alarmMesaj = platform() === "ios"
-    ? saat + " için Kısayollar açılmadıysa “" + kisayolAdi() + "” kısayolu yok " +
-      "ya da adı tutmuyor; aşağıdaki kurulumu bir kez yap. Açıldıysa Saat " +
+    ? saat + " için: Kısayollar “kısayol bulunamadı” dediyse bu adda bir kısayol " +
+      "yok — aşağıdaki kutuya kısayolun tam adını yaz ya da kurulumu yap. " +
+      "Kısayollar hiç açılmadıysa bağlantı çalışmıyor. Açılıp kapandıysa Saat " +
       "uygulamasında alarmın göründüğünü doğrula."
     : saat + " için saat uygulaması açılmadıysa alarm kurulmamıştır; o saati elle kur." +
       (androidMi() ? "" : " (Bu tarayıcı Android görünmüyor, muhtemelen kurulmadı.)");
@@ -1157,7 +1158,8 @@ function kisayolKurulumu(){
       '<li><b>Metinden Tarih Al</b> eylemini ekle; girdisi <b>Kısayol Girdisi</b> olsun.</li>' +
       '<li><b>Alarm Oluştur</b> eylemini ekle; saatine bir önceki adımın ' +
         '<b>Tarih</b> değişkenini koy, etiketine ne istersen yaz.</li>' +
-      '<li>Kısayolun adını <b>' + ad + '</b> yap ve kaydet.</li>' +
+      '<li>Kısayolun adını <b>' + ad + '</b> yap ve kaydet. Ad buradakiyle ' +
+        'birebir aynı olmalı — Kısayollar adı harfi harfine arıyor.</li>' +
     '</ol>' +
     '<div class="plan-alt">' +
       '<label class="sonuk" for="al-kisayol">kısayol adı</label>' +
@@ -1167,7 +1169,8 @@ function kisayolKurulumu(){
     '<p class="sonuk" style="margin:10px 0 0">' +
       'Kurulan şey gerçek alarmdır: Saat uygulamasında görünür, sessiz modda çalar, ' +
       'Rahatsız Etmeyin’i deler. Kısayol ilk çalışmada bir kez onay ister; ' +
-      'onayı kısayolun ayarlarından kapatabilirsin.' +
+      'onayı kısayolun ayarlarından kapatabilirsin. Kısayolunun adı başkaysa ' +
+      'yukarıdaki kutuya onu yaz; kısayolu yeniden adlandırman gerekmez.' +
     '</p>' +
   '</details>';
 }

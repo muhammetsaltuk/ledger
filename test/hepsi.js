@@ -1108,14 +1108,24 @@ await dene("kısayol adı değiştirilince bağlantı da değişir", async () =>
   esit(u.veri().ayar.kisayol, "Ledger Alarm");
 });
 
-await dene("kısayol açılmadıysa uygulama sessizce başarılı saymaz", async () => {
+await dene("kısayol bulunamadıysa uygulama sessizce başarılı saymaz", async () => {
   const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
   u.ic.alarmKur("namaz");
   const h = u.html("b-alarm");
-  icerir(h, "Kısayollar açılmadıysa");
-  icerir(h, "kısayolu yok");
+  // Gerçek cihazda görülen iki ayrı hâl: Kısayollar açılıp "bulunamadı" diyor,
+  // ya da hiç açılmıyor. Metin ikisini de ayrı ayrı karşılıyor.
+  icerir(h, "kısayol bulunamadı");
+  icerir(h, "tam adını yaz");
+  icerir(h, "hiç açılmadıysa");
   icerir(h, "doğrula");
   icerir(h, "yeniden kur");                  // kurulduğu yine de işaretlenir
+});
+
+await dene("adın birebir eşleşmesi gerektiği kurulumda yazılı", async () => {
+  const u = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  const h = u.html("b-alarm");
+  icerir(h, "birebir aynı olmalı");
+  icerir(h, "adı başkaysa");                 // yeniden adlandırma şart değil
 });
 
 bolum("§8.5 — iOS: alarm değil, takvim bildirimi");
