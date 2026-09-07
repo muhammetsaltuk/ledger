@@ -1500,12 +1500,14 @@ async function modelIste(uc, govde){
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(govde)
   });
-  if(cevap.status === 503){
-    UYG.veri.ayar.yapayZeka = false; kaydet();
-    throw new Error("anahtar-yok");
-  }
   if(!cevap.ok){
     const h = await cevap.json().catch(() => ({}));
+    // 503 iki anlama gelir: anahtar yok, ya da model geçici olarak yoğun.
+    // Ayırmazsak Google'ın bir anlık sıkışması yapay zekayı kalıcı kapatır.
+    if(h.hata === "anahtar-yok"){
+      UYG.veri.ayar.yapayZeka = false; kaydet();
+      throw new Error("anahtar-yok");
+    }
     const hata = new Error(h.mesaj || "Model cevap vermedi.");
     hata.kullaniciya = true;
     throw hata;
@@ -1695,9 +1697,12 @@ async function etkinlikCozumle(metin){
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ metin: metin, bugun: bugun })
     });
-    if(cevap.status === 503){ UYG.veri.ayar.yapayZeka = false; kaydet(); throw new Error("anahtar-yok"); }
     if(!cevap.ok){
       const h = await cevap.json().catch(() => ({}));
+      if(h.hata === "anahtar-yok"){
+        UYG.veri.ayar.yapayZeka = false; kaydet();
+        throw new Error("anahtar-yok");
+      }
       const hata = new Error(h.mesaj || "Etkinlik çözümlenemedi."); hata.kullaniciya = true; throw hata;
     }
     const e = await cevap.json();
@@ -2172,13 +2177,13 @@ async function planUret(elle){
       })
     });
 
-    if(cevap.status === 503){                       // anahtar yok (§12)
-      UYG.veri.ayar.yapayZeka = false;
-      kaydet();
-      throw new Error("anahtar-yok");
-    }
     if(!cevap.ok){
       const h = await cevap.json().catch(() => ({}));
+      if(h.hata === "anahtar-yok"){                 // §12 — anahtar tanımlı değil
+        UYG.veri.ayar.yapayZeka = false;
+        kaydet();
+        throw new Error("anahtar-yok");
+      }
       const hata = new Error(h.mesaj || "Plan üretilemedi.");
       hata.kullaniciya = true;                      // sunucunun kendi cümlesi
       throw hata;

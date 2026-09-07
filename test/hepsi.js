@@ -590,6 +590,16 @@ await dene("plan üretimi günde en fazla üç kez", async () => {
   icerir(u.html("b-plan"), "hakkı doldu");
 });
 
+await dene("geçici yoğunluk yapay zekayı kalıcı kapatmaz", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00", api:{
+    plan:{ durum:503, hata:"yogun", mesaj:"Model şu an yoğun. Biraz sonra tekrar dene." } } });
+  esit(u.veri().ayar.yapayZeka, undefined, "anahtar var sayılmalı, kapatılmamalı");
+  icerir(u.html("b-plan"), "yoğun");
+  const once = u.durum.apiCagrilari.length;
+  await u.ic.planUret(true);
+  dogru(u.durum.apiCagrilari.length > once, "sonraki denemede yine çağırmalı");
+});
+
 bolum("§14 — anahtar yokken uygulama çalışır");
 
 await dene("anahtar yoksa plan üretilmez ama uygulama açılır", async () => {

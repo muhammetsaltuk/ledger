@@ -16,7 +16,7 @@ const SISTEM = `Kullanıcı 25 yaşında, yazılım mühendisliği mezunu, bir b
 Yalnız yaşıyor, düzeni yok, kurmaya çalışıyor. Namaza yeni başladı.
 Akşamları İngilizce kursuna gidiyor.
 
-- Türkçe yaz.
+- Türkçe yaz. Kullanıcıya "sen" diye hitap et.
 - Övme. Motivasyon cümlesi kurma. Emoji kullanma.
 - Kullanıcının dini pratiğini yorumlama; sadece tutarlılığından bahsedebilirsin.
 - Kaza borcu hakkında suçlayıcı veya utandırıcı bir dil kullanma.
@@ -115,12 +115,16 @@ function jsonCoz(metin){
 /** Beklenmedik hatayı istemciye anlaşılır biçimde ver; ayrıntı sunucu günlüğünde kalsın. */
 function hataVer(res, e){
   console.error("ledger api hatası:", e && (e.ayrinti || e.message || e));
-  const durum = e && e.durum === 429 ? 429 : 502;
+  const d = e && e.durum;
+  // 503 UNAVAILABLE geçici yoğunluk demek; "cevap vermedi" yanıltıcı oluyor.
+  const durum = (d === 429 || d === 503) ? d : 502;
+  const mesaj =
+    d === 429 ? "Ücretsiz katman kotası doldu, biraz sonra dene."
+  : d === 503 ? "Model şu an yoğun. Biraz sonra tekrar dene."
+  : "Model cevap vermedi.";
   res.status(durum).json({
-    hata: durum === 429 ? "kota" : "model",
-    mesaj: durum === 429
-      ? "Ücretsiz katman kotası doldu, biraz sonra dene."
-      : "Model cevap vermedi."
+    hata: d === 429 ? "kota" : d === 503 ? "yogun" : "model",
+    mesaj: mesaj
   });
 }
 

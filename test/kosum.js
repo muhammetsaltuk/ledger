@@ -179,7 +179,7 @@ function kur(se = {}){
             json: async () => ({ hata:"anahtar-yok" }) });
         if(sahte.durum && sahte.durum !== 200)
           return Promise.resolve({ ok:false, status:sahte.durum,
-            json: async () => ({ hata:"model", mesaj:sahte.mesaj || "hata" }) });
+            json: async () => ({ hata:sahte.hata || "model", mesaj:sahte.mesaj || "hata" }) });
         return Promise.resolve({ ok:true, status:200, json: async () => sahte });
       }
       const ekle = t => {

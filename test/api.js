@@ -185,6 +185,21 @@ await dene("kota hatası 429 olarak geçer, mesajı kullanıcıya uygun", async 
   icerir(c.veri.mesaj, "kotası doldu");
 });
 
+await dene("geçici yoğunluk 503 olarak ayrı geçer, kota ile karışmaz", async () => {
+  geminiTaklit(() => ({ durum:503, metin:"UNAVAILABLE" }));
+  const c = cevap();
+  await plan(istek(ORNEK_GOVDE), c);
+  esit(c.kod, 503);
+  esit(c.veri.hata, "yogun");
+  icerir(c.veri.mesaj, "yoğun");
+});
+
+await dene("sistem promptu kullanıcıya 'sen' diye hitap ettirir", async () => {
+  const kayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
+  await plan(istek(ORNEK_GOVDE), cevap());
+  icerir(kayit.istekler[0].govde.systemInstruction.parts[0].text, '"sen" diye hitap et');
+});
+
 await dene("gövde okunamazsa 400", async () => {
   const c = cevap();
   await plan(istek("bu json değil"), c);
