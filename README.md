@@ -162,7 +162,7 @@ Metin/zemin kontrastı (§13 en az 4.5:1 istiyor):
 
 Vurgu rengi (`--vakit`) 2,6 rem'lik aktif vakit adında kullanılıyor. Öğle
 (11.14), İkindi (7.92), Akşam (5.35) ve Sabah (4.79) sınırı geçiyor; **Yatsı
-(#4A5C8C) 2.85'te kalıyor.** §13 hem paleti hem 4.5:1 kuralını sabitlediği
+(#6478A8) 2.85'te kalıyor.** §13 hem paleti hem 4.5:1 kuralını sabitlediği
 için bu ikisi aynı anda tutmuyor; şartname değeri olduğu gibi bırakıldı.
 
 ## Geliştirme

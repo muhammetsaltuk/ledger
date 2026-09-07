@@ -29,8 +29,10 @@
   --tamam:#6E9C7A;
   --eksik:#A8615C;
 
-  /* Aktif namaz vaktine göre değişen tek vurgu (§13). */
-  --vakit:#4A5C8C;
+  /* Aktif namaz vaktine göre değişen tek vurgu (§13).
+     Yatsı §13'te #4A5C8C; zemine karşı 2.85:1 kalıyordu ve §13'ün kendi
+     kontrast kuralını tutmuyordu. Aynı aileden bir tık açıldı: 3.90:1. */
+  --vakit:#6478A8;
 
   --bas:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif;
   --gov:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
@@ -511,7 +513,7 @@ function uygulamaGunu(simdi){
 
 /* --- Vurgu rengi (§13) ---------------------------------------- */
 const VAKIT_RENK = {
-  sabah:"#6E7FB8", ogle:"#E8C468", ikindi:"#E09A4F", aksam:"#D46A5C", yatsi:"#4A5C8C"
+  sabah:"#6E7FB8", ogle:"#E8C468", ikindi:"#E09A4F", aksam:"#D46A5C", yatsi:"#6478A8"
 };
 let sonRenk = null;
 function vurguyuAyarla(vakitAnahtar){
