@@ -1,7 +1,7 @@
 /* Ledger — çevrimdışı kabuk (§2).
    Kabuk önbellekten, API çağrıları hep ağdan. Uçak modunda uygulama açılmalı (§14). */
 
-const SURUM  = "ledger-v1";
+const SURUM  = "ledger-v2";   /* §13 (v2) tema — kabuğu tazelemek için artırıldı */
 const KABUK  = [
   "./",
   "./index.html",
