@@ -151,10 +151,15 @@ Telefonda: adresi aç → paylaş → **Ana ekrana ekle**.
 
 ### Yeniden dağıtmak
 
-Repo Vercel'e git ile bağlı **değil** — bağlamak için GitHub tarafında
-[Vercel uygulamasının](https://github.com/apps/vercel) `ledger` reposuna kurulu
-olması gerekiyor. Kurulduktan sonra `npx vercel git connect` bir kez çalıştırılır
-ve her push kendiliğinden dağıtılır. O zamana kadar elle:
+Repo Vercel'e git ile **bağlı** (`muhammetsaltuks-projects/ledger`). `main`'e her
+push otomatik olarak production'a dağıtılır; başka bir şey yapmaya gerek yok.
+
+Bağlantı bir kez şöyle kuruldu: GitHub'da
+[Vercel uygulamasına](https://github.com/apps/vercel) `ledger` reposu için erişim
+verildi, sonra repo kökünde `npx vercel link` (mevcut `ledger` projesi seçildi) ve
+`npx vercel git connect` çalıştırıldı.
+
+Elle dağıtım (git bağlantısı koparsa ya da acil durumda):
 
 ```bash
 npx vercel deploy --prod
@@ -164,10 +169,12 @@ npx vercel deploy --prod
 
 ```bash
 npx vercel env add GEMINI_API_KEY production
-npx vercel deploy --prod
+npx vercel deploy --prod        # veya main'e boş bir commit push et
 ```
 
-Anahtar ücretsiz, kredi kartı istemiyor: <https://aistudio.google.com/apikey>
+`vercel env add` tek başına yeni dağıtım tetiklemez; anahtarın devreye girmesi için
+bir dağıtım daha gerekir. Anahtar ücretsiz, kredi kartı istemiyor:
+<https://aistudio.google.com/apikey>
 → "Create API key". Komut anahtarı soracak, terminale yapıştırırsın; kodda ve
 git geçmişinde yer almaz.
 
