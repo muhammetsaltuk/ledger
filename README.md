@@ -111,9 +111,9 @@ plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
 ## Yapı
 
 ```
-index.html      uygulamanın tamamı
+index.html      uygulamanın tamamı — tek sayfa, alt tab bar ile dört görünüm
 manifest.json
-sw.js           çevrimdışı kabuk
+sw.js           çevrimdışı kabuk (SURUM tema değişince artırılır)
 icons/
 api/plan.js     Gemini — günlük plan üretir
 api/review.js   Gemini — gün sonu değerlendirmesi
@@ -139,6 +139,39 @@ Dört yapay zeka fonksiyonu da üretimde, gerçek anahtarla denendi:
 `models/gemini-3.6-flash` kullanılmasını söylüyor. Google'ın gösterdiği halefe
 geçildi — `api/_ortak.js` içinde tek satır. Yapılandırılmış çıktı ve ücretsiz
 katman aynı şekilde çalışıyor.
+
+## Görsel tasarım (§13, v2)
+
+İlk §13 bilinçli olarak sade ve gamification'sızdı: kart yok (bölümler ince
+çizgiyle ayrılırdı), tek vurgu rengi yalnız aktif vakitte, övgü ve rozet yok.
+Kullanıcı "Grit / habit planner" görünümünü istedi; §13 o yönde yeniden yazıldı.
+Değişen kararlar:
+
+- **Kart tabanlı, camsı (glass) yüzeyler.** Her bölüm yuvarlak köşeli bir kart;
+  namaz ve yarın kartları `backdrop-filter` ile camsı. Zeminde sıcak, çok soluk
+  bir radyal ışıma (aktif vurgu ailesinden).
+- **Vurgu artık tema rengi.** Hâlâ tek kaynak — `--vakit`, aktif namaz vaktine
+  göre kayıyor (Sabah moru → Öğle altını → İkindi turuncusu → Akşam kızılı →
+  Yatsı mavisi) — ama artık dar bir yerde değil: birincil düğmeler, ilerleme
+  halkaları, plan saatleri, aktif sekme hep ondan besleniyor. Kural: bileşenler
+  vurgu için `var(--vakit)` yazar, vakit hex'ini elle kopyalamaz (test bunu
+  koruyor). Su kendi mavisini (`--su`), seri alevi kendi altınını (`--alev`)
+  kullanır; ikisi de vakitten bağımsız.
+- **Günlük seri (streak) ve ilerleme halkaları.** "Bugün" görünümünün üstünde
+  ardışık *tam gün* sayısı (beş vaktin hepsi işaretli) ve üç halka: namaz, su,
+  plan. Seri bugün bitmediyse dünden sayılır. Tonu olgu: "bugün tamam",
+  "bugünün N vakti kaldı" — kutlama, "seri bozuldu", emoji yok (§14 hâlâ koruyor).
+- **Alt tab bar.** Tek sayfa dört görünüme bölündü: **Bugün** (özet + namaz +
+  kaza + su), **Seri** (istatistik), **Plan** (plan + etkinlik + gün sonu +
+  sohbet), **Ayarlar** (yarın + profil + ayarlar). Seçilen sekme saklanır.
+- **Seri / istatistik ekranı.** Ay takvimi (tam gün / kısmi / boş), son 7 günün
+  başarı yüzdesi ve mini sütun grafiği, vakit bazında oranlar (her vakit kendi
+  renginde), rozetler (7 gün kesintisiz, N tam gün, kaza kalmadı…). Hepsi mevcut
+  gün kayıtlarından türetilir; yeni bir durum alanı tutulmaz.
+
+Korunan §13 maddeleri: tek sütun, ortalı düzen; `tabular-nums` ile titremeyen
+rakamlar; `prefers-reduced-motion` desteği; klavye erişimi ve görünür odak
+halkası; hiçbir metnin kullanıcıyı övmemesi ve emoji kullanılmaması (§14).
 
 ## Yayına alma
 
@@ -217,8 +250,8 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` ve `node test/api.js` ile fiilen deneniyor; tarayıcı
-kontrolleri headless Edge ile yapıldı.
+`node test/hepsi.js` (125 test) ve `node test/api.js` (35 test) ile fiilen
+deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor.
 
 | Kriter | Durum |
 |---|---|
@@ -235,32 +268,45 @@ kontrolleri headless Edge ile yapıldı.
 | Vurgu rengi ikindide turuncuya döner | ✓ test |
 | `GEMINI_API_KEY` yokken uygulama çalışır | ✓ test |
 | Uçak modunda çökmez | ✓ test |
+| Beş vakti işaretli gün "tam", seri ardışık tam günü sayar | ✓ test |
+| Bir vakit eksikse gün tam değil, seri o günde kırılır | ✓ test |
+| İlerleme halkası deger/toplam gösterir; övgü, emoji yok | ✓ test |
+| İstatistik çizimi boş gün kaydı oluşturmaz | ✓ test |
+| Alt tab: "seri" istatistiği açar, Bugün bölümlerini gizler | ✓ test |
+| Açılışta saklı sekme geri yüklenir | ✓ test |
+| Hiçbir metin kullanıcıyı övmüyor, emoji yok | ✓ test |
+| Vurgu tek kaynaktan (`--vakit`) gelir, su şeridine bulaşmaz | ✓ test |
 | Ana ekrana eklenince adres çubuğu görünmez | ✓ manifest |
-| 360 px'de yatay kaydırma yok | ✓ tarayıcı |
-| Klavyeyle gezilebilir, odak halkası görünür | ✓ tarayıcı |
+| Klavyeyle gezilebilir, odak halkası görünür | ✓ CSS + sahte DOM |
 | Seçilen alarm yöntemi gerçek cihazda denenmiş | ✗ **sende kaldı** |
 | Alarm başarısız olunca kullanıcı görür | ✓ test |
 
-Son iki satır dışında hepsi otomatik denetimde. Alarm intent'i gerçek bir
-Android telefonda denenmedi — bunu ancak sen doğrulayabilirsin: Ayarlar'ın
-üstündeki **Yarın** bölümünde "kur" düğmesine bas, saat uygulamasını aç, alarm
-görünüyor mu bak. Sonucu bu dosyaya yaz.
+Alarm intent'i gerçek bir Android telefonda denenmedi — bunu ancak sen
+doğrulayabilirsin: **Ayarlar** sekmesindeki **Yarın** kartında "kur" düğmesine
+bas, saat uygulamasını aç, alarm görünüyor mu bak. Sonucu bu dosyaya yaz.
+Yeni tema gerçek bir telefonda göz denetiminden geçmedi (cam yüzeylerin
+`backdrop-filter` görünümü, alt tab bar'ın güvenli alan payı).
 
 ### Erişilebilirlik ölçümleri
 
-Metin/zemin kontrastı (§13 en az 4.5:1 istiyor):
+Metin/zemin kontrastı (`#0E1318` zemine karşı):
 
 | Renk | Oran |
 |---|---|
 | `--metin` | 14.98 |
 | `--sonuk` | 5.26 |
 | `--tamam` | 5.95 |
-| `--eksik` | 4.03 — bu yüzden metin rengi olarak kullanılmıyor, yalnız kenar çizgisi |
+| `--eksik` | 4.03 — metin rengi olarak kullanılmıyor, yalnız kenar çizgisi |
 
-Vurgu rengi (`--vakit`) 2,6 rem'lik aktif vakit adında kullanılıyor. Öğle
-(11.14), İkindi (7.92), Akşam (5.35) ve Sabah (4.79) sınırı geçiyor; **Yatsı
-(#6478A8) 2.85'te kalıyor.** §13 hem paleti hem 4.5:1 kuralını sabitlediği
-için bu ikisi aynı anda tutmuyor; şartname değeri olduğu gibi bırakıldı.
+Vurgu (`--vakit`) v2'de geniş kullanılıyor. İki ayrı kullanım, iki ayrı eşik:
+
+- **Dolgu olarak** (birincil düğme, takvimde "tam gün", halka çizgisi): üstündeki
+  yazı koyu (`#15100A`), kontrast beş rengin hepsinde 7:1'in üstünde.
+- **Zemine karşı çizgi/işaret rengi olarak** (halka yayı, aktif vakit adı, aktif
+  sekme): Öğle 11.1, İkindi 7.9, Akşam 5.3, Sabah 4.8 — hepsi 4.5:1'i geçiyor;
+  **Yatsı 3.90**, WCAG'ın metin eşiğinin altında ama grafik/arayüz bileşeni
+  eşiğinin (3:1) ve büyük-metin eşiğinin üstünde. Aktif vakit adı 1,9 rem
+  (büyük metin) olduğu için kalıyor; şartname rengi korundu.
 
 ## Geliştirme
 

@@ -14,11 +14,14 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..600&amp;family=IBM+Plex+Sans:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
 
 <style>
 /* ---------------------------------------------------------------
-   §13 — Görsel tasarım. Bu değerler karardır, tercih değil.
+   §13 — Görsel tasarım (v2, "Grit" yönü).
+   Kart tabanlı, cam yüzeyler, yuvarlak köşeler, sıcak radyal zemin.
+   Aktif namaz vaktine göre kayan tek vurgu korunur; onun yanına
+   ilerleme halkaları, günlük seri ve istatistik geldi.
    --------------------------------------------------------------- */
 :root{
   --zemin:#0E1318;
@@ -29,16 +32,26 @@
   --tamam:#6E9C7A;
   --eksik:#A8615C;
 
-  /* Aktif namaz vaktine göre değişen tek vurgu (§13).
-     Yatsı §13'te #4A5C8C; zemine karşı 2.85:1 kalıyordu ve §13'ün kendi
-     kontrast kuralını tutmuyordu. Aynı aileden bir tık açıldı: 3.90:1. */
+  /* Cam / kart yüzeyleri */
+  --kart:rgba(255,255,255,.055);
+  --kart-cizgi:rgba(255,255,255,.075);
+  --cam:rgba(255,255,255,.038);
+  --cam-cizgi:rgba(255,255,255,.10);
+  --kart-r:22px;
+
+  /* Aktif namaz vaktine göre değişen tek vurgu.
+     Yatsı zemine karşı düşük kontrast kalıyordu; aynı aileden bir tık açıldı. */
   --vakit:#6478A8;
+
+  /* Vakitten bağımsız iki sabit renk: seri alevi ve su. */
+  --alev:#E8C468;
+  --su:#6E7FB8;
 
   --bas:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif;
   --gov:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
 
-  --en:520px;
-  --bosluk:20px;
+  --en:430px;
+  --bosluk:16px;
   --gecis:800ms;
 }
 @media (prefers-reduced-motion: reduce){
@@ -51,53 +64,71 @@ html,body{ margin:0; padding:0; }
 html{ background:var(--zemin); -webkit-text-size-adjust:100%; }
 body{
   background:var(--zemin);
+  background-image:radial-gradient(130% 55% at 50% -6%, rgba(224,154,79,.13), rgba(224,154,79,0) 60%);
+  background-attachment:fixed;
   color:var(--metin);
   font-family:var(--gov);
   font-size:1rem;
   line-height:1.5;
   font-weight:400;
   overflow-x:hidden;
-  /* Rakamlar hizalı dursun, geri sayım titremesin (§13) */
+  /* Rakamlar hizalı dursun, geri sayım titremesin */
   font-variant-numeric:tabular-nums;
 }
 
-h1,h2,h3{ font-family:var(--bas); font-weight:500; margin:0; }
+h1,h2,h3{ font-family:var(--bas); font-weight:600; margin:0; letter-spacing:-.015em; }
 
-/* --- Düzen: tek sütun, sola hizalı, en fazla 520px (§13) --- */
+/* --- Düzen: tek sütun, ortalı, en fazla 430px; altta tab bar payı --- */
 .kabuk{
   max-width:var(--en);
   margin:0 auto;
   padding:
     calc(env(safe-area-inset-top) + 18px)
     var(--bosluk)
-    calc(env(safe-area-inset-bottom) + 56px);
+    calc(env(safe-area-inset-bottom) + 96px);
+  display:flex;
+  flex-direction:column;
+  gap:14px;
 }
 
-/* Bölümler karta bölünmez; üstten ince çizgiyle ayrılır (§13) */
+/* Her bölüm bir kart. */
 .bolum{
-  padding:22px 0;
-  border-top:1px solid var(--cizgi);
+  background:var(--kart);
+  border:1px solid var(--kart-cizgi);
+  border-radius:var(--kart-r);
+  padding:18px;
 }
-.bolum:first-of-type{ border-top:0; padding-top:4px; }
 .bolum[hidden]{ display:none; }
+.bolum:empty{ display:none; }
+
+/* Camsı bölüm (hero, yarın) */
+.bolum.cam{
+  background:var(--cam);
+  border-color:var(--cam-cizgi);
+  backdrop-filter:blur(26px);
+  -webkit-backdrop-filter:blur(26px);
+}
 
 .bolum-bas{
   font-family:var(--bas);
-  font-size:1.15rem;
-  font-weight:500;
-  margin:0 0 14px;
+  font-size:1.05rem;
+  font-weight:600;
+  margin:0 0 12px;
+  display:flex;
+  align-items:baseline;
+  gap:8px;
 }
 .bolum-bas .yan{
   font-family:var(--gov);
-  font-size:.85rem;
+  font-size:.8rem;
   font-weight:400;
   color:var(--sonuk);
-  margin-left:8px;
+  margin-left:auto;
 }
 
 .sonuk{ color:var(--sonuk); font-size:.85rem; }
 
-/* --- Düğmeler: köşe yarıçapı bir karardır, tam yuvarlak (§13) --- */
+/* --- Düğmeler: tam yuvarlak; birincil dolu, ikincil hayalet --- */
 button{
   font-family:inherit;
   font-size:inherit;
@@ -112,20 +143,29 @@ button{
   align-items:center;
   justify-content:center;
   gap:8px;
-  min-height:38px;
+  min-height:40px;
   padding:0 16px;
   border-radius:999px;
-  border:1px solid var(--cizgi);
-  background:transparent;
+  border:1px solid var(--cam-cizgi);
+  background:rgba(255,255,255,.06);
   color:var(--metin);
   font-size:.9rem;
+  font-weight:500;
   line-height:1;
   text-decoration:none;                /* .dg bir <a> da olabilir */
-  transition:border-color 160ms ease,color 160ms ease;
+  transition:border-color 160ms ease,color 160ms ease,background-color 160ms ease;
 }
 .dg:hover{ border-color:var(--sonuk); }
-.dg-bir{ border-color:var(--vakit); }
-.dg-sonuk{ color:var(--sonuk); font-size:.85rem; }
+/* Birincil: aktif vakit renginde dolu düğme */
+.dg-bir{
+  background:var(--vakit);
+  border-color:var(--vakit);
+  color:#15100A;
+  font-weight:600;
+}
+.dg-bir:hover{ filter:brightness(1.08); border-color:var(--vakit); }
+.dg-sonuk{ background:transparent; color:var(--sonuk); font-size:.85rem; }
+.dg-sonuk:hover{ color:var(--metin); }
 .dg[disabled]{ opacity:.45; cursor:default; }
 
 :where(a,button,input,textarea,summary,[tabindex]):focus-visible{
@@ -137,16 +177,16 @@ input,textarea{
   font-family:inherit;
   font-size:1rem;
   color:var(--metin);
-  background:var(--yuzey);
-  border:1px solid var(--cizgi);
-  border-radius:0;
-  padding:9px 11px;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--cam-cizgi);
+  border-radius:11px;
+  padding:10px 12px;
   width:100%;
 }
 input::placeholder,textarea::placeholder{ color:var(--sonuk); }
 input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 
-/* --- Ray: yalnızca plan ve namaz listelerinde (§13) --- */
+/* --- Ray: plan ve namaz listelerinde ince sol çizgi --- */
 .ray{
   list-style:none;
   margin:0;
@@ -166,49 +206,93 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 
 .yukleniyor{ color:var(--sonuk); font-size:.85rem; }
 
+/* --- Günlük: seri bandı + ilerleme halkaları ----------------- */
+.seri-bant{
+  display:flex; align-items:center; gap:13px;
+  padding:14px 16px;
+  border:1px solid rgba(224,154,79,.34);
+  border-radius:16px;
+  background:rgba(224,154,79,.07);
+}
+.seri-bant .alev{
+  width:38px; height:38px; border-radius:13px; flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(224,154,79,.16); color:var(--alev);
+}
+.seri-bant .alev svg{ width:21px; height:21px; }
+.seri-bant b{ font-family:var(--bas); font-size:1rem; font-weight:600; }
+.seri-hafta{ display:flex; gap:6px; margin-left:auto; flex:0 0 auto; }
+.seri-hafta i{ width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.13); }
+.seri-hafta i.on{ background:var(--alev); }
+
+.halkalar{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:14px; }
+.halka{ display:flex; flex-direction:column; align-items:center; gap:7px; }
+.halka .cerceve{ position:relative; width:74px; height:74px; }
+.halka .cerceve .deger{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:var(--bas); font-weight:600; font-size:.95rem;
+}
+.halka .etiket{ font-size:.75rem; color:var(--sonuk); }
+
 /* --- §4 Namaz: şu anki vakit --------------------------------- */
-.simdi{ margin:0 0 22px; }
+.simdi{ text-align:center; margin:0 0 16px; }
+.simdi .halka-hero{ position:relative; width:172px; height:172px; margin:2px auto 12px; }
+.simdi .halka-hero .ortak{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:2px;
+}
 .vakit-ad{
   font-family:var(--bas);
-  font-size:2.6rem;
+  font-size:1.9rem;
   line-height:1.04;
-  font-weight:500;
-  letter-spacing:-.015em;
+  font-weight:700;
+  letter-spacing:-.02em;
   color:var(--vakit);
   transition:color var(--gecis) ease;
-  margin:0 0 4px;
+  margin:0;
 }
-.vakit-ad.bos{ color:var(--sonuk); font-size:1.6rem; }
-.kalan{ margin:0 0 12px; font-size:1rem; color:var(--metin); }
-.kalan .sure{ color:var(--sonuk); }
+.vakit-ad.bos{ color:var(--sonuk); font-size:1.3rem; }
+.kalan{ margin:6px 0 0; font-size:.95rem; color:var(--metin); }
+.kalan .sure{ color:var(--vakit); font-weight:600; }
 .cubuk{
-  height:2px;
-  background:var(--cizgi);
+  height:4px;
+  border-radius:999px;
+  background:rgba(255,255,255,.08);
   overflow:hidden;
+  margin-top:10px;
 }
 .cubuk > i{
   display:block;
-  height:2px;
+  height:4px;
   width:0;
+  border-radius:999px;
   background:var(--vakit);
   transition:width 1000ms linear, background-color var(--gecis) ease;
 }
 @media (prefers-reduced-motion: reduce){ .cubuk > i{ transition:none; } }
 
-/* --- §4 Namaz: beş vakit listesi (ray) ----------------------- */
+/* --- §4 Namaz: beş vakit listesi ----------------------------- */
+.namaz-liste{ list-style:none; margin:0; padding:0; border-left:0; }
 .namaz-liste > li{
   --tirnak:20px;
   display:flex;
   align-items:center;
   gap:12px;
-  padding:8px 0;
+  padding:11px 0;
   min-height:44px;
+  border-top:1px solid rgba(255,255,255,.06);
 }
-.namaz-liste > li + li{ border-top:1px solid var(--cizgi); }
-.namaz-liste > li.aktif::before{ background:var(--vakit); width:14px; }
-.n-saat{ color:var(--sonuk); font-size:.95rem; min-width:3.4em; }
-.n-ad{ flex:1 1 auto; font-size:1rem; }
-.namaz-liste > li.aktif .n-ad{ color:var(--metin); }   /* vurgu tırnakta */
+.namaz-liste > li:first-child{ border-top:0; }
+.namaz-liste > li::before{ display:none; }
+.namaz-liste > li.aktif{
+  margin:0 -18px; padding:11px 18px;
+  background:rgba(255,255,255,.045);
+  border-radius:12px;
+  border-top:0;
+}
+.n-nokta{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; background:var(--vakit); }
+.n-saat{ color:var(--sonuk); font-size:.9rem; min-width:3.2em; }
+.n-ad{ flex:1 1 auto; font-size:1rem; font-weight:500; }
 .namaz-liste > li.gecmis .n-saat,
 .namaz-liste > li.gecmis .n-ad{ color:var(--sonuk); }
 .n-durum{
@@ -224,8 +308,8 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   border:0;
 }
 .n-durum .nokta{
-  width:7px; height:7px; border-radius:999px;
-  border:1px solid var(--sonuk);
+  width:22px; height:22px; border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.2);
   flex:0 0 auto;
 }
 .n-durum.tamam{ color:var(--tamam); }
@@ -235,14 +319,14 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .n-durum.eksik{ color:var(--eksik); }
 .n-durum.eksik .nokta{ border-color:var(--eksik); }
 .n-durum.eylem{
-  border:1px solid var(--cizgi);
+  border:1px solid var(--vakit);
   border-radius:999px;
-  padding:0 13px;
+  padding:0 14px;
   color:var(--metin);
 }
-.n-durum.eylem:hover{ border-color:var(--sonuk); }
-/* Kaçmış vakitler sessiz durur: beş tane çerçeveli düğme ekranı ağırlaştırıyor
-   ve §5'in kaçınmamızı istediği suçluluk tonunu getiriyor. */
+.n-durum.eylem .nokta{ display:none; }
+.n-durum.eylem:hover{ filter:brightness(1.15); }
+/* Kaçmış vakitler sessiz durur; suçluluk tonu getirmiyoruz. */
 .n-durum.eylem-sessiz{ color:var(--sonuk); }
 .n-durum.eylem-sessiz .nokta{ border-color:var(--eksik); }
 .n-durum.eylem-sessiz:hover{ color:var(--metin); }
@@ -253,21 +337,23 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   display:flex;
   align-items:center;
   gap:12px;
-  padding:7px 0;
+  padding:11px 0;
   min-height:44px;
+  border-top:1px solid rgba(255,255,255,.06);
 }
-.kaza-liste > li + li{ border-top:1px solid var(--cizgi); }
-.k-ad{ flex:0 0 auto; }
+.kaza-liste > li:first-child{ border-top:0; }
+.k-ad{ flex:0 0 auto; font-weight:500; }
 .k-sayi{ flex:1 1 auto; color:var(--sonuk); }
 
 /* --- §8 Alarm ve ayarlar ------------------------------------- */
 .alarm-liste{ list-style:none; margin:0 0 14px; padding:0; }
 .alarm-liste > li{
   display:flex; align-items:center; gap:12px;
-  padding:7px 0; min-height:46px;
+  padding:11px 0; min-height:46px;
+  border-top:1px solid rgba(255,255,255,.06);
 }
-.alarm-liste > li + li{ border-top:1px solid var(--cizgi); }
-.al-saat{ flex:0 0 auto; font-family:var(--bas); font-size:1.25rem; min-width:3.4em; }
+.alarm-liste > li:first-child{ border-top:0; }
+.al-saat{ flex:0 0 auto; font-family:var(--bas); font-size:1.15rem; font-weight:600; min-width:3.4em; }
 .al-ad{ flex:1 1 auto; color:var(--sonuk); font-size:.95rem; }
 
 .kisayol{ margin-top:14px; }
@@ -328,14 +414,14 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .e-taslak input[type="time"]{ width:6.6em; flex:0 0 auto; }
 .e-taslak input[type="text"]{ flex:1 1 8em; }
 
-/* --- §11 Su: ince şerit. Vurgu rengi burada kullanılmaz (§13). --- */
+/* --- §11 Su: bardak şeridi. Vurgu rengi burada kullanılmaz. --- */
 .su-satir{ display:flex; align-items:center; gap:14px; }
 .su-etiket{ flex:0 0 auto; color:var(--sonuk); font-size:.85rem; }
 .su-serit{
   flex:1 1 auto;
   display:flex;
-  gap:3px;
-  padding:18px 0;              /* dokunma alanı; şeridin kendisi ince kalır */
+  gap:5px;
+  padding:14px 0;              /* dokunma alanı */
   background:none;
   border:0;
   cursor:pointer;
@@ -345,11 +431,12 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 }
 .su-serit i{
   flex:1 1 0;
-  height:4px;
-  background:var(--cizgi);
-  transition:background-color 200ms ease;
+  height:24px;
+  border-radius:5px 5px 7px 7px;
+  border:1.5px solid rgba(110,127,184,.5);
+  transition:background-color 200ms ease, border-color 200ms ease;
 }
-.su-serit i.dolu{ background:var(--sonuk); }
+.su-serit i.dolu{ background:var(--su); border-color:var(--su); }
 .su-sayi{ flex:0 0 auto; color:var(--sonuk); font-size:.85rem; min-width:3.2em; text-align:right; }
 
 /* --- §6 Plan: günün akışını gösteren ray --------------------- */
@@ -373,13 +460,19 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   margin-left:-4px;
 }
 .p-isaret .nokta{
-  width:12px; height:12px;
+  width:20px; height:20px;
   border-radius:999px;
-  border:1px solid var(--sonuk);
+  border:1.5px solid rgba(255,255,255,.22);
   transition:background-color 160ms ease, border-color 160ms ease;
 }
 .p-isaret[aria-pressed="true"] .nokta{ background:var(--tamam); border-color:var(--tamam); }
-.p-saat{ grid-column:2; grid-row:1; color:var(--sonuk); font-size:.95rem; padding-top:7px; }
+.p-saat{
+  grid-column:2; grid-row:1;
+  align-self:start;
+  color:var(--vakit); font-weight:600;
+  font-family:var(--bas); font-size:.8rem;
+  padding-top:8px;
+}
 .p-govde{
   grid-column:3; grid-row:1;
   text-align:left;
@@ -420,6 +513,91 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   border-left:2px solid var(--eksik);   /* renk anlamı taşır, metni taşımaz */
 }
 
+/* Başlık yanındaki küçük rozet (kaza sayısı vb.) */
+.rozet{
+  font-size:.7rem; font-weight:600;
+  padding:3px 9px; border-radius:999px;
+  background:rgba(168,97,92,.2); color:#d38b86;
+  border:1px solid rgba(168,97,92,.32);
+}
+.rozet.iyi{ background:rgba(110,156,122,.18); color:#8fbb9b; border-color:rgba(110,156,122,.3); }
+
+/* --- Alt tab bar ------------------------------------------------ */
+.alt-nav{
+  position:fixed; left:0; right:0; bottom:0; z-index:20;
+  display:flex; justify-content:space-around;
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  background:rgba(14,19,24,.78);
+  backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+  border-top:1px solid rgba(255,255,255,.08);
+}
+.alt-nav button{
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  color:#5C6773; font-size:.62rem; font-weight:500;
+  min-width:56px; min-height:44px;
+}
+.alt-nav button svg{ width:22px; height:22px; }
+.alt-nav button.aktif{ color:var(--vakit); }
+
+/* --- İstatistik / Seri --------------------------------------- */
+.ist-buyuk{ display:flex; align-items:center; gap:16px; }
+.ist-buyuk .alev{
+  width:52px; height:52px; border-radius:17px; flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(224,154,79,.16); color:var(--alev);
+}
+.ist-buyuk .alev svg{ width:28px; height:28px; }
+.ist-buyuk .say{ font-family:var(--bas); font-size:2.3rem; font-weight:700; line-height:1; color:var(--vakit); }
+.ist-buyuk .alt{ font-size:.8rem; color:var(--sonuk); margin-top:2px; }
+.ist-buyuk .rekor{ margin-left:auto; text-align:right; flex:0 0 auto; }
+.ist-buyuk .rekor b{ font-family:var(--bas); font-size:1.15rem; }
+.ist-blok{ margin-top:6px; }
+.ist-blok.bosluk{ margin-top:16px; }
+
+.takvim{ display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px; }
+.takvim .gunad{ font-size:.62rem; color:#5C6773; text-align:center; padding-bottom:2px; }
+.takvim .g{
+  aspect-ratio:1; border-radius:9px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:.68rem; color:var(--sonuk);
+  background:rgba(255,255,255,.045);
+}
+.takvim .g.kismi{ background:rgba(224,154,79,.32); color:#F1D9BF; }
+.takvim .g.tam{ background:var(--vakit); color:#15100A; font-weight:600; }
+.takvim .g.disi{ opacity:.3; }
+.takvim-lgnd{ display:flex; align-items:center; gap:7px; margin-top:12px; font-size:.68rem; color:#5C6773; }
+.takvim-lgnd i{ width:12px; height:12px; border-radius:4px; }
+
+.ist-oran{ display:flex; align-items:flex-end; gap:16px; }
+.ist-oran .pct{ font-family:var(--bas); font-size:2.1rem; font-weight:700; line-height:1; }
+.ist-bar{ display:flex; align-items:flex-end; gap:8px; height:72px; flex:1 1 auto; }
+.ist-bar .b{ flex:1 1 0; display:flex; flex-direction:column; align-items:center; gap:6px; height:100%; justify-content:flex-end; }
+.ist-bar .b > i{ width:100%; border-radius:6px 6px 3px 3px; background:var(--vakit); min-height:3px; }
+.ist-bar .b > span{ font-size:.6rem; color:#5C6773; }
+
+.vk-satir{ display:flex; align-items:center; gap:11px; padding:9px 0; border-top:1px solid rgba(255,255,255,.06); }
+.vk-satir:first-child{ border-top:0; }
+.vk-satir .ad{ width:52px; font-size:.82rem; flex:0 0 auto; }
+.vk-satir .ray-ic{ flex:1 1 auto; height:8px; border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; }
+.vk-satir .ray-ic > i{ display:block; height:100%; border-radius:999px; }
+.vk-satir .pc{ width:34px; text-align:right; font-size:.75rem; color:var(--sonuk); flex:0 0 auto; }
+
+.rozet-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.rz{
+  display:flex; flex-direction:column; align-items:center; gap:7px; text-align:center;
+  padding:14px 6px; border-radius:16px;
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+}
+.rz .ic{
+  width:38px; height:38px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(232,196,104,.16); color:var(--alev);
+}
+.rz .ic svg{ width:20px; height:20px; }
+.rz small{ font-size:.68rem; color:#B8C0C4; line-height:1.35; }
+.rz.kilit{ opacity:.4; }
+.rz.kilit .ic{ background:rgba(255,255,255,.06); color:var(--sonuk); }
+
 .gizli{
   position:absolute; width:1px; height:1px;
   padding:0; margin:-1px; overflow:hidden;
@@ -430,10 +608,16 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 <body>
 <main class="kabuk">
 
-  <!-- §3.1 Namaz vakitleri — en üstte, her zaman görünür -->
-  <section id="b-namaz" class="bolum" aria-label="Namaz vakitleri">
+  <!-- Günlük özet: seri bandı + ilerleme halkaları (Bugün görünümü) -->
+  <section id="b-gunluk" class="bolum" aria-label="Günlük özet"></section>
+
+  <!-- §3.1 Namaz vakitleri — Bugün görünümünün üstünde -->
+  <section id="b-namaz" class="bolum cam" aria-label="Namaz vakitleri">
     <p class="yukleniyor">Vakitler alınıyor…</p>
   </section>
+
+  <!-- İstatistik / seri (Seri görünümü) -->
+  <section id="b-istatistik" class="bolum" aria-label="İstatistik ve seri" hidden></section>
 
   <!-- §3.2 Kaza borcu — borç yoksa bölümün tamamı gizli (§5) -->
   <section id="b-kaza" class="bolum" aria-label="Kaza borcu" hidden></section>
@@ -454,7 +638,7 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   <section id="b-degerlendirme" class="bolum" aria-label="Gün sonu değerlendirmesi"></section>
 
   <!-- §8 Yarının alarmları -->
-  <section id="b-alarm" class="bolum" aria-label="Yarının alarmları"></section>
+  <section id="b-alarm" class="bolum cam" aria-label="Yarının alarmları"></section>
 
   <!-- Profil -->
   <section id="b-ayar" class="bolum" aria-label="Profil"></section>
@@ -463,6 +647,21 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   <section id="b-ayarlar" class="bolum" aria-label="Ayarlar"></section>
 
 </main>
+
+<nav class="alt-nav" id="alt-nav" aria-label="Görünüm">
+  <button type="button" data-gor="bugun" class="aktif" aria-label="Bugün">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7"/><path d="M6 10v10h12V10"/></svg>Bugün
+  </button>
+  <button type="button" data-gor="seri" aria-label="Seri ve istatistik">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M6 21V11M12 21V5M18 21v-7"/></svg>Seri
+  </button>
+  <button type="button" data-gor="plan" aria-label="Plan">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Plan
+  </button>
+  <button type="button" data-gor="ayarlar" aria-label="Ayarlar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.4"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Ayarlar
+  </button>
+</nav>
 
 <script>
 "use strict";
@@ -528,6 +727,58 @@ function vurguyuAyarla(vakitAnahtar){
   document.documentElement.style.setProperty("--vakit", renk);
   sonRenk = renk;
 }
+
+/* ===============================================================
+   §13 (v2) — Günlük seri ve ilerleme halkaları
+   Bir gün "tam": beş vaktin hepsi işaretli (vaktinde ya da kaza).
+   Seri: bugünden (bitmediyse dünden) geriye ardışık tam gün sayısı.
+   Yeni durum tutulmaz; hepsi mevcut gün kayıtlarından türetilir.
+   =============================================================== */
+function gunTamMi(tarih){
+  const g = UYG.veri.gunler[tarih];
+  if(!g || !g.namaz) return false;
+  return VAKITLER.every(v => g.namaz[v.a]);
+}
+function gununNamazSayisi(tarih){
+  const n = (UYG.veri.gunler[tarih] && UYG.veri.gunler[tarih].namaz) || {};
+  return VAKITLER.reduce((t, v) => t + (n[v.a] ? 1 : 0), 0);
+}
+function seriHesapla(){
+  const bugun = uygulamaGunu();
+  let t = gunTamMi(bugun) ? bugun : gunKaydir(bugun, -1);
+  let seri = 0;
+  while(gunTamMi(t)){ seri++; t = gunKaydir(t, -1); }
+  return seri;
+}
+function enUzunSeri(){
+  const gunler = Object.keys(UYG.veri.gunler).filter(gunTamMi).sort();
+  let en = 0, art = 0, onceki = null;
+  for(const t of gunler){
+    art = (onceki && gunKaydir(onceki, 1) === t) ? art + 1 : 1;
+    if(art > en) en = art;
+    onceki = t;
+  }
+  return Math.max(en, seriHesapla());
+}
+
+/* İlerleme halkası — SVG. Renk var(--...) olarak geçirilir, tek kaynak korunur. */
+function halkaSVG(deger, toplam, renk){
+  const c = 207.35;                                   // 2πr, r = 33
+  const dolu = toplam > 0 ? Math.max(0, Math.min(1, deger / toplam)) : 0;
+  return '<svg viewBox="0 0 80 80" width="74" height="74" aria-hidden="true">' +
+    '<circle cx="40" cy="40" r="33" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="7"></circle>' +
+    '<circle cx="40" cy="40" r="33" fill="none" stroke="' + renk + '" stroke-width="7" ' +
+      'stroke-linecap="round" stroke-dasharray="' + c.toFixed(2) + '" ' +
+      'stroke-dashoffset="' + (c * (1 - dolu)).toFixed(2) + '" transform="rotate(-90 40 40)"></circle>' +
+  '</svg>';
+}
+
+/* Alev simgesi — seri motifi. Emoji değil, çizili SVG. */
+const ALEV_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M12 3c1.6 2.8 4.5 4.4 4.5 8.2A4.5 4.5 0 0 1 7.5 12c0-1.6.7-2.9 1.6-3.7' +
+  '-.1 1.3.5 2.3 1.4 2.7-.6-2.6.3-6 0-8.2z"></path></svg>';
 
 /* ===============================================================
    §4 — Namaz modülü
@@ -737,6 +988,48 @@ function sureMetni(ms){
 
 /* --- Çizim ---------------------------------------------------- */
 const $namaz = document.getElementById("b-namaz");
+const $gunluk = document.getElementById("b-gunluk");
+
+/* Bugün görünümünün üstü: seri bandı + üç ilerleme halkası.
+   Namaz/su/plan kaydı her değiştiğinde yeniden çizilir. */
+function gunlukCiz(){
+  if(!UYG.veri) return;
+  const bugun = uygulamaGunu();
+  const seri  = seriHesapla();
+  const g     = gunKaydi(bugun);
+  const nOk   = gununNamazSayisi(bugun);
+  const su    = g.su || 0;
+  const md    = g.maddeler || [];
+  const mOk   = md.filter(m => m.yapildi).length;
+
+  let hafta = "";
+  for(let i = 6; i >= 0; i--){
+    const t = gunKaydir(bugun, -i);
+    hafta += '<i class="' + (gunTamMi(t) ? "on" : "") + '"></i>';
+  }
+
+  const alt = nOk >= 5 ? "bugün tamam"
+            : seri === 0 ? "bugünü tamamla, seriyi başlat"
+            : "bugünün " + (5 - nOk) + " vakti kaldı";
+
+  const kutu = (d, t, renk, ad) =>
+    '<div class="halka"><div class="cerceve">' + halkaSVG(d, t, renk) +
+    '<span class="deger">' + d + '/' + t + '</span></div>' +
+    '<span class="etiket">' + ad + '</span></div>';
+
+  $gunluk.innerHTML =
+    '<div class="seri-bant">' +
+      '<span class="alev">' + ALEV_SVG + '</span>' +
+      '<div><b>' + seri + ' günlük seri</b>' +
+        '<div class="sonuk">' + alt + '</div></div>' +
+      '<span class="seri-hafta">' + hafta + '</span>' +
+    '</div>' +
+    '<div class="halkalar">' +
+      kutu(nOk, 5, "var(--vakit)", "Namaz") +
+      kutu(su, SU_HEDEFI, "var(--su)", "Su") +
+      kutu(mOk, md.length || 1, "var(--tamam)", "Plan") +
+    '</div>';
+}
 
 function namazCiz(){
   const d = UYG.namaz;
@@ -760,7 +1053,12 @@ function namazCiz(){
     const oran  = Math.max(0, Math.min(1, kalan / (aktif.bit - aktif.bas)));
     ust =
       '<div class="simdi">' +
-        '<h1 class="vakit-ad">' + aktif.ad + '</h1>' +
+        '<div class="halka-hero">' + halkaSVG(1 - oran, 1, "var(--vakit)") +
+          '<div class="ortak">' +
+            '<h1 class="vakit-ad">' + aktif.ad + '</h1>' +
+            '<span class="sonuk">şu an ' + ss(an) + '</span>' +
+          '</div>' +
+        '</div>' +
         '<p class="kalan">çıkmasına <span class="sure">' + sureMetni(kalan) + '</span></p>' +
         '<div class="cubuk" role="presentation"><i style="width:' + (oran*100).toFixed(2) + '%"></i></div>' +
       '</div>';
@@ -797,6 +1095,7 @@ function namazCiz(){
 
     const sinif = (suAn ? "aktif " : "") + (gecmis && !durum ? "gecmis" : "");
     return '<li class="' + sinif.trim() + '">' +
+             '<span class="n-nokta" style="background:' + VAKIT_RENK[v.a] + '"></span>' +
              '<span class="n-saat">' + ss(v.bas) + '</span>' +
              '<span class="n-ad">' + v.ad + '</span>' +
              dugme +
@@ -814,6 +1113,8 @@ function namazCiz(){
       '<button class="dg dg-sonuk" id="konum-yenile">konumu güncelle</button>' +
     '</div>' +
     (d.hata ? '<p class="hata">' + kacir(d.hata) + '</p>' : '');
+
+  gunlukCiz();
 }
 
 function ss(d){ return iki(d.getHours()) + ":" + iki(d.getMinutes()); }
@@ -982,7 +1283,7 @@ function kazaCiz(){
     .join("");
 
   $kaza.innerHTML =
-    '<h2 class="bolum-bas">Kaza</h2>' +
+    '<h2 class="bolum-bas">Kaza<span class="rozet">' + toplamBorc() + '</span></h2>' +
     '<ul class="kaza-liste">' + satirlar + '</ul>';
 }
 
@@ -1700,7 +2001,8 @@ function degerCiz(){
     '<h2 class="bolum-bas">Gün sonu</h2>' +
     (g.degerlendirme ? '<p class="deger-metin">' + kacir(g.degerlendirme) + '</p>' : "") +
     '<div class="plan-alt">' +
-      '<button class="dg dg-sonuk" id="d-uret"' + (UYG.degerBekliyor ? " disabled" : "") + '>' +
+      '<button class="dg ' + (g.degerlendirme ? "dg-sonuk" : "dg-bir") + '" id="d-uret"' +
+        (UYG.degerBekliyor ? " disabled" : "") + '>' +
         (UYG.degerBekliyor ? "yazılıyor…" : (g.degerlendirme ? "yeniden değerlendir" : "günü değerlendir")) +
       '</button>' +
       (degerMesaj ? '<span class="sonuk">' + kacir(degerMesaj) + '</span>' : "") +
@@ -2010,6 +2312,8 @@ function suCiz(){
     "Su: " + adet + " bardak. Dokun bir bardak ekle, uzun bas geri al.");
   document.getElementById("su-sayi").textContent =
     (adet * BARDAK / 1000).toFixed(2).replace(".", ",") + " L";
+
+  gunlukCiz();
 }
 
 /* Dokun: bir bardak ekle. Uzun bas: geri al. Klavyede geri almak için
@@ -2176,13 +2480,16 @@ function planCiz(){
       '<button class="dg" id="p-ekle">ekle</button>' +
     '</div>' +
     '<div class="plan-alt">' +
-      '<button class="dg dg-sonuk" id="p-uret"' + (UYG.planUretiliyor || hak <= 0 ? " disabled" : "") + '>' +
+      '<button class="dg ' + (maddeler.length ? "dg-sonuk" : "dg-bir") + '" id="p-uret"' +
+        (UYG.planUretiliyor || hak <= 0 ? " disabled" : "") + '>' +
         (maddeler.length ? "planı yeniden üret" : "plan üret") +
       '</button>' +
       '<button class="dg dg-sonuk" id="p-etkinlik">etkinlik ekle</button>' +
       (hak < PLAN_SINIR && hak > 0 ? '<span class="sonuk">' + hak + ' hak kaldı</span>' : "") +
       (planMesaj ? '<span class="sonuk">' + kacir(planMesaj) + '</span>' : "") +
     '</div>';
+
+  gunlukCiz();
 }
 
 /* --- Olaylar -------------------------------------------------- */
@@ -2392,12 +2699,189 @@ function planHazirla(){
   planUret(false);
 }
 
+/* ===============================================================
+   §13 (v2) — İstatistik / Seri görünümü
+   Ay takvimi, son 7 gün başarısı, vakit bazında oran, rozetler.
+   Hepsi mevcut gün kayıtlarından türetilir; yeni durum tutulmaz.
+   =============================================================== */
+
+const $istatistik = document.getElementById("b-istatistik");
+
+/* Rozet: kilit ikonu (kilitli) ya da madalya (açık). */
+const RZ_KILIT =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect>' +
+  '<path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>';
+const RZ_ACIK =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="6"></circle>' +
+  '<path d="M9 9 6.5 3h11L15 9"></path></svg>';
+
+function istatistikCiz(){
+  if(!UYG.veri) return;
+  const bugun = uygulamaGunu();
+  const p = bugun.split("-").map(Number);
+  const yil = p[0], ay = p[1];
+  const basBosluk = (new Date(yil, ay - 1, 1).getDay() + 6) % 7;   // Pzt = 0
+  const gunSayisi = new Date(yil, ay, 0).getDate();
+
+  // Ay takvimi
+  let hucre = "";
+  for(const a of ["Pt","Sa","Ça","Pe","Cu","Ct","Pz"]) hucre += '<div class="gunad">' + a + '</div>';
+  for(let i = 0; i < basBosluk; i++) hucre += '<div class="g disi"></div>';
+  for(let d = 1; d <= gunSayisi; d++){
+    const t = yil + "-" + iki(ay) + "-" + iki(d);
+    let snf = "g";
+    if(t > bugun)               snf += " disi";
+    else if(gunTamMi(t))        snf += " tam";
+    else if(gununNamazSayisi(t) > 0) snf += " kismi";
+    hucre += '<div class="' + snf + '">' + d + '</div>';
+  }
+
+  // Son 7 gün: başarı yüzdesi + mini sütun grafik
+  const kisa = ["Pt","Sa","Ça","Pe","Cu","Ct","Pz"];
+  let toplamOk = 0, barlar = "";
+  for(let i = 6; i >= 0; i--){
+    const t  = gunKaydir(bugun, -i);
+    const ok = gununNamazSayisi(t);
+    toplamOk += ok;
+    barlar += '<div class="b"><i style="height:' + Math.round(ok / 5 * 100) + '%"></i>' +
+              '<span>' + kisa[(gunNesnesi(t).getDay() + 6) % 7] + '</span></div>';
+  }
+  const oran = Math.round(toplamOk / 35 * 100);
+
+  // Vakit bazında (bu ayın geçen günleri) — kayıt yoksa gün oluşturmadan oku
+  const vk = VAKITLER.map(v => {
+    let ok = 0, gecen = 0;
+    for(let d = 1; d <= gunSayisi; d++){
+      const t = yil + "-" + iki(ay) + "-" + iki(d);
+      if(t > bugun) break;
+      gecen++;
+      if(((UYG.veri.gunler[t] || {}).namaz || {})[v.a]) ok++;
+    }
+    const pc = gecen ? Math.round(ok / gecen * 100) : 0;
+    return '<div class="vk-satir"><span class="ad">' + v.ad + '</span>' +
+      '<span class="ray-ic"><i style="width:' + pc + '%; background:' + VAKIT_RENK[v.a] + '"></i></span>' +
+      '<span class="pc">%' + pc + '</span></div>';
+  }).join("");
+
+  // Rozetler — kutlama tonu yok, olgu: kaç tam gün, en uzun seri
+  const enUzun  = enUzunSeri();
+  const tamGun  = Object.keys(UYG.veri.gunler).filter(gunTamMi).length;
+  const borcYok = toplamBorc() === 0 && tamGun > 0;
+  const rozetler = [
+    { ad: "7 gün<br>kesintisiz",  acik: enUzun >= 7 },
+    { ad: "15 tam<br>gün",        acik: tamGun >= 15 },
+    { ad: "30 günlük<br>seri",    acik: enUzun >= 30 },
+    { ad: "kaza<br>kalmadı",      acik: borcYok },
+    { ad: "50 tam<br>gün",        acik: tamGun >= 50 },
+    { ad: "100 tam<br>gün",       acik: tamGun >= 100 }
+  ].map(r =>
+    '<div class="rz' + (r.acik ? "" : " kilit") + '">' +
+      '<span class="ic">' + (r.acik ? RZ_ACIK : RZ_KILIT) + '</span>' +
+      '<small>' + r.ad + '</small>' +
+    '</div>').join("");
+
+  const kaza = toplamBorc();
+
+  $istatistik.innerHTML =
+    '<div class="ist-buyuk">' +
+      '<span class="alev">' + ALEV_SVG + '</span>' +
+      '<div><div class="say">' + seriHesapla() + '</div>' +
+        '<div class="alt">günlük seri</div></div>' +
+      '<div class="rekor"><b>' + enUzun + '</b><div class="sonuk">en uzun</div></div>' +
+    '</div>' +
+
+    '<div class="ist-blok">' +
+      '<h2 class="bolum-bas">Bu ay<span class="yan">tam gün · kısmi</span></h2>' +
+      '<div class="takvim">' + hucre + '</div>' +
+      '<div class="takvim-lgnd">' +
+        '<i style="background:rgba(255,255,255,.05)"></i><span>hiç</span>' +
+        '<i style="background:rgba(224,154,79,.32)"></i><span>kısmi</span>' +
+        '<i style="background:var(--vakit)"></i><span>tam gün</span>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="ist-blok bosluk">' +
+      '<h2 class="bolum-bas">Başarı oranı<span class="yan">son 7 gün</span></h2>' +
+      '<div class="ist-oran"><div class="pct">%' + oran + '</div>' +
+        '<div class="ist-bar">' + barlar + '</div></div>' +
+    '</div>' +
+
+    '<div class="ist-blok bosluk">' +
+      '<h2 class="bolum-bas">Vakit bazında<span class="yan">bu ay</span></h2>' + vk +
+    '</div>' +
+
+    '<div class="ist-blok bosluk">' +
+      '<h2 class="bolum-bas">Rozetler</h2>' +
+      '<div class="rozet-grid">' + rozetler + '</div>' +
+    '</div>' +
+
+    (kaza > 0
+      ? '<div class="ist-blok bosluk">' +
+          '<h2 class="bolum-bas">Kaza borcu</h2>' +
+          '<p class="sonuk" style="margin:0 0 10px">' + kaza + ' namaz. Bugün sekmesinde kılabilirsin.</p>' +
+          '<button class="dg dg-sonuk" data-gor="bugun">Bugün\'e git</button>' +
+        '</div>'
+      : "");
+}
+
+$istatistik.addEventListener("click", e => {
+  const d = e.target.closest("[data-gor]");
+  if(d) gorunum(d.dataset.gor);
+});
+
+/* ===============================================================
+   Görünüm (alt tab bar): tek sayfa, bölümler sekmeye göre gösterilir.
+   =============================================================== */
+const GORUNUM = {
+  bugun:   ["b-gunluk", "b-namaz", "b-kaza", "b-su"],
+  seri:    ["b-istatistik"],
+  plan:    ["b-plan", "b-etkinlik", "b-degerlendirme", "b-sohbet"],
+  ayarlar: ["b-alarm", "b-ayar", "b-ayarlar"]
+};
+const TUM_BOLUMLER = Object.keys(GORUNUM).reduce((a, k) => a.concat(GORUNUM[k]), []);
+let aktifGorunum = "bugun";
+
+function gorunum(sekme){
+  if(!GORUNUM[sekme]) sekme = "bugun";
+  aktifGorunum = sekme;
+  if(UYG.veri && UYG.veri.ayar){ UYG.veri.ayar.sekme = sekme; kaydet(); }
+
+  for(const id of TUM_BOLUMLER){
+    const el = document.getElementById(id);
+    if(el) el.hidden = GORUNUM[sekme].indexOf(id) === -1;
+  }
+  // İçeriğe göre kendini gizleyen bölümler yeniden karar versin.
+  if(sekme === "bugun") kazaCiz();
+  if(sekme === "plan")  etkinlikCiz();
+  if(sekme === "seri")  istatistikCiz();
+
+  const nav = document.getElementById("alt-nav");
+  if(nav && nav.querySelectorAll){
+    const btns = nav.querySelectorAll("button");
+    if(btns && btns.forEach)
+      btns.forEach(b => { if(b.classList) b.classList.toggle("aktif", b.dataset && b.dataset.gor === sekme); });
+  }
+  if(typeof scrollTo === "function") try{ scrollTo(0, 0); }catch(e){}
+}
+
+(function navKur(){
+  const nav = document.getElementById("alt-nav");
+  if(!nav || !nav.addEventListener) return;
+  nav.addEventListener("click", e => {
+    const b = e.target.closest("button[data-gor]");
+    if(b) gorunum(b.dataset.gor);
+  });
+})();
+
 /* --- Açılış --------------------------------------------------- */
 function baslat(){
   UYG.veri  = yukle();
   UYG.bugun = uygulamaGunu();
   vurguyuAyarla("yatsi");
 
+  gunlukCiz();
   kazaCiz();
   suCiz();
   planCiz();
@@ -2407,6 +2891,8 @@ function baslat(){
   alarmCiz();
   ayarCiz();
   ayarlarCiz();
+  istatistikCiz();
+  gorunum((UYG.veri.ayar && UYG.veri.ayar.sekme) || "bugun");
 
   // Plan üretimi vakitleri de gönderir (§6), o yüzden namazKur'dan sonra.
   namazKur().then(borcTara).then(planHazirla).then(() => {

@@ -1352,16 +1352,125 @@ await dene("hiçbir metin kullanıcıyı övmüyor, emoji yok", async () => {
   }
 });
 
-await dene("vurgu rengi yalnız §13'ün izin verdiği yerlerde", async () => {
+await dene("vurgu tek kaynaktan gelir (--vakit), su şeridine bulaşmaz", async () => {
   const fs = require("fs"), path = require("path");
   const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
-  const kullanim = (css.match(/var\(--vakit\)/g) || []).length;
-  // aktif vakit adı, kalan süre çubuğu, aktif vakit tırnağı, aktif satır adı,
-  // birincil düğme kenarlığı, odak halkası, giriş odağı
-  dogru(kullanim <= 8, "vurgu rengi dağılmamalı, kullanım: " + kullanim);
+  // §13 (v2): vurgu artık tema rengi ve geniş kullanılıyor — ama tek kaynaktan.
+  // :root dışındaki kurallar vurgu için hep var(--vakit) yazar, vakit hex'ini
+  // (VAKIT_RENK haricinde) elle kopyalamaz.
+  const kokSonu = css.indexOf("}", css.indexOf(":root{")) + 1;
+  const kurallar = css.slice(kokSonu);
+  for(const hex of ["#6478A8", "#E09A4F", "#E8C468", "#D46A5C"]){
+    if(kurallar.indexOf(hex) !== -1)
+      throw new Error("vakit rengi CSS kurallarına elle kopyalanmış: " + hex);
+  }
+  dogru((css.match(/var\(--vakit\)/g) || []).length >= 3, "vurgu var(--vakit) ile bağlanmalı");
+  // Su kendi mavisini kullanır, aktif vakit rengini değil.
   const suSerit = css.slice(css.indexOf(".su-serit"), css.indexOf(".su-serit") + 400);
   if(suSerit.indexOf("--vakit") !== -1) throw new Error("su şeridinde vurgu rengi olmamalı");
+});
+
+bolum("§13 (v2) — günlük seri ve ilerleme halkaları");
+
+const BES = { namaz:{ sabah:"vaktinde", ogle:"vaktinde", ikindi:"vaktinde",
+                      aksam:"vaktinde", yatsi:"vaktinde" }, maddeler:[], su:0 };
+const DORT = { namaz:{ sabah:"vaktinde", ogle:"vaktinde", ikindi:"vaktinde",
+                       aksam:"vaktinde" }, maddeler:[], su:0 };
+function depoGunler(map){
+  return { "ledger/v1": JSON.stringify({ surum:1, gunler:map, sonKontrol:"2026-09-06" }) };
+}
+
+await dene("beş vakti işaretli gün 'tam' sayılır, seri ardışık tam günü sayar", async () => {
+  const u = kur({ simdi:"2026-09-07T09:00:00",
+    depo: depoGunler({ "2026-09-04":BES, "2026-09-05":BES, "2026-09-06":BES }) });
+  await u.bekle();
+  esit(u.ic.gunTamMi("2026-09-06"), true);
+  esit(u.ic.seriHesapla(), 3, "6-5-4 Eylül");
+});
+
+await dene("bir vakit eksikse gün tam değil, seri o günde kırılır", async () => {
+  const u = kur({ simdi:"2026-09-07T09:00:00",
+    depo: depoGunler({ "2026-09-04":BES, "2026-09-05":DORT, "2026-09-06":BES }) });
+  await u.bekle();
+  esit(u.ic.gunTamMi("2026-09-05"), false);
+  esit(u.ic.seriHesapla(), 1, "yalnız 6 Eylül");
+  esit(u.ic.enUzunSeri(), 1);
+});
+
+await dene("bugün henüz bitmediyse seri dünden sayılır", async () => {
+  const u = kur({ simdi:"2026-09-07T09:00:00",
+    depo: depoGunler({ "2026-09-05":BES, "2026-09-06":BES }) });   // 7 Eylül boş
+  await u.bekle();
+  esit(u.ic.seriHesapla(), 2, "bugün eksik, dünden geriye 2");
+});
+
+await dene("halka çıktısı deger/toplam gösterir; övgü, emoji yok", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  await u.bekle(); await u.bekle(); await u.bekle();
+  u.ic.namazIsaretle("2026-09-06", "sabah", "vaktinde");
+  u.ic.namazIsaretle("2026-09-06", "ogle", "vaktinde");
+  const h = u.html("b-gunluk");
+  icerir(h, "2/5");                       // iki vakit işaretli
+  icerir(h, "günlük seri");
+  icermez(h, "tebrik"); icermez(h, "harika"); icermez(h, "🔥");
+});
+
+await dene("halkaSVG dolu oranını stroke-dashoffset'e çevirir", async () => {
+  const u = kur({ simdi:"2026-09-06T09:00:00" });
+  icerir(u.ic.halkaSVG(0, 5, "var(--vakit)"), 'stroke-dashoffset="207.35"');
+  icerir(u.ic.halkaSVG(5, 5, "var(--vakit)"), 'stroke-dashoffset="0.00"');
+  icerir(u.ic.halkaSVG(2, 5, "var(--tamam)"), "var(--tamam)");
+});
+
+bolum("§13 (v2) — istatistik / seri görünümü");
+
+await dene("istatistik: takvim, başarı %, vakit oranları, rozetler çizilir", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00",
+    depo: depoGunler({ "2026-09-01":BES, "2026-09-02":BES, "2026-09-03":BES,
+                       "2026-09-04":BES, "2026-09-05":BES }) });
+  await u.bekle();
+  u.ic.istatistikCiz();
+  const h = u.html("b-istatistik");
+  icerir(h, "takvim");
+  icerir(h, "Başarı oranı");
+  icerir(h, "Vakit bazında");
+  icerir(h, "Rozetler");
+  icerir(h, "günlük seri");
+  icermez(h, "🎉"); icermez(h, "muhteşem");
+});
+
+await dene("istatistik çizimi boş gün kaydı oluşturmaz", async () => {
+  const u = kur({ simdi:"2026-09-20T10:00:00" });
+  await u.bekle(); await u.bekle(); await u.bekle();
+  const once = Object.keys(u.ic.UYG.veri.gunler).length;
+  u.ic.istatistikCiz();
+  u.ic.istatistikCiz();
+  esit(Object.keys(u.ic.UYG.veri.gunler).length, once, "gün kaydı sayısı sabit kalmalı");
+});
+
+bolum("§13 (v2) — alt tab görünümü");
+
+await dene("gorunum('seri') istatistiği açar, Bugün bölümlerini gizler", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00" });
+  await u.bekle();
+  u.ic.gorunum("seri");
+  esit(u.ctx.document.getElementById("b-istatistik").hidden, false);
+  esit(u.ctx.document.getElementById("b-namaz").hidden, true);
+  esit(u.ctx.document.getElementById("b-gunluk").hidden, true);
+  u.ic.gorunum("plan");
+  esit(u.ctx.document.getElementById("b-plan").hidden, false);
+  esit(u.ctx.document.getElementById("b-istatistik").hidden, true);
+  esit(u.ic.UYG.veri.ayar.sekme, "plan", "seçilen sekme saklanır");
+});
+
+await dene("açılışta saklı sekme geri yüklenir", async () => {
+  const u = kur({ simdi:"2026-09-06T14:00:00",
+    depo: { "ledger/v1": JSON.stringify({ surum:1, ayar:{ sekme:"ayarlar" } }) } });
+  await u.bekle();
+  esit(u.ic.UYG.veri.ayar.sekme, "ayarlar");
+  esit(u.ctx.document.getElementById("b-ayarlar").hidden, false);
+  esit(u.ctx.document.getElementById("b-namaz").hidden, true);
 });
 
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
