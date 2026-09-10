@@ -1473,6 +1473,37 @@ await dene("açılışta saklı sekme geri yüklenir", async () => {
   esit(u.ctx.document.getElementById("b-namaz").hidden, true);
 });
 
+bolum("§13 (v2) — halka boyutu saran kutuyla senkron (regresyon)");
+
+await dene("halkaSVG sabit px boyut yazmaz, kutuyu %100 doldurur", async () => {
+  const u = kur({ simdi:"2026-09-06T09:00:00" });
+  const s = u.ic.halkaSVG(2, 5, "var(--vakit)");
+  icerir(s, 'width="100%"');
+  icerir(s, 'height="100%"');
+  icermez(s, 'width="74"');
+  icermez(s, 'width="172"');
+  icermez(s, 'width="160"');
+});
+
+await dene("hero halkası ince (4.5), mini halkalar varsayılan (7) çizgi alır", async () => {
+  const u = kur({ simdi:"2026-09-07T20:00:00" });        // Akşam aktif → hero halkası
+  await u.bekle(); await u.bekle(); await u.bekle();
+  icerir(u.html("b-namaz"), 'stroke-width="4.5"');
+  u.ic.namazIsaretle("2026-09-07", "sabah", "vaktinde");
+  icerir(u.html("b-gunluk"), 'stroke-width="7"');
+});
+
+await dene("halkayı taşıyan her kutu CSS'te açık width/height alır", async () => {
+  const fs = require("fs"), path = require("path");
+  const html  = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  const style = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  for(const sec of [".halka .cerceve", ".simdi .halka-hero"]){
+    const kural = style.slice(style.indexOf(sec), style.indexOf(sec) + 200);
+    if(!/width:\s*\d/.test(kural) || !/height:\s*\d/.test(kural))
+      throw new Error(sec + " için açık boyut yok — halka saran kutuyla senkronsuz kalır");
+  }
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

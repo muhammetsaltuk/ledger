@@ -235,23 +235,24 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .halka .etiket{ font-size:.75rem; color:var(--sonuk); }
 
 /* --- §4 Namaz: şu anki vakit --------------------------------- */
-.simdi{ text-align:center; margin:0 0 16px; }
-.simdi .halka-hero{ position:relative; width:172px; height:172px; margin:2px auto 12px; }
+.simdi{ text-align:center; margin:0 0 4px; }
+/* Hero halkasının boyutu YALNIZ burada. halkaSVG %100 dolar; ikisi senkron. */
+.simdi .halka-hero{ position:relative; width:160px; height:160px; margin:2px auto 14px; }
 .simdi .halka-hero .ortak{
-  position:absolute; inset:0; display:flex; flex-direction:column;
+  position:absolute; inset:14px; display:flex; flex-direction:column;
   align-items:center; justify-content:center; gap:2px;
 }
 .vakit-ad{
   font-family:var(--bas);
-  font-size:1.9rem;
-  line-height:1.04;
+  font-size:1.6rem;
+  line-height:1.05;
   font-weight:700;
   letter-spacing:-.02em;
   color:var(--vakit);
   transition:color var(--gecis) ease;
   margin:0;
 }
-.vakit-ad.bos{ color:var(--sonuk); font-size:1.3rem; }
+.vakit-ad.bos{ color:var(--sonuk); font-size:1.2rem; }
 .kalan{ margin:6px 0 0; font-size:.95rem; color:var(--metin); }
 .kalan .sure{ color:var(--vakit); font-weight:600; }
 .cubuk{
@@ -761,13 +762,18 @@ function enUzunSeri(){
   return Math.max(en, seriHesapla());
 }
 
-/* İlerleme halkası — SVG. Renk var(--...) olarak geçirilir, tek kaynak korunur. */
-function halkaSVG(deger, toplam, renk){
+/* İlerleme halkası — SVG. Boyutu her zaman saran kutudan gelir (width/height
+   %100); px değeri yazılmaz ki CSS kutusuyla senkronsuz kalmasın. Çizgi
+   kalınlığı viewBox biriminde, büyük halkalarda (hero) inceltmek için parametre.
+   Renk var(--...) olarak geçirilir, tek kaynak korunur. */
+function halkaSVG(deger, toplam, renk, kalinlik){
   const c = 207.35;                                   // 2πr, r = 33
+  const k = kalinlik || 7;
   const dolu = toplam > 0 ? Math.max(0, Math.min(1, deger / toplam)) : 0;
-  return '<svg viewBox="0 0 80 80" width="74" height="74" aria-hidden="true">' +
-    '<circle cx="40" cy="40" r="33" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="7"></circle>' +
-    '<circle cx="40" cy="40" r="33" fill="none" stroke="' + renk + '" stroke-width="7" ' +
+  return '<svg viewBox="0 0 80 80" width="100%" height="100%" ' +
+      'preserveAspectRatio="xMidYMid meet" style="display:block" aria-hidden="true">' +
+    '<circle cx="40" cy="40" r="33" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="' + k + '"></circle>' +
+    '<circle cx="40" cy="40" r="33" fill="none" stroke="' + renk + '" stroke-width="' + k + '" ' +
       'stroke-linecap="round" stroke-dasharray="' + c.toFixed(2) + '" ' +
       'stroke-dashoffset="' + (c * (1 - dolu)).toFixed(2) + '" transform="rotate(-90 40 40)"></circle>' +
   '</svg>';
@@ -1053,7 +1059,7 @@ function namazCiz(){
     const oran  = Math.max(0, Math.min(1, kalan / (aktif.bit - aktif.bas)));
     ust =
       '<div class="simdi">' +
-        '<div class="halka-hero">' + halkaSVG(1 - oran, 1, "var(--vakit)") +
+        '<div class="halka-hero">' + halkaSVG(1 - oran, 1, "var(--vakit)", 4.5) +
           '<div class="ortak">' +
             '<h1 class="vakit-ad">' + aktif.ad + '</h1>' +
             '<span class="sonuk">şu an ' + ss(an) + '</span>' +
