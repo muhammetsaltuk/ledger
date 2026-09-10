@@ -713,6 +713,38 @@ await dene("program: boş/başlıksız öğünler elenir, sayılar tamsayıya ç
   dogru(c.veri.not.length > 0);
 });
 
+await dene("program: istem malzeme listesi ister, malzemeler diziye çekilir", async () => {
+  const kayit = geminiTaklit(() => ({ metin: JSON.stringify({
+    gunlukKalori: 3000, makro:{ protein:130, karb:400, yag:80 },
+    ogunler: [
+      { ad:"Kahvaltı", yemekler:[
+        { ad:"Menemen", miktar:"1 tabak", kalori:320,
+          malzemeler:["yumurta"," domates ", "", "biber"], tarif:"Kavur." } ] },
+      { ad:"Öğle", yemekler:[
+        { ad:"Pilav", miktar:"1 kase", kalori:400, tarif:"Pişir." } ] }   // malzemeler yok
+    ]
+  }) }));
+  const c = cevap();
+  await beslenme(istek(BESLENME_GOVDE), c);
+  esit(c.kod, 200);
+  icerir(kayit.istekler[0].govde.contents[0].parts[0].text, "`malzemeler`");
+  esit(c.veri.ogunler[0].yemekler[0].malzemeler.join(","), "yumurta,domates,biber");
+  esit(Array.isArray(c.veri.ogunler[1].yemekler[0].malzemeler), true);
+  esit(c.veri.ogunler[1].yemekler[0].malzemeler.length, 0);
+});
+
+await dene("alternatif modu: malzemeler döner ve istemde istenir", async () => {
+  const kayit = geminiTaklit(() => ({ metin: JSON.stringify({
+    ad:"Tavuklu pilav", miktar:"1 tabak", kalori:560, protein:45, karb:70, yag:10,
+    malzemeler:["pirinç","tavuk göğsü","tereyağı"], tarif:"Pişir." }) }));
+  const c = cevap();
+  await beslenme(istek({ mod:"alternatif",
+    yemek:{ ad:"Kuru fasulye", miktar:"1 kase", kalori:520 }, ogun:"Öğle" }), c);
+  esit(c.kod, 200);
+  esit(c.veri.malzemeler.join(","), "pirinç,tavuk göğsü,tereyağı");
+  icerir(kayit.istekler[0].govde.contents[0].parts[0].text, "`malzemeler`");
+});
+
 await dene("program tamamen boş gelirse 502", async () => {
   geminiTaklit(() => ({ metin: JSON.stringify({ gunlukKalori:3000, makro:{}, ogunler:[] }) }));
   const c = cevap();

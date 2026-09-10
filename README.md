@@ -249,11 +249,22 @@ yuvarlı). Protein 1,8 g/kg, yağ kalorinin %25'i, karb kalanı. Deterministik,
 olarak alır, kendi hesaplamaz. Güncel kilo son tartımdan gelir.
 
 **Program** (`api/beslenme` `mod:program`). Profil + hedef + sevmediklerin +
-(varsa) mevcut program → 4-6 öğün, her yemek için gramaj, kalori, makro ve kısa
-bir tarif. Yapılandırılmış çıktı (`responseSchema`) zorunlu. Günde en fazla 3
-üretim; sayaç istemcide (`beslenme.sayac`), `PLAN_SINIR` ile aynı kalıp.
-`GEMINI_API_KEY` yoksa üretim kapanır; elle öğün girişi ve tartım çalışır.
-Ağ/model hatasında eldeki program silinmez.
+(varsa) mevcut program → 4-6 öğün, her yemek için gramaj, kalori, makro, sade
+market adlarıyla `malzemeler` listesi ve kısa bir tarif. Yapılandırılmış çıktı
+(`responseSchema`) zorunlu. Günde en fazla 3 üretim; sayaç istemcide
+(`beslenme.sayac`), `PLAN_SINIR` ile aynı kalıp. `GEMINI_API_KEY` yoksa üretim
+kapanır; elle öğün girişi ve tartım çalışır. Ağ/model hatasında eldeki program
+silinmez.
+
+**Market (mutfak dolabı + alınacaklar listesi).** Beslenme sekmesinde Program'ın
+altında iki liste: **Market** (`beslenme.market`) evde olan malzemeler,
+**Market listesi** (`beslenme.marketListesi`) alınacaklar. Bir yemeğin tarifi
+açıldığında malzemeler tek tek listelenir; dolapta olan "mutfakta" diye
+işaretlenir, olmayanın yanında "listeye ekle" (ya da hepsi için tek düğme)
+çıkar ve malzeme Market listesi'ne düşer. Listeden "aldım" öğeyi mutfağa taşır;
+mutfağa elle eklenen bir malzeme listeden düşer. Eşleştirme ada göre,
+büyük/küçük harf duyarsız (`toLocaleLowerCase("tr")`). Tamamen istemcide,
+`localStorage`'da; anahtar gerektirmez.
 
 **Alternatif** (`mod:alternatif`). Bir yemeğe "beğenmedim" dersen, kalorisi ve
 makroları yakın (±80 kcal) tek bir yemek gelir, yerine geçer; beğenmediğin yemek
@@ -375,7 +386,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (159 test) ve `node test/api.js` (56 test) ile fiilen
+`node test/hepsi.js` (166 test) ve `node test/api.js` (58 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
 gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
@@ -413,6 +424,8 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §15 tartım aynı güne üzerine yazar; kg/hafta eğilimi en küçük kareler | ✓ test |
 | §15 program isteği hedefi taşır, kota 3/gün ve istemcide | ✓ test |
 | §15 "beğenmedim" yemeği değiştirir, sevmediklerine ekler | ✓ test |
+| §15 tarif malzemeleri: dolapta yoksa Market listesi'ne, "aldım" mutfağa | ✓ test |
+| §15 program/alternatif istemi `malzemeler` ister, dizi olarak temizlenir | ✓ test |
 | §15 api/tarif: anahtar varsa Data API, yoksa kazıma, sonra arama linki | ✓ test |
 | §15 fotoğraf: görsel parça API'ye gider; güven geçersizse "dusuk" | ✓ test |
 | §15 kalori halkası öğün toplamını yansıtır; profil yoksa çizilmez | ✓ test |

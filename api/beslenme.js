@@ -15,10 +15,15 @@ const YEMEK = {
     protein: { type: "integer", description: "gram" },
     karb:    { type: "integer", description: "gram" },
     yag:     { type: "integer", description: "gram" },
+    malzemeler: {
+      type: "array",
+      description: "yemeğin malzemeleri, sade market adlarıyla; ör. 'yumurta', 'tam buğday ekmeği', 'zeytinyağı'",
+      items: { type: "string" }
+    },
     tarif:   { type: "string", description: "kısa hazırlanış, en fazla 60 kelime" }
   },
-  required: ["ad", "miktar", "kalori", "tarif"],
-  propertyOrdering: ["ad", "miktar", "kalori", "protein", "karb", "yag", "tarif"]
+  required: ["ad", "miktar", "kalori", "malzemeler", "tarif"],
+  propertyOrdering: ["ad", "miktar", "kalori", "protein", "karb", "yag", "malzemeler", "tarif"]
 };
 
 const SEMA_PROGRAM = {
@@ -108,6 +113,8 @@ function programIstem(g){
     "- 4-6 öğün; kilo almak için ara öğünler dahil.\n" +
     "- Öğünlerin kalori toplamı günlük hedefe ±100 kcal yaklaşsın; makrolar da yakın olsun.\n" +
     "- Her yemek için `miktar` gram/porsiyon olarak net yazılsın.\n" +
+    "- Her yemek için `malzemeler`: markete yazılır gibi sade adlar (ör. 'yumurta', 'yulaf', 'süt'). " +
+      "Tuz, su, karabiber gibi bariz şeyleri koyma.\n" +
     "- Her yemek için kısa bir `tarif` (hazırlanış) yaz; en fazla 60 kelime. Uydurma.\n" +
     "- Sevmediği listesindekileri ve yakın türevlerini hiç koyma.\n" +
     "- `not` en fazla iki cümle: programın neden böyle kurulduğu.\n" +
@@ -127,7 +134,7 @@ function alternatifIstem(g){
     "## Kurallar\n" +
     "- Kalorisi ve makroları değişen yemeğe yakın olsun (±80 kcal).\n" +
     "- Türkiye'de bulunan sıradan bir yemek.\n" +
-    "- `miktar` net, `tarif` en fazla 60 kelime, uydurma yok.\n" +
+    "- `miktar` net, `malzemeler` sade market adlarıyla, `tarif` en fazla 60 kelime, uydurma yok.\n" +
     "- Sadece yemeği döndür; açıklama yazma.";
 }
 
@@ -159,6 +166,9 @@ function yemekTemizle(y){
     protein: tamsayi(y.protein),
     karb:    tamsayi(y.karb),
     yag:     tamsayi(y.yag),
+    malzemeler: Array.isArray(y.malzemeler)
+      ? y.malzemeler.map(m => String(m || "").trim().slice(0, 60)).filter(Boolean).slice(0, 20)
+      : [],
     tarif:   String(y.tarif || "").slice(0, 600)
   };
 }
