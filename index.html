@@ -682,30 +682,20 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .bes-yemek-alt .dg{ min-height:32px; font-size:.78rem; padding:0 12px; }
 .bes-tarif{ margin:10px 0 0; font-size:.85rem; color:#B8C0C4; line-height:1.5; white-space:pre-wrap; }
 
-.bes-malz{ list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
-.bes-malz .malz{ display:flex; align-items:center; justify-content:space-between; gap:10px;
-  font-size:.82rem; color:var(--metin); }
-.bes-malz .malz.malz-var{ color:var(--sonuk); }
-.bes-malz .malz > span:first-child{ min-width:0; overflow-wrap:anywhere; }
-.malz-rozet{ font-size:.66rem; color:var(--sonuk); padding:2px 8px; border-radius:999px;
-  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.07); flex:0 0 auto; }
-.bes-malz .dg{ min-height:28px; font-size:.72rem; padding:0 10px; flex:0 0 auto; }
-.bes-malz-hepsi{ margin-top:8px; min-height:30px; font-size:.74rem; padding:0 12px; }
+.bes-malz{ margin:10px 0 2px; display:flex; flex-direction:column; gap:1px; }
+.bes-malz .malz{ display:flex; align-items:center; gap:9px; padding:6px 0;
+  font-size:.85rem; color:var(--metin); cursor:pointer; }
+.bes-malz .malz > span{ min-width:0; overflow-wrap:anywhere; }
+.malz-ipuc{ margin:4px 0 0; }
+.bes-malz input[type="checkbox"],
+.mkt-satir input[type="checkbox"]{ width:18px; height:18px; flex:0 0 auto;
+  accent-color:var(--vakit); margin:0; cursor:pointer; }
 
-.mkt-liste{ list-style:none; margin:2px 0 0; padding:0; }
-.mkt-satir{ display:flex; align-items:center; justify-content:space-between; gap:10px;
-  padding:9px 0; border-top:1px solid rgba(255,255,255,.06); font-size:.92rem; }
-.mkt-satir:first-of-type{ border-top:0; }
-.mkt-satir > span:first-child{ min-width:0; overflow-wrap:anywhere; }
-.mkt-satir .mkt-alt{ display:flex; gap:6px; flex:0 0 auto; }
-.mkt-satir .dg{ min-height:30px; padding:0 10px; font-size:.74rem; }
-.mkt-dolap{ display:flex; flex-wrap:wrap; gap:7px; margin-top:4px; }
-.mkt-cip{ display:inline-flex; align-items:center; gap:6px; font-size:.8rem;
-  padding:5px 6px 5px 11px; border-radius:999px;
-  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.07); }
-.mkt-x{ border:0; background:rgba(255,255,255,.08); color:var(--metin);
-  width:18px; height:18px; border-radius:999px; font-size:.9rem; line-height:1;
-  display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+.mkt-liste{ display:flex; flex-direction:column; gap:1px; margin-top:4px; }
+.mkt-satir{ display:flex; align-items:center; gap:9px; padding:9px 0;
+  border-top:1px solid rgba(255,255,255,.06); font-size:.92rem; cursor:pointer; }
+.mkt-satir:first-child{ border-top:0; }
+.mkt-satir > span{ min-width:0; overflow-wrap:anywhere; }
 
 .bes-spark{ width:100%; height:36px; display:block; margin-top:4px; }
 
@@ -827,8 +817,7 @@ const VARSAYILAN = {
     kayit: {},           // "YYYY-MM-DD" -> öğün kayıtları
     sevmedigim: [],      // kaçınılacak yemekler
     sayac: {},           // "YYYY-MM-DD" -> program üretim sayısı (kota)
-    market: [],          // mutfakta olan malzemeler — ["yumurta", …]
-    marketListesi: []    // alınacaklar — ["yulaf", …]
+    market: []           // mutfakta işaretli malzemeler; kalanlar alışveriş listesi
   }
 };
 
@@ -3206,46 +3195,41 @@ function beslenmeHakkiDus(){
   for(const k of Object.keys(s)) if(k < gunKaydir(t, -7)) delete s[k];
 }
 
-/* --- Market (mutfak dolabı + alınacaklar listesi) ------------ */
+/* --- Market: tarif malzemeleri işaretlenir, işaretsizler alışveriş listesi -- */
 function malzNorm(s){ return String(s || "").trim().toLocaleLowerCase("tr"); }
 function mutfaktaVar(ad){
   const n = malzNorm(ad);
   return !!n && (UYG.veri.beslenme.market || []).some(x => malzNorm(x) === n);
 }
-function listedeVar(ad){
+function programMalzemeleri(){
+  const pr = UYG.veri.beslenme.program, gor = new Set(), liste = [];
+  if(!pr) return liste;
+  (pr.ogunler || []).forEach(o => (o.yemekler || []).forEach(y =>
+    (y.malzemeler || []).forEach(m => {
+      const n = malzNorm(m);
+      if(n && !gor.has(n)){ gor.add(n); liste.push(String(m).trim()); }
+    })));
+  return liste;
+}
+function alinacaklar(){ return programMalzemeleri().filter(m => !mutfaktaVar(m)); }
+function mutfagaAl(ad){
+  const a = String(ad || "").trim().slice(0, 60);
+  if(!a || mutfaktaVar(a)) return false;
+  const d = UYG.veri.beslenme.market || (UYG.veri.beslenme.market = []);
+  d.push(a);
+  if(d.length > 300) UYG.veri.beslenme.market = d.slice(-300);
+  return true;
+}
+function mutfaktanCikar(ad){
   const n = malzNorm(ad);
-  return !!n && (UYG.veri.beslenme.marketListesi || []).some(x => malzNorm(x) === n);
-}
-function marketListeEkle(ad){
-  const a = String(ad || "").trim().slice(0, 60);
-  if(!a || mutfaktaVar(a) || listedeVar(a)) return false;
-  const l = UYG.veri.beslenme.marketListesi || (UYG.veri.beslenme.marketListesi = []);
-  l.push(a);
-  if(l.length > 200) UYG.veri.beslenme.marketListesi = l.slice(-200);
+  const d = UYG.veri.beslenme.market || [];
+  const i = d.findIndex(x => malzNorm(x) === n);
+  if(i === -1) return false;
+  d.splice(i, 1);
   return true;
 }
-function mutfagaEkle(ad){
-  const a = String(ad || "").trim().slice(0, 60);
-  if(!a) return false;
-  const yeni = !mutfaktaVar(a);
-  if(yeni){
-    const d = UYG.veri.beslenme.market || (UYG.veri.beslenme.market = []);
-    d.push(a);
-    if(d.length > 300) UYG.veri.beslenme.market = d.slice(-300);
-  }
-  const n = malzNorm(a);
-  UYG.veri.beslenme.marketListesi =
-    (UYG.veri.beslenme.marketListesi || []).filter(x => malzNorm(x) !== n);
-  return true;
-}
-function malzHepsiEkle(id){
-  const [oi, yi] = id.split("-").map(Number);
-  const pr = UYG.veri.beslenme.program;
-  const y = pr && pr.ogunler[oi] && pr.ogunler[oi].yemekler[yi];
-  if(!y) return;
-  let n = 0;
-  (y.malzemeler || []).forEach(m => { if(marketListeEkle(m)) n++; });
-  if(n){ kaydet(); beslenmeCiz(); }
+function malzIsaretle(ad, iceri){
+  if(iceri ? mutfagaAl(ad) : mutfaktanCikar(ad)){ kaydet(); beslenmeCiz(); }
 }
 
 /* --- Çizim --------------------------------------------------- */
@@ -3344,7 +3328,7 @@ function programBolum(){
               (UYG.alternatifBekliyor === id ? " disabled" : "") + '>' +
               (UYG.alternatifBekliyor === id ? "değişiyor…" : "beğenmedim") + '</button>' +
           '</div>' +
-          (acik ? malzemeVeTarif(y, id) : '') +
+          (acik ? malzemeVeTarif(y) : '') +
         '</div>';
       }).join("") +
     '</div>').join("");
@@ -3355,67 +3339,50 @@ function programBolum(){
     ogunler + dugme;
 }
 
-function malzemeVeTarif(y, id){
+function malzemeVeTarif(y){
   const ml = (y.malzemeler || []).filter(Boolean);
   let govde = "";
   if(ml.length){
-    const satirlar = ml.map(m => {
-      const varsa = mutfaktaVar(m);
-      const listede = !varsa && listedeVar(m);
-      return '<li class="malz' + (varsa ? ' malz-var' : '') + '">' +
+    const satirlar = ml.map(m =>
+      '<label class="malz">' +
+        '<input type="checkbox" data-malz="' + kacir(m) + '"' +
+          (mutfaktaVar(m) ? ' checked' : '') + '>' +
         '<span>' + kacir(m) + '</span>' +
-        (varsa
-          ? '<span class="malz-rozet">mutfakta</span>'
-          : '<button class="dg dg-sonuk" data-malz-ekle="' + kacir(m) + '"' +
-            (listede ? ' disabled' : '') + '>' + (listede ? 'listede' : 'listeye ekle') + '</button>') +
-      '</li>';
-    }).join("");
-    const eksik = ml.filter(m => !mutfaktaVar(m) && !listedeVar(m)).length;
-    govde += '<ul class="bes-malz">' + satirlar + '</ul>' +
-      (eksik > 1
-        ? '<button class="dg dg-sonuk bes-malz-hepsi" data-malz-hepsi="' + id + '">' +
-          'eksik ' + eksik + ' malzemeyi listeye ekle</button>'
-        : '');
+      '</label>').join("");
+    govde += '<div class="bes-malz">' + satirlar + '</div>' +
+      '<p class="sonuk mini malz-ipuc">İşaretle: mutfağında var. İşaretsizler market listesine düşer.</p>';
   }
   if(y.tarif) govde += '<p class="bes-tarif">' + kacir(y.tarif) + '</p>';
   return govde;
 }
 
 function marketBolum(){
-  const liste = UYG.veri.beslenme.marketListesi || [];
   const dolap = UYG.veri.beslenme.market || [];
+  const alinacak = alinacaklar();
+  if(!UYG.veri.beslenme.program && !dolap.length) return "";
 
-  const lg = liste.length
-    ? liste.map((ad, i) =>
-        '<li class="mkt-satir"><span>' + kacir(ad) + '</span>' +
-          '<span class="mkt-alt">' +
-            '<button class="dg dg-sonuk" data-mkt-aldim="' + i + '">aldım</button>' +
-            '<button class="dg dg-sonuk" data-mkt-sil="' + i + '">sil</button>' +
-          '</span></li>').join("")
-    : '<li class="mkt-satir"><span class="sonuk mini">Liste boş. Tariflerdeki eksik ' +
-      'malzemeleri buraya ekle.</span></li>';
+  const satir = (ad, iceri) =>
+    '<label class="mkt-satir">' +
+      '<input type="checkbox" data-mkt="' + kacir(ad) + '"' + (iceri ? " checked" : "") + '>' +
+      '<span>' + kacir(ad) + '</span>' +
+    '</label>';
+
+  const ag = alinacak.length
+    ? alinacak.map(ad => satir(ad, false)).join("")
+    : '<p class="sonuk mini" style="margin:2px 0 0">Program malzemelerinin hepsi işaretli. ' +
+      'Bir tarifte işareti kaldırdığın malzeme buraya gelir.</p>';
 
   const dg = dolap.length
-    ? dolap.map((ad, i) =>
-        '<span class="mkt-cip">' + kacir(ad) +
-          '<button class="mkt-x" data-dolap-sil="' + i + '" aria-label="çıkar">×</button>' +
-        '</span>').join("")
-    : '<span class="sonuk mini">Mutfağında olanları ekle; tariflerde “mutfakta” diye işaretlenir.</span>';
+    ? dolap.map(ad => satir(ad, true)).join("")
+    : '<p class="sonuk mini" style="margin:2px 0 0">Tariflerdeki malzemeleri işaretledikçe burada birikir.</p>';
 
   return '<h2 class="bolum-bas">Market listesi' +
-      (liste.length ? '<span class="yan">' + liste.length + '</span>' : '') + '</h2>' +
-    '<ul class="mkt-liste">' + lg + '</ul>' +
-    '<div class="plan-ekle">' +
-      '<input type="text" id="mkt-giris" placeholder="malzeme ekle" aria-label="market listesine ekle">' +
-      '<button class="dg" id="mkt-ekle">ekle</button>' +
-    '</div>' +
-    '<h2 class="bolum-bas" style="margin-top:18px">Market' +
+      (alinacak.length ? '<span class="yan">' + alinacak.length + '</span>' : '') + '</h2>' +
+    '<p class="sonuk mini" style="margin:0 0 2px">Aldığını işaretle; mutfağına geçer.</p>' +
+    '<div class="mkt-liste">' + ag + '</div>' +
+    '<h2 class="bolum-bas" style="margin-top:18px">Mutfağımda' +
       (dolap.length ? '<span class="yan">' + dolap.length + '</span>' : '') + '</h2>' +
-    '<div class="mkt-dolap">' + dg + '</div>' +
-    '<div class="plan-ekle">' +
-      '<input type="text" id="dolap-giris" placeholder="malzeme ekle" aria-label="markete ekle">' +
-      '<button class="dg" id="dolap-ekle">ekle</button>' +
-    '</div>';
+    '<div class="mkt-liste">' + dg + '</div>';
 }
 
 function kiloSparkline(){
@@ -3454,10 +3421,11 @@ function tartimBolum(){
 
 function beslenmeCiz(){
   if(!UYG.veri) return;
+  const mkt = marketBolum();
   $beslenme.innerHTML =
     '<div class="ist-blok">' + profilBolum() + '</div>' +
     '<div class="ist-blok bosluk">' + programBolum() + '</div>' +
-    '<div class="ist-blok bosluk">' + marketBolum() + '</div>' +
+    (mkt ? '<div class="ist-blok bosluk">' + mkt + '</div>' : '') +
     '<div class="ist-blok bosluk">' + tartimBolum() + '</div>';
 }
 
@@ -3609,43 +3577,14 @@ $beslenme.addEventListener("click", e => {
   else if(d.dataset.tarif){ acikTarif = (acikTarif === d.dataset.tarif) ? null : d.dataset.tarif; beslenmeCiz(); }
   else if(d.dataset.video)       tarifVideosu(d.dataset.video);
   else if(d.dataset.begenmedim)  yemekBegenmedim(d.dataset.begenmedim);
-  else if(d.dataset.malzEkle != null){
-    if(marketListeEkle(d.dataset.malzEkle)){ kaydet(); beslenmeCiz(); }
-  }
-  else if(d.dataset.malzHepsi != null) malzHepsiEkle(d.dataset.malzHepsi);
-  else if(d.id === "mkt-ekle"){
-    const el = document.getElementById("mkt-giris");
-    if(el && marketListeEkle(el.value)){ kaydet(); beslenmeCiz(); }
-  }
-  else if(d.id === "dolap-ekle"){
-    const el = document.getElementById("dolap-giris");
-    if(el && mutfagaEkle(el.value)){ kaydet(); beslenmeCiz(); }
-  }
-  else if(d.dataset.mktAldim != null){
-    const ad = (UYG.veri.beslenme.marketListesi || [])[+d.dataset.mktAldim];
-    if(ad != null){ mutfagaEkle(ad); kaydet(); beslenmeCiz(); }
-  }
-  else if(d.dataset.mktSil != null){
-    (UYG.veri.beslenme.marketListesi || []).splice(+d.dataset.mktSil, 1);
-    kaydet(); beslenmeCiz();
-  }
-  else if(d.dataset.dolapSil != null){
-    (UYG.veri.beslenme.market || []).splice(+d.dataset.dolapSil, 1);
-    kaydet(); beslenmeCiz();
-  }
+});
+$beslenme.addEventListener("change", e => {
+  const ds = e.target.dataset;
+  const ad = ds && (ds.malz || ds.mkt);
+  if(ad != null) malzIsaretle(ad, !!e.target.checked);
 });
 $beslenme.addEventListener("keydown", e => {
-  if(e.key !== "Enter") return;
-  const t = e.target;
-  if(t.id === "bes-kilo"){ e.preventDefault(); tartimGirisGonder(); }
-  else if(t.id === "mkt-giris"){
-    e.preventDefault();
-    if(marketListeEkle(t.value)){ kaydet(); beslenmeCiz(); }
-  }
-  else if(t.id === "dolap-giris"){
-    e.preventDefault();
-    if(mutfagaEkle(t.value)){ kaydet(); beslenmeCiz(); }
-  }
+  if(e.key === "Enter" && e.target.id === "bes-kilo"){ e.preventDefault(); tartimGirisGonder(); }
 });
 
 /* ===============================================================

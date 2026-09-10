@@ -256,14 +256,16 @@ market adlarıyla `malzemeler` listesi ve kısa bir tarif. Yapılandırılmış 
 kapanır; elle öğün girişi ve tartım çalışır. Ağ/model hatasında eldeki program
 silinmez.
 
-**Market (mutfak dolabı + alınacaklar listesi).** Beslenme sekmesinde Program'ın
-altında iki liste: **Market** (`beslenme.market`) evde olan malzemeler,
-**Market listesi** (`beslenme.marketListesi`) alınacaklar. Bir yemeğin tarifi
-açıldığında malzemeler tek tek listelenir; dolapta olan "mutfakta" diye
-işaretlenir, olmayanın yanında "listeye ekle" (ya da hepsi için tek düğme)
-çıkar ve malzeme Market listesi'ne düşer. Listeden "aldım" öğeyi mutfağa taşır;
-mutfağa elle eklenen bir malzeme listeden düşer. Eşleştirme ada göre,
-büyük/küçük harf duyarsız (`toLocaleLowerCase("tr")`). Tamamen istemcide,
+**Market (tarif malzemeleri + alışveriş listesi).** Elle malzeme girişi yok,
+her şey onay kutusu. Bir yemeğin tarifi açıldığında malzemeler onay kutusu
+olarak listelenir; işaretli = mutfağında var. Tek saklanan alan
+`beslenme.market` (işaretli malzemeler); **Market listesi** bundan türetilir:
+programdaki tüm malzemeler eksi işaretli olanlar (ada göre, büyük/küçük harf
+duyarsız — `toLocaleLowerCase("tr")` — ve tekilleştirilmiş). Program'ın altında
+iki blok: **Market listesi** (alınacaklar; işaretleyince mutfağa geçer) ve
+**Mutfağımda** (işareti kaldırınca alışveriş listesine geri döner). Bir tarifte,
+Market listesinde ve Mutfağımda'da aynı malzemenin kutusu hep aynı durumu
+gösterir. Program da mutfak da boşsa blok çizilmez. Tamamen istemcide,
 `localStorage`'da; anahtar gerektirmez.
 
 **Alternatif** (`mod:alternatif`). Bir yemeğe "beğenmedim" dersen, kalorisi ve
@@ -386,7 +388,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (166 test) ve `node test/api.js` (58 test) ile fiilen
+`node test/hepsi.js` (165 test) ve `node test/api.js` (58 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
 gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
@@ -424,7 +426,8 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §15 tartım aynı güne üzerine yazar; kg/hafta eğilimi en küçük kareler | ✓ test |
 | §15 program isteği hedefi taşır, kota 3/gün ve istemcide | ✓ test |
 | §15 "beğenmedim" yemeği değiştirir, sevmediklerine ekler | ✓ test |
-| §15 tarif malzemeleri: dolapta yoksa Market listesi'ne, "aldım" mutfağa | ✓ test |
+| §15 tarif malzemeleri onay kutusu; işaretsizler türetilmiş alışveriş listesi | ✓ test |
+| §15 Market listesi ⇄ Mutfağımda kutuları aynı `beslenme.market` durumunu paylaşır | ✓ test |
 | §15 program/alternatif istemi `malzemeler` ister, dizi olarak temizlenir | ✓ test |
 | §15 api/tarif: anahtar varsa Data API, yoksa kazıma, sonra arama linki | ✓ test |
 | §15 fotoğraf: görsel parça API'ye gider; güven geçersizse "dusuk" | ✓ test |
