@@ -314,8 +314,9 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (150 test) ve `node test/api.js` (46 test) ile fiilen
-deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor.
+`node test/hepsi.js` (151 test) ve `node test/api.js` (46 test) ile fiilen
+deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
+gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
 | Kriter | Durum |
 |---|---|
@@ -351,6 +352,7 @@ deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor.
 | Vurgu tek kaynaktan (`--vakit`) gelir, su şeridine bulaşmaz | ✓ test |
 | Ana ekrana eklenince adres çubuğu görünmez | ✓ manifest |
 | Klavyeyle gezilebilir, odak halkası görünür | ✓ CSS + sahte DOM |
+| 360-414 px'de hiçbir sekmede yatay kaydırma yok | ✓ WebKit render (`test/kaydirma.mjs`) + CSS regresyon |
 | Seçilen alarm yöntemi gerçek cihazda denenmiş | ✗ **sende kaldı** |
 | Alarm başarısız olunca kullanıcı görür | ✓ test |
 
@@ -399,12 +401,21 @@ npx serve .          # veya: python -m http.server
 ```bash
 node test/hepsi.js   # uygulama: §14 kabul kriterleri
 node test/api.js     # api/ fonksiyonları
+
+# opsiyonel — gerçek düzen ölçümü (dep + tarayıcı iner):
+npm i -D playwright && npx playwright install webkit
+node test/kaydirma.mjs   # 360-414 px'de her sekmede yatay kaydırma var mı
 ```
 
 `test/kosum.js` index.html içindeki betiği sahte bir DOM'da çalıştırır; saati
 ileri alabildiği için "üç gün sonra açılınca borç doğru mu", "00:30'da
 işaretlenen yatsı hangi güne yazılıyor" gibi şeyler fiilen denenebiliyor.
 Ağ isteği atılmaz: aladhan ve `api/` uydurulur. Tarayıcı gerekmez.
+
+`test/kaydirma.mjs` sahte DOM'un ölçemediği tek şey için: WebKit'te gerçek
+render, bütün bölümleri uzun bölünemez metinlerle doldurup her sekmede
+`scrollWidth <= innerWidth` kontrol eder. "no deps" kuralının dışında, o yüzden
+varsayılan akışta değil; `hepsi.js` yalnız ilgili CSS değişmezlerini denetler.
 
 Şartnamede test istenmiyordu; §0'ın "çalıştır, tarihi ileri al, sınır
 durumlarını dene" maddesini kodu okuyarak yerine getirmenin yolu yoktu.

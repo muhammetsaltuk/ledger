@@ -61,7 +61,13 @@
 
 *,*::before,*::after{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
-html{ background:var(--zemin); -webkit-text-size-adjust:100%; }
+/* Yatay kaydırma sayfa düzeyinde kapalı. body'deki hidden tek başına iOS'ta
+   sayfayı yine de pan ettirebiliyor; html'de de clip gerekiyor. */
+html{
+  background:var(--zemin);
+  -webkit-text-size-adjust:100%;
+  overflow-x:clip;
+}
 body{
   background:var(--zemin);
   background-image:radial-gradient(130% 55% at 50% -6%, rgba(224,154,79,.13), rgba(224,154,79,0) 60%);
@@ -71,12 +77,21 @@ body{
   font-size:1rem;
   line-height:1.5;
   font-weight:400;
-  overflow-x:hidden;
+  overflow-x:clip;
   /* Rakamlar hizalı dursun, geri sayım titremesin */
   font-variant-numeric:tabular-nums;
 }
+img,svg,video{ max-width:100%; }
 
 h1,h2,h3{ font-family:var(--bas); font-weight:600; margin:0; letter-spacing:-.015em; }
+
+/* Uzun bölünemez kelime (yapıştırılmış adres, model çıktısı) kutudan taşmasın.
+   white-space:nowrap olan yerlerde (.ay-kod) etkisiz, orası kendi içinde kayar. */
+.bolum, .bolum *{ overflow-wrap:anywhere; }
+/* Flex/grid içindeki metin kutusu içeriğinden dar olabilsin (yoksa satırı
+   viewport'tan geniş iter). */
+.n-ad,.e-ad,.al-ad,.k-sayi,.p-govde,.bes-yad,.og-ad,.bolum-bas,
+.seri-bant > div,.bes-yemek-bas > div{ min-width:0; }
 
 /* --- Düzen: tek sütun, ortalı, en fazla 430px; altta tab bar payı --- */
 .kabuk{
@@ -116,7 +131,8 @@ h1,h2,h3{ font-family:var(--bas); font-weight:600; margin:0; letter-spacing:-.01
   margin:0 0 12px;
   display:flex;
   align-items:baseline;
-  gap:8px;
+  flex-wrap:wrap;
+  gap:4px 8px;
 }
 .bolum-bas .yan{
   font-family:var(--gov);
@@ -214,6 +230,7 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   border-radius:16px;
   background:rgba(224,154,79,.07);
 }
+.seri-bant > div{ min-width:0; }
 .seri-bant .alev{
   width:38px; height:38px; border-radius:13px; flex:0 0 auto;
   display:flex; align-items:center; justify-content:center;
@@ -446,7 +463,7 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .plan-liste > li{
   --tirnak:18px;
   display:grid;
-  grid-template-columns:26px 3.6em 1fr;
+  grid-template-columns:26px 3.6em minmax(0,1fr);
   column-gap:11px;
   align-items:start;
   padding:4px 0 6px;
@@ -629,6 +646,7 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   border:1px solid rgba(255,255,255,.06); }
 .bes-yemek + .bes-yemek{ margin-top:8px; }
 .bes-yemek-bas{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.bes-yemek-bas > div{ min-width:0; }
 .bes-yad{ font-weight:500; }
 .bes-kcal{ font-family:var(--bas); font-weight:600; color:var(--vakit); flex:0 0 auto; }
 .bes-mk{ display:flex; gap:6px; margin-top:6px; }
