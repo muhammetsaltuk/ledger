@@ -1,4 +1,6 @@
-/* Gerçek WebKit render'ında yatay kaydırma testi (§13).
+/* Gerçek WebKit render'ında mobil düzen testi (§13):
+   - hiçbir sekmede yatay kaydırma yok (scrollWidth <= innerWidth)
+   - düğme etiketleri tek satır (kısa etiket harf harf sarmıyor)
    OPSİYONEL — playwright ister, "no deps" kuralının dışında:
      npm i -D playwright && npx playwright install webkit
      node test/kaydirma.mjs
@@ -77,18 +79,37 @@ for (const w of [360, 390, 414]) {
   for (const s of ["bugun", "seri", "plan", "beslenme", "ayarlar"]) {
     await page.click(`.alt-nav button[data-gor="${s}"]`).catch(()=>{});
     await page.waitForTimeout(200);
-    const r = await page.evaluate(() => ({
-      iw: innerWidth,
-      doc: document.documentElement.scrollWidth,
-      body: document.body.scrollWidth
-    }));
+    const r = await page.evaluate(() => {
+      const iw = innerWidth;
+      // Düğme etiketi tek satırda mı (harf harf kırılmış mı)?
+      const sarmisButon = [];
+      for (const el of document.querySelectorAll("button, a.dg")) {
+        if (el.offsetParent === null) continue;
+        const cs = getComputedStyle(el);
+        if (cs.flexDirection === "column") continue;      // alt-nav ikon+etiket
+        const txt = (el.textContent || "").trim();
+        if (!txt) continue;
+        const rg = document.createRange(); rg.selectNodeContents(el);
+        let t = Infinity, btm = -Infinity;
+        for (const rc of rg.getClientRects()) { if (rc.height === 0) continue; t = Math.min(t, rc.top); btm = Math.max(btm, rc.bottom); }
+        const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.3;
+        if (btm - t > lh * 1.6) sarmisButon.push(txt.slice(0, 24));
+      }
+      return {
+        iw, doc: document.documentElement.scrollWidth, body: document.body.scrollWidth,
+        sarmisButon
+      };
+    });
     const tasti = r.doc > r.iw + 1 || r.body > r.iw + 1;
-    if (tasti) hata++;
-    console.log(`${tasti ? "✗" : "✓"} ${w}px / ${s.padEnd(9)} doc=${r.doc} body=${r.body} (iw=${r.iw})`);
+    const butonKotu = r.sarmisButon.length > 0;
+    if (tasti || butonKotu) hata++;
+    let sat = `${tasti || butonKotu ? "✗" : "✓"} ${w}px / ${s.padEnd(9)} doc=${r.doc} body=${r.body} (iw=${r.iw})`;
+    if (butonKotu) sat += `  sarmış düğme: ${r.sarmisButon.join(", ")}`;
+    console.log(sat);
   }
   await ctx.close();
 }
 await b.close();
 srv.close();
-console.log(hata ? `\n✗ ${hata} durumda yatay kaydırma` : "\n✓ yatay kaydırma yok");
+console.log(hata ? `\n✗ ${hata} durumda yatay kaydırma / sarmış düğme` : "\n✓ yatay kaydırma yok, düğme etiketleri tek satır");
 process.exit(hata ? 1 : 0);

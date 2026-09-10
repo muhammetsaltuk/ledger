@@ -88,6 +88,12 @@ h1,h2,h3{ font-family:var(--bas); font-weight:600; margin:0; letter-spacing:-.01
 /* Uzun bölünemez kelime (yapıştırılmış adres, model çıktısı) kutudan taşmasın.
    white-space:nowrap olan yerlerde (.ay-kod) etkisiz, orası kendi içinde kayar. */
 .bolum, .bolum *{ overflow-wrap:anywhere; }
+/* Ama kontroller hariç: "anywhere" min-genişliği düşürüp kısa buton etiketini
+   (ör. "ekle") harf harf alt alta kırıyordu. Etiketleri hep tek parça tut. */
+.bolum button, .bolum a.dg, .bolum input, .bolum select, .bolum summary{
+  overflow-wrap:normal;
+  word-break:normal;
+}
 /* Flex/grid içindeki metin kutusu içeriğinden dar olabilsin (yoksa satırı
    viewport'tan geniş iter). */
 .n-ad,.e-ad,.al-ad,.k-sayi,.p-govde,.bes-yad,.og-ad,.bolum-bas,
@@ -168,9 +174,13 @@ button{
   font-size:.9rem;
   font-weight:500;
   line-height:1;
+  white-space:nowrap;                   /* etiket tek satır; asla kırılmaz */
+  flex-shrink:0;                         /* flex satırda büzülüp sarmasın */
   text-decoration:none;                /* .dg bir <a> da olabilir */
   transition:border-color 160ms ease,color 160ms ease,background-color 160ms ease;
 }
+/* Flex satırdaki girdiler büzülebilsin ki düğmeyi ezmesin. */
+.bolum input, .bolum select, .bolum textarea{ min-width:0; }
 .dg:hover{ border-color:var(--sonuk); }
 /* Birincil: aktif vakit renginde dolu düğme */
 .dg-bir{

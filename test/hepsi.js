@@ -1527,6 +1527,20 @@ await dene("yatay kaydırma: sayfa düzeyinde kapalı, uzun kelime kırılıyor 
     throw new Error("flex metin kutularında min-width:0 yok");
 });
 
+await dene("düğme etiketleri kırılmaz: .dg nowrap + shrink:0, kontroller wrap dışı", async () => {
+  const fs = require("fs"), path = require("path");
+  const html  = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  const style = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  const dg = style.slice(style.indexOf(".dg{"), style.indexOf(".dg{") + 600);
+  if(!/white-space:\s*nowrap/.test(dg))
+    throw new Error(".dg'de white-space:nowrap yok — dar flex satırda etiket sarar");
+  if(!/flex-shrink:\s*0/.test(dg))
+    throw new Error(".dg'de flex-shrink:0 yok — girdi düğmeyi ezip etiketi sarabilir");
+  // overflow-wrap:anywhere kuralının kontrolleri geri alması şart.
+  if(!/\.bolum button[^{]*\{[^}]*overflow-wrap:\s*normal/.test(style))
+    throw new Error(".bolum button için overflow-wrap:normal yok — anywhere etiketi harf harf kırar");
+});
+
 bolum("§15 — kalori hesabı ve kilo günlüğü");
 
 const BP = { boy:178, kilo:72, yas:25, cinsiyet:"erkek", aktivite:"orta", haftalikHedef:0.35 };
