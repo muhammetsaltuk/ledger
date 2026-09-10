@@ -130,8 +130,48 @@ await dene("istem §6'nın bütün girdilerini taşır", async () => {
   icerir(metin, "ikindi 2");                 // kaza borcu
   icerir(metin, "Berber");                   // yaklaşan etkinlik
   icerir(metin, "08:35");                    // profil
-  icerir(metin, "09:10'da kalktım");         // son 14 günün notları
+  icerir(metin, "09:10'da kalktım");         // dünün notları
   icerir(metin, "Kahvaltı, spordan sonraki 45 dakika içinde");   // çerçeve
+});
+
+await dene("§6 dün uyumu: 'Dün' bölümü + değerlendirme + tek cümle isteme girer", async () => {
+  const kayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
+  const govde = Object.assign({}, ORNEK_GOVDE, {
+    dun: "akşam yoruldum, kodu bitiremedim",
+    son14: [
+      { tarih:"2026-08-30", gunAdi:"Cumartesi", namaz:"", su:4,
+        maddeler:[{ saat:"10:00", baslik:"Eski madde", yapildi:true, not:"" }] },
+      { tarih:"2026-09-06", gunAdi:"Pazar", namaz:"yatsi:vaktinde", su:6,
+        maddeler:[
+          { saat:"09:00", baslik:"Kod bloğu", yapildi:false, not:"yarıda bıraktım" },
+          { saat:"16:30", baslik:"Koşu", yapildi:true, not:"" }
+        ],
+        gununNotu:"Pazar, kurs yok.",
+        degerlendirme:"Kod bloğunu yarıda bırakıyorsun. Yarın 10:30'da başlat.",
+        kullaniciNotu:"" }
+    ]
+  });
+  await plan(istek(govde), cevap());
+  const metin = kayit.istekler[0].govde.contents[0].parts[0].text;
+  icerir(metin, "## Dün");
+  icerir(metin, "[x] 16:30 Koşu");                          // yapıldı işareti
+  icerir(metin, "[ ] 09:00 Kod bloğu");                     // yapılmadı işareti
+  icerir(metin, "yarıda bıraktım");
+  icerir(metin, "gün sonu değerlendirmesi: Kod bloğunu yarıda");
+  icerir(metin, "Kullanıcının az önce yazdığı: akşam yoruldum");
+  icerir(metin, "## Daha önceki günler");
+  icerir(metin, "2026-08-30");                              // eski gün geçmişte
+  if(metin.indexOf("## Dün") > metin.indexOf("## Daha önceki günler"))
+    throw new Error("'Dün' bölümü 'Daha önceki günler'den önce olmalı");
+});
+
+await dene("§6 dün uyumu: sabit-şablon-üretme ve düne-göre-ayarla talimatı istemde", async () => {
+  const kayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
+  await plan(istek(ORNEK_GOVDE), cevap());
+  const metin = kayit.istekler[0].govde.contents[0].parts[0].text;
+  icerir(metin, "Sabit şablon üretme");
+  icerir(metin, "Bugünü düne göre ayarla");
+  icerir(metin, "Çerçevedeki maddeler");                    // frame sabit kalıyor
 });
 
 await dene("sistem promptu §12'deki kurallarla gider", async () => {

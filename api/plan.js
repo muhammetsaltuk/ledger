@@ -61,18 +61,34 @@ function istemKur(g){
         (e.sure ? " (" + e.sure + " dk)" : "")).join("\n")
     : "";
 
-  const gecmis = (g.son14 || []).length
-    ? g.son14.map(gun => {
-        const satir = [gun.tarih + (gun.gunAdi ? " " + gun.gunAdi : "")];
-        if(gun.namaz) satir.push("namaz: " + gun.namaz);
-        if(gun.su != null) satir.push("su: " + gun.su + "/10");
-        (gun.maddeler || []).forEach(m => {
-          satir.push("  [" + (m.yapildi ? "x" : " ") + "] " + (m.saat || "") + " " +
-            m.baslik + (m.not ? "  — not: " + m.not : ""));
-        });
-        return satir.join("\n");
-      }).join("\n\n")
-    : "Kayıt yok; bu ilk günlerden biri.";
+  function gunSatiri(gun, kisa){
+    const satir = [gun.tarih + (gun.gunAdi ? " " + gun.gunAdi : "")];
+    if(gun.namaz) satir.push("namaz: " + gun.namaz);
+    if(gun.su != null) satir.push("su: " + gun.su + "/10");
+    (gun.maddeler || []).forEach(m => {
+      satir.push("  [" + (m.yapildi ? "x" : " ") + "] " + (m.saat || "") + " " +
+        m.baslik + (m.not ? "  — not: " + m.not : ""));
+    });
+    if(!kisa && gun.gununNotu)     satir.push("  planın şekli: " + gun.gununNotu);
+    if(gun.kullaniciNotu)          satir.push("  kullanıcı: " + gun.kullaniciNotu);
+    if(gun.degerlendirme)          satir.push("  gün sonu değerlendirmesi: " + gun.degerlendirme);
+    return satir.join("\n");
+  }
+
+  const dizi = g.son14 || [];
+  const dun  = dizi.length ? dizi[dizi.length - 1] : null;
+  const dunCumle = String(g.dun || "").trim().slice(0, 400);
+
+  const dunMetni = (() => {
+    const parcalar = [];
+    if(dun) parcalar.push(gunSatiri(dun, false));
+    if(dunCumle) parcalar.push("Kullanıcının az önce yazdığı: " + dunCumle);
+    return parcalar.join("\n");
+  })();
+
+  const gecmis = dizi.length > 1
+    ? dizi.slice(0, -1).map(gun => gunSatiri(gun, true)).join("\n\n")
+    : (dizi.length ? "" : "Kayıt yok; bu ilk günlerden biri.");
 
   return "Bugün için bir günlük plan üret." +
     bolum("Bugün", g.tarih + " " + (g.gunAdi || "") + "\n" + kurs) +
@@ -81,16 +97,21 @@ function istemKur(g){
       ? "\nBirikmiş borç varsa güne bir kaza namazı yerleştirebilirsin." : "")) +
     bolum("Yaklaşan etkinlikler", etkinlik) +
     bolum("Kullanıcı profili", g.profil) +
-    bolum("Son 14 günün kaydı", gecmis) +
+    bolum("Dün", dunMetni) +
+    bolum("Daha önceki günler", gecmis) +
     bolum("Çerçeve", CERCEVE) +
     "\n\n## Nasıl\n" +
     "- Günün tamamını planla, sabah kalkıştan yatmaya kadar.\n" +
     "- Saatler HH:MM, 24 saat biçiminde ve artan sırada olsun.\n" +
+    "- **Bugünü düne göre ayarla.** Dün yarım kalan ya da atlanan bir işi bugüne\n" +
+    "  taşı; sürekli aksayan bir maddenin saatini/süresini değiştir ya da bugün\n" +
+    "  çıkar. Dünkü değerlendirmedeki veya kullanıcının yazdığı tek öneriyi uygula.\n" +
+    "- **Sabit şablon üretme.** Esnek blokların (kod, ev sporu, kitap, serbest\n" +
+    "  zaman) sırasını ve sürelerini günden güne değiştir. Çerçevedeki maddeler\n" +
+    "  değişmez; onların dışındaki her şey düne ve bugünün koşullarına göre akar.\n" +
     "- `gerekce` kısa ve isteğe bağlıdır; yalnız kayıtta karşılığı olan bir gözleme\n" +
     "  dayanıyorsa yaz. Uydurma.\n" +
-    "- Notlarda geçen şeyleri dikkate al: bir madde sürekli yarım kalıyorsa saatini\n" +
-    "  veya süresini değiştir.\n" +
-    "- `gununNotu` en fazla iki cümle, günün şeklini anlatır.";
+    "- `gununNotu` en fazla iki cümle: bugünkü planın dünden ne farkla kurulduğu.";
 }
 
 module.exports = async (req, res) => {

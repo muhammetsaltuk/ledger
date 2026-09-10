@@ -600,6 +600,80 @@ await dene("geçici yoğunluk yapay zekayı kalıcı kapatmaz", async () => {
   dogru(u.durum.apiCagrilari.length > once, "sonraki denemede yine çağırmalı");
 });
 
+bolum("§6 — plan dün uyumu (dün nasıl geçti?)");
+
+/* Dün (2026-09-05) plan var, değerlendirme yok — soru çıkması gereken durum. */
+function dunPlanliDepo(extra){
+  return { "ledger/v1": JSON.stringify(Object.assign({
+    surum:1, ayar:{},
+    gunler:{ "2026-09-05": Object.assign({
+      namaz:{}, su:3,
+      maddeler:[
+        { id:"m1", saat:"09:00", baslik:"Kod bloğu", tur:"kod", yapildi:false, not:"yorgundum" },
+        { id:"m2", saat:"16:30", baslik:"Koşu", tur:"spor", yapildi:true, not:"" }
+      ],
+      gununNotu:"Pazar, kurs yok."
+    }, extra || {}) }
+  }, {})) };
+}
+
+await dene("son14Gun: günün notu, değerlendirmesi ve kullanıcı notu da gider", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00",
+    depo: dunPlanliDepo({ degerlendirme:"Kod bloğunu yarıda bıraktın. Yarın 10:30'da başlat.",
+                          kullaniciNotu:"akşam çok yoruldum" }) });
+  const dun = u.ic.son14Gun("2026-09-06").find(g => g.tarih === "2026-09-05");
+  dogru(dun, "dünün kaydı listede");
+  esit(dun.gununNotu, "Pazar, kurs yok.");
+  icerir(dun.degerlendirme, "10:30");
+  esit(dun.kullaniciNotu, "akşam çok yoruldum");
+});
+
+await dene("dunUyumSorulsun: dün plan var + değerlendirme/not yoksa true", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00", depo: dunPlanliDepo() });
+  dogru(u.ic.dunUyumSorulsun(), "sorulmalı");
+
+  const v = await ac({ simdi:"2026-09-06T09:00:00", depo: dunPlanliDepo({ degerlendirme:"bir şeyler" }) });
+  dogru(!v.ic.dunUyumSorulsun(), "değerlendirme varsa sorma");
+
+  const w = await ac({ simdi:"2026-09-06T09:00:00", depo: dunPlanliDepo({ kullaniciNotu:"iyiydi" }) });
+  dogru(!w.ic.dunUyumSorulsun(), "kullanıcı notu varsa sorma");
+
+  const x = await ac({ simdi:"2026-09-06T09:00:00" });   // dün plan yok
+  dogru(!x.ic.dunUyumSorulsun(), "dün plan yoksa sorma");
+});
+
+await dene("'plan üret' önce dünü sorar; cümle dünün kaydına yazılır ve isteğe gider", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00", depo: dunPlanliDepo(), api:{ plan:SAHTE_PLAN } });
+  const oncekiCagri = u.durum.apiCagrilari.filter(c => c.ad === "plan").length;
+
+  u.ic.planUreteBasla();
+  icerir(u.html("b-plan"), 'id="p-dun"');       // soru kutusu açıldı
+  esit(u.durum.apiCagrilari.filter(c => c.ad === "plan").length, oncekiCagri, "henüz istek yok");
+
+  await u.ic.planUret(true, "akşam yoruldum, kodu bitiremedim");
+  icermez(u.html("b-plan"), 'id="p-dun"');       // kutu kapandı
+  esit(u.veri().gunler["2026-09-05"].kullaniciNotu, "akşam yoruldum, kodu bitiremedim");
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "plan").pop();
+  esit(c.govde.dun, "akşam yoruldum, kodu bitiremedim");
+  dogru(!u.ic.dunUyumSorulsun(), "bugün tekrar sorulmaz");
+});
+
+await dene("'bu adımı geç': istek boş dun ile gider, not yazılmaz, tekrar sorulmaz", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00", depo: dunPlanliDepo(), api:{ plan:SAHTE_PLAN } });
+  u.ic.planUreteBasla();
+  await u.ic.planUret(true, "");
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "plan").pop();
+  esit(c.govde.dun, "");
+  esit(u.veri().gunler["2026-09-05"].kullaniciNotu || "", "");
+  dogru(!u.ic.dunUyumSorulsun(), "geçince de bugün tekrar sorulmaz");
+});
+
+await dene("açılıştaki otomatik üretim dünü sormaz (elle değil)", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00", depo: dunPlanliDepo(), api:{ plan:SAHTE_PLAN } });
+  icermez(u.html("b-plan"), 'id="p-dun"');
+  dogru(u.durum.apiCagrilari.some(c => c.ad === "plan"), "yine de otomatik üretilmiş");
+});
+
 bolum("§14 — anahtar yokken uygulama çalışır");
 
 await dene("anahtar yoksa plan üretilmez ama uygulama açılır", async () => {
