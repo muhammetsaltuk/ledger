@@ -265,8 +265,10 @@ duyarsız — `toLocaleLowerCase("tr")` — ve tekilleştirilmiş). Program'ın 
 iki blok: **Market listesi** (alınacaklar; işaretleyince mutfağa geçer) ve
 **Mutfağımda** (işareti kaldırınca alışveriş listesine geri döner). Bir tarifte,
 Market listesinde ve Mutfağımda'da aynı malzemenin kutusu hep aynı durumu
-gösterir. Program da mutfak da boşsa blok çizilmez. Tamamen istemcide,
-`localStorage`'da; anahtar gerektirmez.
+gösterir. Program da mutfak da boşsa blok çizilmez. `malzemeler` alanı §15'e
+sonradan eklendi; daha önce üretilmiş bir programda bu alan yoktur — o zaman
+hem tarif kartı hem Market listesi "programı yeniden üret" uyarısı gösterir.
+Tamamen istemcide, `localStorage`'da; anahtar gerektirmez.
 
 **Alternatif** (`mod:alternatif`). Bir yemeğe "beğenmedim" dersen, kalorisi ve
 makroları yakın (±80 kcal) tek bir yemek gelir, yerine geçer; beğenmediğin yemek
@@ -388,7 +390,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (165 test) ve `node test/api.js` (58 test) ile fiilen
+`node test/hepsi.js` (166 test) ve `node test/api.js` (58 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
 gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
@@ -428,6 +430,7 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §15 "beğenmedim" yemeği değiştirir, sevmediklerine ekler | ✓ test |
 | §15 tarif malzemeleri onay kutusu; işaretsizler türetilmiş alışveriş listesi | ✓ test |
 | §15 Market listesi ⇄ Mutfağımda kutuları aynı `beslenme.market` durumunu paylaşır | ✓ test |
+| §15 malzemesiz eski program: tarif ve Market listesi "yeniden üret" uyarır | ✓ test |
 | §15 program/alternatif istemi `malzemeler` ister, dizi olarak temizlenir | ✓ test |
 | §15 api/tarif: anahtar varsa Data API, yoksa kazıma, sonra arama linki | ✓ test |
 | §15 fotoğraf: görsel parça API'ye gider; güven geçersizse "dusuk" | ✓ test |
