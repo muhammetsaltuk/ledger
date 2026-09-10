@@ -1504,6 +1504,29 @@ await dene("halkayı taşıyan her kutu CSS'te açık width/height alır", async
   }
 });
 
+await dene("yatay kaydırma: sayfa düzeyinde kapalı, uzun kelime kırılıyor (regresyon)", async () => {
+  const fs = require("fs"), path = require("path");
+  const html  = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  const style = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  const kural = ad => style.slice(style.indexOf(ad + "{"), style.indexOf(ad + "{") + 400);
+
+  // html VE body: overflow-x clip/hidden. body tek başına iOS'ta yetmiyor.
+  if(!/overflow-x:\s*(clip|hidden)/.test(kural("html")))
+    throw new Error("html{}'de overflow-x yok — sayfa yatay pan eder");
+  if(!/overflow-x:\s*(clip|hidden)/.test(kural("body")))
+    throw new Error("body{}'de overflow-x yok");
+  // Uzun bölünemez kelime her bölümde kırılsın.
+  if(style.indexOf(".bolum *") === -1 || !/\.bolum[^{]*\{\s*overflow-wrap:\s*anywhere/.test(style))
+    throw new Error(".bolum içeriğinde overflow-wrap:anywhere kuralı yok");
+  // Grid hücreleri içeriğinden geniş kalmasın.
+  if(style.indexOf("minmax(0,1fr)") === -1 && style.indexOf("minmax(0, 1fr)") === -1)
+    throw new Error("plan ızgarası minmax(0,1fr) kullanmıyor — uzun başlık satırı taşırır");
+  // Küçülebilir flex/grid metin kutuları.
+  if(!/\.seri-bant\s*>\s*div\{[^}]*min-width:\s*0/.test(style) &&
+     style.indexOf("min-width:0") === -1)
+    throw new Error("flex metin kutularında min-width:0 yok");
+});
+
 bolum("§15 — kalori hesabı ve kilo günlüğü");
 
 const BP = { boy:178, kilo:72, yas:25, cinsiyet:"erkek", aktivite:"orta", haftalikHedef:0.35 };
