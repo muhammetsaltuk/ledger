@@ -523,6 +523,9 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 }
 .plan-alt{ display:flex; align-items:center; gap:10px; margin-top:16px; flex-wrap:wrap; }
 .plan-ekle{ display:flex; gap:8px; align-items:center; margin-top:14px; }
+.dun-soru{ margin-top:14px; padding:14px; border-radius:14px;
+  background:rgba(224,154,79,.08); border:1px solid rgba(224,154,79,.28); }
+.dun-soru .plan-ekle{ margin-top:0; }
 .plan-ekle input[type="time"]{ width:6.6em; flex:0 0 auto; }
 .plan-ekle input[type="text"]{ flex:1 1 auto; }
 .plan-bos{ color:var(--sonuk); font-size:.9rem; margin:0 0 4px; }
@@ -2562,6 +2565,8 @@ const TURLER = ["uyku","spor","yemek","kod","kitap","ingilizce","kurs",
 
 const $plan = document.getElementById("b-plan");
 let acikNot = null;                          // not alanı açık olan maddenin id'si
+let dunSoruAcik = false;                     // "dün nasıl geçti" kutusu açık mı
+let dunSoruldu = null;                       // hangi uygulama günü için soruldu/geçildi
 
 function yeniId(){
   return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
@@ -2687,10 +2692,24 @@ function planCiz(){
       '<input type="text" id="p-baslik" aria-label="madde" placeholder="madde ekle" autocomplete="off">' +
       '<button class="dg" id="p-ekle">ekle</button>' +
     '</div>' +
+    (dunSoruAcik
+      ? '<div class="dun-soru">' +
+          '<p class="sonuk" style="margin:0 0 8px">Dün nasıl geçti? Bir cümle — ' +
+            'yarının planı buna göre ayarlanır.</p>' +
+          '<div class="plan-ekle">' +
+            '<input type="text" id="p-dun" placeholder="ör. akşam çok yoruldum, kod bloğunu bitiremedim" ' +
+              'autocomplete="off" aria-label="dün nasıl geçti">' +
+            '<button class="dg dg-bir" id="p-dun-uret">üret</button>' +
+          '</div>' +
+          '<button class="dg dg-sonuk" id="p-dun-gec" style="margin-top:8px">bu adımı geç</button>' +
+        '</div>'
+      : '') +
     '<div class="plan-alt">' +
       '<button class="dg ' + (maddeler.length ? "dg-sonuk" : "dg-bir") + '" id="p-uret"' +
         (UYG.planUretiliyor || hak <= 0 ? " disabled" : "") + '>' +
-        (maddeler.length ? "planı yeniden üret" : "plan üret") +
+        (UYG.planUretiliyor ? "üretiliyor…"
+          : dunSoruAcik ? "vazgeç"
+          : maddeler.length ? "planı yeniden üret" : "plan üret") +
       '</button>' +
       '<button class="dg dg-sonuk" id="p-etkinlik">etkinlik ekle</button>' +
       (hak < PLAN_SINIR && hak > 0 ? '<span class="sonuk">' + hak + ' hak kaldı</span>' : "") +
@@ -2713,7 +2732,12 @@ $plan.addEventListener("click", e => {
     if(alan) alan.focus();
   }
   else if(d.id === "p-ekle") planEkleGonder();
-  else if(d.id === "p-uret") planUret(true);
+  else if(d.id === "p-uret") planUreteBasla();
+  else if(d.id === "p-dun-uret"){
+    const alan = document.getElementById("p-dun");
+    planUret(true, alan ? alan.value : "");
+  }
+  else if(d.id === "p-dun-gec") planUret(true, "");
   else if(d.id === "p-etkinlik") etkinlikGirisAc();
 });
 
@@ -2729,6 +2753,9 @@ $plan.addEventListener("keydown", e => {
   }else if(e.target.id === "p-baslik" || e.target.id === "p-saat"){
     e.preventDefault();
     planEkleGonder();
+  }else if(e.target.id === "p-dun"){
+    e.preventDefault();
+    planUret(true, e.target.value);
   }
 });
 
@@ -2776,7 +2803,10 @@ function son14Gun(bugun){
       su: g.su || 0,
       maddeler: (g.maddeler || []).map(m => ({
         saat: m.saat, baslik: m.baslik, yapildi: !!m.yapildi, not: m.not || ""
-      }))
+      })),
+      gununNotu: g.gununNotu || "",                 // modelin o günkü plan şekli notu
+      degerlendirme: g.degerlendirme || "",         // gün sonu değerlendirmesi (§12)
+      kullaniciNotu: g.kullaniciNotu || ""          // "dün nasıl geçti" tek cümle
     });
   }
   return liste;
@@ -2813,14 +2843,47 @@ function planHakkiDus(tarih){
 
 let planMesaj = "";
 
-async function planUret(elle){
+/* Dün bir plan vardı ama ne değerlendirme ne de tek cümlelik not girildiyse,
+   "plan üret"e basınca önce "dün nasıl geçti?" diye sorulur (§6). */
+function dunUyumSorulsun(){
+  if(dunSoruldu === uygulamaGunu()) return false;   // bugün bir kez soruldu/geçildi
+  const dg = gunKaydir(uygulamaGunu(), -1);
+  const g = UYG.veri.gunler[dg];
+  return !!(g && g.maddeler && g.maddeler.length && !g.degerlendirme && !g.kullaniciNotu);
+}
+
+/* "plan üret" düğmesinin girişi: gerekiyorsa önce dünü sor, yoksa doğrudan üret. */
+function planUreteBasla(){
+  if(dunSoruAcik){ dunSoruAcik = false; planCiz(); return; }
+  if(dunUyumSorulsun()){
+    dunSoruAcik = true;
+    planCiz();
+    const alan = document.getElementById("p-dun");
+    if(alan) alan.focus();
+    return;
+  }
+  planUret(true);
+}
+
+async function planUret(elle, dun){
   const tarih = uygulamaGunu();
   if(planHakki(tarih) <= 0){
     planMesaj = "Bugün için plan üretme hakkı doldu (günde " + PLAN_SINIR + " kez).";
+    dunSoruAcik = false;
     planCiz();
     return false;
   }
 
+  // "Dün nasıl geçti" cümlesi geldiyse dünün kaydına yaz — tekrar sorulmasın,
+  // sonraki plan istekleri de görsün.
+  const cumle = String(dun || "").trim();
+  if(cumle){
+    const dg = gunKaydir(tarih, -1);
+    if(UYG.veri.gunler[dg]){ UYG.veri.gunler[dg].kullaniciNotu = cumle.slice(0, 300); kaydet(); }
+  }
+
+  dunSoruAcik = false;
+  if(elle) dunSoruldu = tarih;                 // bugün için tekrar sorma
   UYG.planUretiliyor = true;
   planMesaj = "";
   planCiz();
@@ -2837,7 +2900,8 @@ async function planUret(elle){
         etkinlikler: yaklasanEtkinlikler(tarih),
         profil: UYG.veri.profil || "",
         son14: son14Gun(tarih),
-        borc: UYG.veri.borc
+        borc: UYG.veri.borc,
+        dun: cumle
       })
     });
 

@@ -135,6 +135,20 @@ Dört yapay zeka fonksiyonu da üretimde, gerçek anahtarla denendi:
 | `api/review` | 120 kelime altı düz metin, somut gözlem + tek ölçülebilir öneri, liste yok |
 | `api/plan` | Kurs sabit ve akşam namazı için bölünmüş, kurs günü uyku iki parçalı, kahvaltı spordan 40 dk sonra, kod bloğu profildeki kanıta göre 10:30, ikindi borcuna karşılık bir kaza namazı, yatmadan 20 dk kitap |
 
+### Plan düne uyar (§6)
+
+Plan artık düz bir şablon değil. `api/plan` isteğinde ayrı bir **"Dün"** bölümü
+var: dünkü maddeler `[x]/[ ]` işaretiyle, notlar, o günün `gununNotu`'su, **gün
+sonu değerlendirmesi** ve kullanıcının tek cümlelik "dün nasıl geçti" notu.
+İstem modele "bugünü düne göre ayarla — yarım kalanı taşı, aksayan maddenin
+saatini/süresini değiştir, sabit şablon üretme; esnek blokların sırasını günden
+güne değiştir" diyor. Çerçevedeki maddeler (§6 Değişmeyenler) sabit kalır.
+
+Arayüzde: bir gün için henüz "günü değerlendir" yapılmadıysa, **"plan üret"e
+basınca** önce "dün nasıl geçti? (bir cümle)" kutusu çıkar; cümle hem dünün
+kaydına yazılır hem de isteğe gider. "Bu adımı geç" ile atlanabilir; her iki
+durumda o gün tekrar sorulmaz.
+
 ## Model (§12)
 
 Arka planda **Google Gemini**, ücretsiz katman. `api/_ortak.js` bütün AI
@@ -348,7 +362,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (152 test) ve `node test/api.js` (54 test) ile fiilen
+`node test/hepsi.js` (157 test) ve `node test/api.js` (56 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
 gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
@@ -362,6 +376,8 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | Borç sıfırsa kaza bölümü hiç görünmez | ✓ test |
 | 00:30'da işaretlenen yatsı dünün kaydına yazılır | ✓ test |
 | Maddeye yazılan not ertesi günün plan isteğine girer | ✓ test |
+| §6 plan düne uyar: "Dün" bölümü + gün sonu değerlendirmesi isteme girer | ✓ test |
+| §6 "plan üret" değerlendirme yoksa önce "dün nasıl geçti?" sorar | ✓ test |
 | "Koşuyu akşama al" hem planı hem profili değiştirir | ✓ test |
 | "12 Eylül saat 14'te berber" doğru çevrilir | ✓ test |
 | Vurgu rengi ikindide turuncuya döner | ✓ test |
