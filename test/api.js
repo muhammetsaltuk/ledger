@@ -525,6 +525,191 @@ await dene("aladhan çökerse 502, topic hata mesajında geçmez", async () => {
     throw new Error("topic cevaba sızdı");
 });
 
+/* --------------------------------------------------------------- */
+
+bolum("api/beslenme — §15 program / alternatif / foto");
+
+process.env.GEMINI_API_KEY = "test-anahtari";
+delete require.cache[require.resolve("../api/_ortak")];
+delete require.cache[require.resolve("../api/beslenme")];
+const beslenme = require("../api/beslenme");
+
+const BESLENME_GOVDE = {
+  mod: "program",
+  profil: { boy:178, kilo:72, yas:25, cinsiyet:"erkek", aktivite:"orta", haftalikHedef:0.35,
+            metin:"Bir buçuk yıldır işsiz, düzen kurmaya çalışıyor." },
+  hedef: { hedef:3029, protein:130, karb:438, yag:84 },
+  sevmedigim: ["kuru fasulye", "karnabahar"]
+};
+
+const PROGRAM_CEVABI = JSON.stringify({
+  gunlukKalori: 3020,
+  makro: { protein:132, karb:430, yag:85 },
+  ogunler: [
+    { ad:"Kahvaltı", saat:"08:30", yemekler:[
+      { ad:"Yulaf ezmesi + süt + muz", miktar:"80 g yulaf, 300 ml süt, 1 muz",
+        kalori:520, protein:22, karb:78, yag:12, tarif:"Yulafı sütle 3 dk pişir, muzu dilimle ekle." } ] },
+    { ad:"Ara öğün", yemekler:[
+      { ad:"Ceviz + kuru üzüm", miktar:"30 g ceviz, 30 g üzüm", kalori:290,
+        protein:5, karb:25, yag:19, tarif:"Karıştır." } ] },
+    { ad:"", yemekler:[] },                                  // elenmeli
+    { ad:"Öğle", yemekler:[ { ad:"", miktar:"", kalori:0 } ] } // yemeği başlıksız → elenir → öğün de
+  ],
+  not: "Ara öğünler kalori açığını kapatmak için."
+});
+
+await dene("program modu: profil, hedef ve sevmedikleri isteme girer", async () => {
+  const kayit = geminiTaklit(() => ({ metin: PROGRAM_CEVABI }));
+  const c = cevap();
+  await beslenme(istek(BESLENME_GOVDE), c);
+  esit(c.kod, 200);
+  const metin = kayit.istekler[0].govde.contents[0].parts[0].text;
+  icerir(metin, "178 cm");
+  icerir(metin, "72 kg");
+  icerir(metin, "3029 kcal");
+  icerir(metin, "Protein: 130 g");
+  icerir(metin, "kuru fasulye, karnabahar");
+  icerir(metin, "Bir buçuk yıldır işsiz");
+  icerir(metin, "Övme");
+  const g = kayit.istekler[0].govde;
+  esit(g.generationConfig.responseMimeType, "application/json");
+});
+
+await dene("program: boş/başlıksız öğünler elenir, sayılar tamsayıya çekilir", async () => {
+  geminiTaklit(() => ({ metin: PROGRAM_CEVABI }));
+  const c = cevap();
+  await beslenme(istek(BESLENME_GOVDE), c);
+  esit(c.veri.ogunler.length, 2, "boş ve başlıksız öğün elenmeli");
+  esit(c.veri.ogunler[0].ad, "Kahvaltı");
+  esit(c.veri.ogunler[0].yemekler[0].kalori, 520);
+  dogru(c.veri.not.length > 0);
+});
+
+await dene("program tamamen boş gelirse 502", async () => {
+  geminiTaklit(() => ({ metin: JSON.stringify({ gunlukKalori:3000, makro:{}, ogunler:[] }) }));
+  const c = cevap();
+  await beslenme(istek(BESLENME_GOVDE), c);
+  esit(c.kod, 502);
+});
+
+await dene("alternatif modu: değişecek yemeğin kalorisi isteme girer, tek yemek döner", async () => {
+  const kayit = geminiTaklit(() => ({ metin: JSON.stringify({
+    ad:"Tam buğday makarna + tavuk", miktar:"100 g makarna, 120 g tavuk",
+    kalori:560, protein:45, karb:70, yag:10, tarif:"Makarnayı haşla, tavuğu ızgara yap." }) }));
+  const c = cevap();
+  await beslenme(istek({ mod:"alternatif",
+    yemek:{ ad:"Kuru fasulye", miktar:"1 kase", kalori:520, protein:20, karb:60, yag:12 },
+    ogun:"Öğle", sevmedigim:["kuru fasulye"] }), c);
+  esit(c.kod, 200);
+  esit(c.veri.ad, "Tam buğday makarna + tavuk");
+  esit(c.veri.kalori, 560);
+  const metin = kayit.istekler[0].govde.contents[0].parts[0].text;
+  icerir(metin, "Kuru fasulye");
+  icerir(metin, "520 kcal");
+  icerir(metin, "Öğün: Öğle");
+});
+
+await dene("foto modu: görsel parça olarak gönderilir, tahmin doğrulanır", async () => {
+  const kayit = geminiTaklit(() => ({ metin: JSON.stringify({
+    yemek:"Tavuklu pilav", kalori:640, protein:38, karb:70, yag:18, guven:"orta",
+    not:"Bir tabak porsiyonu varsaydım." }) }));
+  const c = cevap();
+  await beslenme(istek({ mod:"foto", foto:"x".repeat(200), mime:"image/jpeg",
+    ipucu:"öğle yemeği" }), c);
+  esit(c.kod, 200);
+  esit(c.veri.yemek, "Tavuklu pilav");
+  esit(c.veri.kalori, 640);
+  esit(c.veri.guven, "orta");
+
+  const parts = kayit.istekler[0].govde.contents[0].parts;
+  icerir(parts[0].text, "öğle yemeği");
+  dogru(parts[1] && parts[1].inline_data, "görsel parça gitmeli");
+  esit(parts[1].inline_data.mime_type, "image/jpeg");
+  esit(parts[1].inline_data.data.length, 200);
+});
+
+await dene("foto: veri yoksa 400; güven değeri geçersizse 'dusuk'a düşer", async () => {
+  const c = cevap();
+  await beslenme(istek({ mod:"foto", foto:"kisa" }), c);
+  esit(c.kod, 400);
+
+  geminiTaklit(() => ({ metin: JSON.stringify({ yemek:"Çorba", kalori:200, guven:"belki" }) }));
+  const c2 = cevap();
+  await beslenme(istek({ mod:"foto", foto:"y".repeat(150) }), c2);
+  esit(c2.veri.guven, "dusuk");
+});
+
+await dene("anahtar yoksa 503 (program da AI'ye bağlı)", async () => {
+  delete process.env.GEMINI_API_KEY;
+  delete require.cache[require.resolve("../api/_ortak")];
+  delete require.cache[require.resolve("../api/beslenme")];
+  const b = require("../api/beslenme");
+  const c = cevap();
+  await b(istek(BESLENME_GOVDE), c);
+  esit(c.kod, 503);
+  esit(c.veri.hata, "anahtar-yok");
+  process.env.GEMINI_API_KEY = "test-anahtari";
+  delete require.cache[require.resolve("../api/_ortak")];
+  delete require.cache[require.resolve("../api/beslenme")];
+});
+
+/* --------------------------------------------------------------- */
+
+bolum("api/tarif — §15 YouTube linki");
+
+delete require.cache[require.resolve("../api/tarif")];
+const tarif = require("../api/tarif");
+
+function istekGet(url){ return { method:"GET", url }; }
+
+await dene("YOUTUBE_API_KEY varsa Data API'den gerçek watch linki döner", async () => {
+  process.env.YOUTUBE_API_KEY = "yt-anahtari";
+  const gorulen = [];
+  global.fetch = async (url) => {
+    gorulen.push(url);
+    return { ok:true, status:200, json: async () => ({
+      items: [{ id: { videoId: "abcdef12345" } }] }) };
+  };
+  const c = cevap();
+  await tarif(istek({ yemek:"Mercimek çorbası" }), c);
+  esit(c.kod, 200);
+  esit(c.veri.url, "https://www.youtube.com/watch?v=abcdef12345");
+  esit(c.veri.kaynak, "api");
+  icerir(gorulen[0], "googleapis.com/youtube/v3/search");
+  icerir(gorulen[0], "key=yt-anahtari");
+  icerir(gorulen[0], "Mercimek");
+});
+
+await dene("anahtar yoksa results sayfasından ilk videoId çekilir", async () => {
+  delete process.env.YOUTUBE_API_KEY;
+  global.fetch = async (url) => {
+    icerir(url, "youtube.com/results");
+    return { ok:true, status:200, text: async () =>
+      'xxx {"videoId":"ZZZ0aaa1bbb"} yyy {"videoId":"sonraki0000"}' };
+  };
+  const c = cevap();
+  await tarif(istekGet("/api/tarif?yemek=" + encodeURIComponent("Tavuk sote")), c);
+  esit(c.veri.url, "https://www.youtube.com/watch?v=ZZZ0aaa1bbb");
+  esit(c.veri.kaynak, "kazima");
+});
+
+await dene("hiçbiri olmazsa arama linkine düşer", async () => {
+  delete process.env.YOUTUBE_API_KEY;
+  global.fetch = async () => ({ ok:false, status:429, text: async () => "" });
+  const c = cevap();
+  await tarif(istek({ yemek:"Karnıyarık" }), c);
+  esit(c.kod, 200);
+  esit(c.veri.kaynak, "arama");
+  icerir(c.veri.url, "youtube.com/results?search_query=");
+  icerir(c.veri.url, "Kar");
+});
+
+await dene("yemek adı boşsa 400", async () => {
+  const c = cevap();
+  await tarif(istek({ yemek:"  " }), c);
+  esit(c.kod, 400);
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

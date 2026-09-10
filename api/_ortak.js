@@ -56,11 +56,15 @@ function girdiAl(req, res){
 /**
  * Gemini'ye tek turluk istek. `sema` verilirse yapılandırılmış çıktı zorunlu
  * olur (§12); verilmezse düz metin döner.
+ *
+ * `istem` bir metin ya da parça dizisi olabilir. Dizi biçimi görsel için:
+ *   [{ text: "..." }, { inline_data: { mime_type: "image/jpeg", data: "<base64>" } }]
  */
 async function gemini(istem, sema, ayar){
+  const parcalar = Array.isArray(istem) ? istem : [{ text: String(istem) }];
   const govde = {
     systemInstruction: { parts: [{ text: SISTEM }] },
-    contents: [{ role: "user", parts: [{ text: istem }] }],
+    contents: [{ role: "user", parts: parcalar }],
     generationConfig: Object.assign({ temperature: 0.7 }, ayar || {})
   };
   if(sema){
