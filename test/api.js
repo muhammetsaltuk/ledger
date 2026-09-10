@@ -2,6 +2,8 @@
    şema zorlaması ve hata yolları. Gemini'ye gerçek istek atılmaz, uydurulur.
    node test/api.js */
 
+process.env.LEDGER_TEST = "1";     // §12 retry backoff'u testte beklemesin
+
 let gecen = 0, kalan = 0;
 
 function bolum(ad){ console.log("\n— " + ad); }
@@ -28,24 +30,33 @@ function cevap(){
   return c;
 }
 
-/** Gemini'yi taklit et; son gönderilen gövdeyi sakla. */
+/** Gemini'yi taklit et; her çağrıyı sakla. `uret(govde, cagriNo)` çağrı sırasına
+    göre farklı cevap verebilir. Dönüş biçimleri:
+      { metin: "..." }            → 200, gövdesi bu metin
+      { durum: 503, metin: "…" }  → HTTP hatası
+      { at: "ağ yok" }            → fetch fırlatır (ağ/timeout)               */
 function geminiTaklit(uret){
   const kayit = { istekler: [] };
   global.fetch = async (url, secenek) => {
     const govde = JSON.parse(secenek.body);
     kayit.istekler.push({ url, govde });
-    const sonuc = uret(govde);
-    if(sonuc && sonuc.durum && sonuc.durum !== 200){
+    const sonuc = uret(govde, kayit.istekler.length) || {};
+    if(sonuc.at) throw new Error(sonuc.at);
+    if(sonuc.durum && sonuc.durum !== 200){
       return { ok:false, status:sonuc.durum, text: async () => sonuc.metin || "hata" };
     }
     return {
       ok: true, status: 200,
-      text: async () => JSON.stringify({
+      text: async () => (typeof sonuc.ham === "string" ? sonuc.ham : JSON.stringify({
         candidates: [{ content: { parts: [{ text: sonuc.metin }] } }]
-      })
+      }))
     };
   };
   return kayit;
+}
+/** Modelleri URL'den çıkar (istek sırasında). */
+function cagriModelleri(kayit){
+  return kayit.istekler.map(i => (String(i.url).match(/models\/([\w.-]+):/) || [])[1]);
 }
 
 const PLAN_CEVABI = JSON.stringify({
@@ -212,6 +223,83 @@ await dene("anahtar hiçbir hata mesajında geçmez", async () => {
   await plan(istek(ORNEK_GOVDE), c);
   const yazi = JSON.stringify(c.veri);
   if(yazi.indexOf("test-anahtari") !== -1) throw new Error("anahtar cevaba sızdı");
+});
+
+/* --------------------------------------------------------------- */
+
+bolum("api/_ortak — §12 sertleştirme: retry + model zinciri");
+
+await dene("503 sonra başarı: kendini toparlar, kullanıcı hata görmez", async () => {
+  const kayit = geminiTaklit((g, n) => n === 1 ? { durum:503, metin:"UNAVAILABLE" } : { metin: PLAN_CEVABI });
+  const c = cevap();
+  await plan(istek(ORNEK_GOVDE), c);
+  esit(c.kod, 200, "ikinci denemede başarılı");
+  esit(kayit.istekler.length, 2);
+  esit(cagriModelleri(kayit)[1], "gemini-3.6-flash", "aynı modelde yeniden denendi");
+});
+
+await dene("ağ/timeout hatası da geçici sayılır, yeniden denenir", async () => {
+  const kayit = geminiTaklit((g, n) => n === 1 ? { at:"ECONNRESET" } : { metin: PLAN_CEVABI });
+  const c = cevap();
+  await plan(istek(ORNEK_GOVDE), c);
+  esit(c.kod, 200);
+  esit(kayit.istekler.length, 2);
+});
+
+await dene("birincil model 404 (emekli) → retry yok, ikincil modele düşer", async () => {
+  const kayit = geminiTaklit((g, n) => n === 1
+    ? { durum:404, metin:"models/gemini-3.6-flash is not found" }
+    : { metin: PLAN_CEVABI });
+  const c = cevap();
+  await plan(istek(ORNEK_GOVDE), c);
+  esit(c.kod, 200);
+  esit(kayit.istekler.length, 2, "404'te aynı modelde tekrar denenmez");
+  esit(cagriModelleri(kayit)[0], "gemini-3.6-flash");
+  esit(cagriModelleri(kayit)[1], "gemini-2.5-flash", "ikincil modele geçildi");
+});
+
+await dene("birincil model geçici hatada tükenince ikincile geçilir", async () => {
+  const kayit = geminiTaklit((g, n) => n <= 3 ? { durum:503, metin:"UNAVAILABLE" } : { metin: PLAN_CEVABI });
+  const c = cevap();
+  await plan(istek(ORNEK_GOVDE), c);
+  esit(c.kod, 200);
+  esit(kayit.istekler.length, 4, "birincil 3 deneme + ikincil 1");
+  esit(cagriModelleri(kayit).slice(0,3).join(","), "gemini-3.6-flash,gemini-3.6-flash,gemini-3.6-flash");
+  esit(cagriModelleri(kayit)[3], "gemini-2.5-flash");
+});
+
+await dene("her iki model de 503: zincir tükenince 503 döner, kota ile karışmaz", async () => {
+  const kayit = geminiTaklit(() => ({ durum:503, metin:"UNAVAILABLE" }));
+  const c = cevap();
+  await plan(istek(ORNEK_GOVDE), c);
+  esit(c.kod, 503);
+  esit(c.veri.hata, "yogun");
+  esit(kayit.istekler.length, 6, "2 model × 3 deneme");
+});
+
+await dene("400 kötü istek: geçici değil, hiç yeniden denenmez", async () => {
+  const kayit = geminiTaklit(() => ({ durum:400, metin:"INVALID_ARGUMENT" }));
+  const c = cevap();
+  await plan(istek(ORNEK_GOVDE), c);
+  esit(c.kod, 502);
+  esit(kayit.istekler.length, 1, "400'de tek deneme");
+});
+
+await dene("429 kota: yeniden denenir ama tükenince 429/kota olarak geçer", async () => {
+  const kayit = geminiTaklit(() => ({ durum:429, metin:"RESOURCE_EXHAUSTED" }));
+  const c = cevap();
+  await plan(istek(ORNEK_GOVDE), c);
+  esit(c.kod, 429);
+  esit(c.veri.hata, "kota");
+  dogru(kayit.istekler.length > 1, "kota da geçici, yeniden denenir");
+});
+
+await dene("biçimsiz cevap geçici sayılır; ikinci deneme düzgünse başarı", async () => {
+  const kayit = geminiTaklit((g, n) => n === 1 ? { ham:"bu json değil <<<" } : { metin: PLAN_CEVABI });
+  const c = cevap();
+  await plan(istek(ORNEK_GOVDE), c);
+  esit(c.kod, 200);
+  esit(kayit.istekler.length, 2);
 });
 
 /* --------------------------------------------------------------- */

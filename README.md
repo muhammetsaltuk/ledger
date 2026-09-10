@@ -135,12 +135,44 @@ Dört yapay zeka fonksiyonu da üretimde, gerçek anahtarla denendi:
 | `api/review` | 120 kelime altı düz metin, somut gözlem + tek ölçülebilir öneri, liste yok |
 | `api/plan` | Kurs sabit ve akşam namazı için bölünmüş, kurs günü uyku iki parçalı, kahvaltı spordan 40 dk sonra, kod bloğu profildeki kanıta göre 10:30, ikindi borcuna karşılık bir kaza namazı, yatmadan 20 dk kitap |
 
-## Model
+## Model (§12)
 
-§12 `gemini-2.0-flash` diyordu; o model emekliye ayrıldı ve API 404 ile
-`models/gemini-3.6-flash` kullanılmasını söylüyor. Google'ın gösterdiği halefe
-geçildi — `api/_ortak.js` içinde tek satır. Yapılandırılmış çıktı ve ücretsiz
-katman aynı şekilde çalışıyor.
+Arka planda **Google Gemini**, ücretsiz katman. `api/_ortak.js` bütün AI
+uçlarının (`plan`, `review`, `chat`, `parse`, `beslenme`) tek geçiş noktası.
+
+### Neden Gemini, neden Claude değil
+
+Claude API ücretli ve ücretsiz katmanı yok (Claude Pro aboneliği API'yi
+kapsamaz). Groq / Cerebras / Mistral gibi ücretsiz alternatiflerin görsel
+(vision) tarafı yemek fotoğrafında belirgin zayıf. `api/beslenme`'nin
+fotoğraftan kalori tahmini için ücretsiz + iyi vision pratikte Gemini demek.
+O yüzden sağlayıcı değil, dayanıklılık sertleştirildi.
+
+### Model zinciri
+
+```
+MODELLER = ["gemini-3.6-flash", "gemini-2.5-flash"]
+```
+
+`gemini-2.0-flash` bir kez emekliye ayrılıp API'yi 404'e düşürmüştü. Artık
+birincil model 404 dönerse **anında** ikincile geçilir (retry yok); ikisi de
+aynı istek şeklini destekliyor (`responseSchema`, `systemInstruction`, görsel
+parça).
+
+### Geçici hatada yeniden deneme
+
+- **Geçici:** HTTP `429, 500, 502, 503, 504`, ağ hatası, timeout, biçimsiz/boş
+  cevap. Model başına **3 deneme**, üstel gecikmeyle (~0.4 sn → ~0.9 sn).
+- **Kalıcı:** `400/401/403` → tek deneme, hemen bırak.
+- Tüm zincir **40 sn bütçeyle** sınırlı; bittiğinde son hata `hataVer` ile
+  ayrıştırılır (`429 → kota`, `503 → yogun`, diğer → `502`). İstemcinin
+  "geçici yoğunluk yapay zekayı kalıcı kapatmasın" mantığı aynen duruyor.
+- `vercel.json` `functions.maxDuration = 60` — retry bütçesi tek denemeden
+  uzun sürebiliyor.
+
+Ek maliyet yok, anahtar aynı `GEMINI_API_KEY`. Test: `test/api.js` içinde
+"§12 sertleştirme" bölümü (503→toparlama, 404→ikincil model, zincir tükenişi,
+400 tek-deneme).
 
 ## Görsel tasarım (§13, v2)
 
@@ -314,7 +346,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (151 test) ve `node test/api.js` (46 test) ile fiilen
+`node test/hepsi.js` (152 test) ve `node test/api.js` (54 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
 gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
@@ -333,6 +365,9 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | Vurgu rengi ikindide turuncuya döner | ✓ test |
 | `GEMINI_API_KEY` yokken uygulama çalışır | ✓ test |
 | Uçak modunda çökmez | ✓ test |
+| §12 geçici Gemini hatası (503/ağ) tek seferde toparlanır | ✓ test |
+| §12 birincil model 404 (emekli) → ikincil modele düşülür | ✓ test |
+| §12 kalıcı hata (400) yeniden denenmez | ✓ test |
 | Beş vakti işaretli gün "tam", seri ardışık tam günü sayar | ✓ test |
 | Bir vakit eksikse gün tam değil, seri o günde kırılır | ✓ test |
 | İlerleme halkası deger/toplam gösterir; övgü, emoji yok | ✓ test |
