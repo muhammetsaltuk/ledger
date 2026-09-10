@@ -1823,6 +1823,88 @@ await dene("tarifVideosu: api/tarif'ten gelen linki yemeğe önbellekler", async
        "https://www.youtube.com/watch?v=abcdefghijk");
 });
 
+bolum("§15 — market (mutfak dolabı + alınacaklar listesi)");
+
+const MPROG = { gunlukKalori:3000, makro:{protein:130,karb:400,yag:80},
+  ogunler:[{ ad:"Kahvaltı", yemekler:[
+    { ad:"Menemen", miktar:"1 tabak", kalori:320, protein:16, karb:10, yag:24,
+      malzemeler:["yumurta","domates","yeşil biber","zeytinyağı"], tarif:"Kavur." } ] }] };
+
+function marketliDepo(ek){
+  return JSON.stringify({ surum:1, ayar:{},
+    beslenme: Object.assign({ profil:BP, program:MPROG }, ek || {}) });
+}
+
+await dene("tarif açılınca malzemeler listelenir; mutfaktakiler işaretli", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": marketliDepo({ market:["Yumurta"] }) } });
+  await u.bekle();
+  u.tikla({ dataset:{ tarif:"0-0" } });
+  const h = u.html("b-beslenme");
+  icerir(h, "domates");
+  icerir(h, "listeye ekle");
+  icerir(h, "mutfakta");                       // yumurta zaten dolapta
+});
+
+await dene("malzeme 'listeye ekle': market listesine düşer, çift eklenmez", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": marketliDepo() } });
+  await u.bekle();
+  u.tikla({ dataset:{ tarif:"0-0" } });
+  u.tikla({ dataset:{ malzEkle:"domates" } });
+  u.tikla({ dataset:{ malzEkle:"domates" } });
+  esit(u.ic.UYG.veri.beslenme.marketListesi.length, 1);
+  esit(u.ic.UYG.veri.beslenme.marketListesi[0], "domates");
+  icerir(u.html("b-beslenme"), "listede");
+  esit(JSON.parse(u.durum.depo.get("ledger/v1")).beslenme.marketListesi[0], "domates");
+});
+
+await dene("malzHepsiEkle: eksik malzemelerin hepsini listeye atar", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": marketliDepo({ market:["zeytinyağı"] }) } });
+  await u.bekle();
+  u.tikla({ dataset:{ tarif:"0-0" } });
+  u.tikla({ dataset:{ malzHepsi:"0-0" } });
+  esit(u.ic.UYG.veri.beslenme.marketListesi.sort().join(","),
+       "domates,yeşil biber,yumurta");         // zeytinyağı dolapta olduğu için hariç
+});
+
+await dene("market listesi 'aldım': üründen mutfağa taşır", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": marketliDepo({ marketListesi:["süt","yulaf"] }) } });
+  await u.bekle();
+  u.tikla({ dataset:{ mktAldim:"0" } });
+  esit(u.ic.UYG.veri.beslenme.market.indexOf("süt") !== -1, true);
+  esit(u.ic.UYG.veri.beslenme.marketListesi.join(","), "yulaf");
+});
+
+await dene("market listesi 'sil' ve mutfak 'çıkar' öğeyi kaldırır", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": marketliDepo({ marketListesi:["süt"], market:["un"] }) } });
+  await u.bekle();
+  u.tikla({ dataset:{ mktSil:"0" } });
+  u.tikla({ dataset:{ dolapSil:"0" } });
+  esit(u.ic.UYG.veri.beslenme.marketListesi.length, 0);
+  esit(u.ic.UYG.veri.beslenme.market.length, 0);
+});
+
+await dene("mutfağa elle eklenen malzeme listeden düşer (büyük/küçük harf)", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": marketliDepo({ marketListesi:["Domates"] }) } });
+  await u.bekle();
+  u.el("dolap-giris").value = "domates";
+  u.tikla({ id:"dolap-ekle" });
+  esit(u.ic.UYG.veri.beslenme.market.join(","), "domates");
+  esit(u.ic.UYG.veri.beslenme.marketListesi.length, 0, "aynı ürün listede kalmamalı");
+});
+
+await dene("mutfakta olan malzeme market listesine eklenmez", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": marketliDepo({ market:["domates"] }) } });
+  await u.bekle();
+  esit(u.ic.marketListeEkle("Domates"), false);
+  esit(u.ic.UYG.veri.beslenme.marketListesi.length, 0);
+});
+
 bolum("§15 — öğün günlüğü ve kalori halkası");
 
 await dene("b-ogun: profil ve kayıt yoksa gizli, profil varsa görünür", async () => {

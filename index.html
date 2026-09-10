@@ -682,6 +682,31 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .bes-yemek-alt .dg{ min-height:32px; font-size:.78rem; padding:0 12px; }
 .bes-tarif{ margin:10px 0 0; font-size:.85rem; color:#B8C0C4; line-height:1.5; white-space:pre-wrap; }
 
+.bes-malz{ list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.bes-malz .malz{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+  font-size:.82rem; color:var(--metin); }
+.bes-malz .malz.malz-var{ color:var(--sonuk); }
+.bes-malz .malz > span:first-child{ min-width:0; overflow-wrap:anywhere; }
+.malz-rozet{ font-size:.66rem; color:var(--sonuk); padding:2px 8px; border-radius:999px;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.07); flex:0 0 auto; }
+.bes-malz .dg{ min-height:28px; font-size:.72rem; padding:0 10px; flex:0 0 auto; }
+.bes-malz-hepsi{ margin-top:8px; min-height:30px; font-size:.74rem; padding:0 12px; }
+
+.mkt-liste{ list-style:none; margin:2px 0 0; padding:0; }
+.mkt-satir{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:9px 0; border-top:1px solid rgba(255,255,255,.06); font-size:.92rem; }
+.mkt-satir:first-of-type{ border-top:0; }
+.mkt-satir > span:first-child{ min-width:0; overflow-wrap:anywhere; }
+.mkt-satir .mkt-alt{ display:flex; gap:6px; flex:0 0 auto; }
+.mkt-satir .dg{ min-height:30px; padding:0 10px; font-size:.74rem; }
+.mkt-dolap{ display:flex; flex-wrap:wrap; gap:7px; margin-top:4px; }
+.mkt-cip{ display:inline-flex; align-items:center; gap:6px; font-size:.8rem;
+  padding:5px 6px 5px 11px; border-radius:999px;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.07); }
+.mkt-x{ border:0; background:rgba(255,255,255,.08); color:var(--metin);
+  width:18px; height:18px; border-radius:999px; font-size:.9rem; line-height:1;
+  display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+
 .bes-spark{ width:100%; height:36px; display:block; margin-top:4px; }
 
 /* §15 Öğün günlüğü */
@@ -801,7 +826,9 @@ const VARSAYILAN = {
     tartim: [],          // [{tarih, kilo}] — kilo günlüğü
     kayit: {},           // "YYYY-MM-DD" -> öğün kayıtları
     sevmedigim: [],      // kaçınılacak yemekler
-    sayac: {}            // "YYYY-MM-DD" -> program üretim sayısı (kota)
+    sayac: {},           // "YYYY-MM-DD" -> program üretim sayısı (kota)
+    market: [],          // mutfakta olan malzemeler — ["yumurta", …]
+    marketListesi: []    // alınacaklar — ["yulaf", …]
   }
 };
 
@@ -3179,6 +3206,48 @@ function beslenmeHakkiDus(){
   for(const k of Object.keys(s)) if(k < gunKaydir(t, -7)) delete s[k];
 }
 
+/* --- Market (mutfak dolabı + alınacaklar listesi) ------------ */
+function malzNorm(s){ return String(s || "").trim().toLocaleLowerCase("tr"); }
+function mutfaktaVar(ad){
+  const n = malzNorm(ad);
+  return !!n && (UYG.veri.beslenme.market || []).some(x => malzNorm(x) === n);
+}
+function listedeVar(ad){
+  const n = malzNorm(ad);
+  return !!n && (UYG.veri.beslenme.marketListesi || []).some(x => malzNorm(x) === n);
+}
+function marketListeEkle(ad){
+  const a = String(ad || "").trim().slice(0, 60);
+  if(!a || mutfaktaVar(a) || listedeVar(a)) return false;
+  const l = UYG.veri.beslenme.marketListesi || (UYG.veri.beslenme.marketListesi = []);
+  l.push(a);
+  if(l.length > 200) UYG.veri.beslenme.marketListesi = l.slice(-200);
+  return true;
+}
+function mutfagaEkle(ad){
+  const a = String(ad || "").trim().slice(0, 60);
+  if(!a) return false;
+  const yeni = !mutfaktaVar(a);
+  if(yeni){
+    const d = UYG.veri.beslenme.market || (UYG.veri.beslenme.market = []);
+    d.push(a);
+    if(d.length > 300) UYG.veri.beslenme.market = d.slice(-300);
+  }
+  const n = malzNorm(a);
+  UYG.veri.beslenme.marketListesi =
+    (UYG.veri.beslenme.marketListesi || []).filter(x => malzNorm(x) !== n);
+  return true;
+}
+function malzHepsiEkle(id){
+  const [oi, yi] = id.split("-").map(Number);
+  const pr = UYG.veri.beslenme.program;
+  const y = pr && pr.ogunler[oi] && pr.ogunler[oi].yemekler[yi];
+  if(!y) return;
+  let n = 0;
+  (y.malzemeler || []).forEach(m => { if(marketListeEkle(m)) n++; });
+  if(n){ kaydet(); beslenmeCiz(); }
+}
+
 /* --- Çizim --------------------------------------------------- */
 function makroCip(y){
   return '<span class="mk">P' + (y.protein || 0) + '</span>' +
@@ -3275,7 +3344,7 @@ function programBolum(){
               (UYG.alternatifBekliyor === id ? " disabled" : "") + '>' +
               (UYG.alternatifBekliyor === id ? "değişiyor…" : "beğenmedim") + '</button>' +
           '</div>' +
-          (acik && y.tarif ? '<p class="bes-tarif">' + kacir(y.tarif) + '</p>' : '') +
+          (acik ? malzemeVeTarif(y, id) : '') +
         '</div>';
       }).join("") +
     '</div>').join("");
@@ -3284,6 +3353,69 @@ function programBolum(){
       '<span class="yan">' + (pr.gunlukKalori || 0) + ' kcal</span></h2>' +
     (pr.not ? '<p class="sonuk" style="margin:0 0 12px">' + kacir(pr.not) + '</p>' : '') +
     ogunler + dugme;
+}
+
+function malzemeVeTarif(y, id){
+  const ml = (y.malzemeler || []).filter(Boolean);
+  let govde = "";
+  if(ml.length){
+    const satirlar = ml.map(m => {
+      const varsa = mutfaktaVar(m);
+      const listede = !varsa && listedeVar(m);
+      return '<li class="malz' + (varsa ? ' malz-var' : '') + '">' +
+        '<span>' + kacir(m) + '</span>' +
+        (varsa
+          ? '<span class="malz-rozet">mutfakta</span>'
+          : '<button class="dg dg-sonuk" data-malz-ekle="' + kacir(m) + '"' +
+            (listede ? ' disabled' : '') + '>' + (listede ? 'listede' : 'listeye ekle') + '</button>') +
+      '</li>';
+    }).join("");
+    const eksik = ml.filter(m => !mutfaktaVar(m) && !listedeVar(m)).length;
+    govde += '<ul class="bes-malz">' + satirlar + '</ul>' +
+      (eksik > 1
+        ? '<button class="dg dg-sonuk bes-malz-hepsi" data-malz-hepsi="' + id + '">' +
+          'eksik ' + eksik + ' malzemeyi listeye ekle</button>'
+        : '');
+  }
+  if(y.tarif) govde += '<p class="bes-tarif">' + kacir(y.tarif) + '</p>';
+  return govde;
+}
+
+function marketBolum(){
+  const liste = UYG.veri.beslenme.marketListesi || [];
+  const dolap = UYG.veri.beslenme.market || [];
+
+  const lg = liste.length
+    ? liste.map((ad, i) =>
+        '<li class="mkt-satir"><span>' + kacir(ad) + '</span>' +
+          '<span class="mkt-alt">' +
+            '<button class="dg dg-sonuk" data-mkt-aldim="' + i + '">aldım</button>' +
+            '<button class="dg dg-sonuk" data-mkt-sil="' + i + '">sil</button>' +
+          '</span></li>').join("")
+    : '<li class="mkt-satir"><span class="sonuk mini">Liste boş. Tariflerdeki eksik ' +
+      'malzemeleri buraya ekle.</span></li>';
+
+  const dg = dolap.length
+    ? dolap.map((ad, i) =>
+        '<span class="mkt-cip">' + kacir(ad) +
+          '<button class="mkt-x" data-dolap-sil="' + i + '" aria-label="çıkar">×</button>' +
+        '</span>').join("")
+    : '<span class="sonuk mini">Mutfağında olanları ekle; tariflerde “mutfakta” diye işaretlenir.</span>';
+
+  return '<h2 class="bolum-bas">Market listesi' +
+      (liste.length ? '<span class="yan">' + liste.length + '</span>' : '') + '</h2>' +
+    '<ul class="mkt-liste">' + lg + '</ul>' +
+    '<div class="plan-ekle">' +
+      '<input type="text" id="mkt-giris" placeholder="malzeme ekle" aria-label="market listesine ekle">' +
+      '<button class="dg" id="mkt-ekle">ekle</button>' +
+    '</div>' +
+    '<h2 class="bolum-bas" style="margin-top:18px">Market' +
+      (dolap.length ? '<span class="yan">' + dolap.length + '</span>' : '') + '</h2>' +
+    '<div class="mkt-dolap">' + dg + '</div>' +
+    '<div class="plan-ekle">' +
+      '<input type="text" id="dolap-giris" placeholder="malzeme ekle" aria-label="markete ekle">' +
+      '<button class="dg" id="dolap-ekle">ekle</button>' +
+    '</div>';
 }
 
 function kiloSparkline(){
@@ -3325,6 +3457,7 @@ function beslenmeCiz(){
   $beslenme.innerHTML =
     '<div class="ist-blok">' + profilBolum() + '</div>' +
     '<div class="ist-blok bosluk">' + programBolum() + '</div>' +
+    '<div class="ist-blok bosluk">' + marketBolum() + '</div>' +
     '<div class="ist-blok bosluk">' + tartimBolum() + '</div>';
 }
 
@@ -3476,9 +3609,43 @@ $beslenme.addEventListener("click", e => {
   else if(d.dataset.tarif){ acikTarif = (acikTarif === d.dataset.tarif) ? null : d.dataset.tarif; beslenmeCiz(); }
   else if(d.dataset.video)       tarifVideosu(d.dataset.video);
   else if(d.dataset.begenmedim)  yemekBegenmedim(d.dataset.begenmedim);
+  else if(d.dataset.malzEkle != null){
+    if(marketListeEkle(d.dataset.malzEkle)){ kaydet(); beslenmeCiz(); }
+  }
+  else if(d.dataset.malzHepsi != null) malzHepsiEkle(d.dataset.malzHepsi);
+  else if(d.id === "mkt-ekle"){
+    const el = document.getElementById("mkt-giris");
+    if(el && marketListeEkle(el.value)){ kaydet(); beslenmeCiz(); }
+  }
+  else if(d.id === "dolap-ekle"){
+    const el = document.getElementById("dolap-giris");
+    if(el && mutfagaEkle(el.value)){ kaydet(); beslenmeCiz(); }
+  }
+  else if(d.dataset.mktAldim != null){
+    const ad = (UYG.veri.beslenme.marketListesi || [])[+d.dataset.mktAldim];
+    if(ad != null){ mutfagaEkle(ad); kaydet(); beslenmeCiz(); }
+  }
+  else if(d.dataset.mktSil != null){
+    (UYG.veri.beslenme.marketListesi || []).splice(+d.dataset.mktSil, 1);
+    kaydet(); beslenmeCiz();
+  }
+  else if(d.dataset.dolapSil != null){
+    (UYG.veri.beslenme.market || []).splice(+d.dataset.dolapSil, 1);
+    kaydet(); beslenmeCiz();
+  }
 });
 $beslenme.addEventListener("keydown", e => {
-  if(e.key === "Enter" && e.target.id === "bes-kilo"){ e.preventDefault(); tartimGirisGonder(); }
+  if(e.key !== "Enter") return;
+  const t = e.target;
+  if(t.id === "bes-kilo"){ e.preventDefault(); tartimGirisGonder(); }
+  else if(t.id === "mkt-giris"){
+    e.preventDefault();
+    if(marketListeEkle(t.value)){ kaydet(); beslenmeCiz(); }
+  }
+  else if(t.id === "dolap-giris"){
+    e.preventDefault();
+    if(mutfagaEkle(t.value)){ kaydet(); beslenmeCiz(); }
+  }
 });
 
 /* ===============================================================
