@@ -1504,6 +1504,251 @@ await dene("halkayı taşıyan her kutu CSS'te açık width/height alır", async
   }
 });
 
+bolum("§15 — kalori hesabı ve kilo günlüğü");
+
+const BP = { boy:178, kilo:72, yas:25, cinsiyet:"erkek", aktivite:"orta", haftalikHedef:0.35 };
+
+await dene("Mifflin-St Jeor + aktivite + kilo-alma fazlası (erkek)", async () => {
+  const u = kur({ simdi:"2026-09-06T09:00:00" });
+  const h = u.ic.kaloriHedefi(BP);
+  esit(h.bmr, 1713);
+  esit(h.tdee, 2654);
+  esit(h.fazla, 375, "+0.35 kg/hafta");
+  esit(h.hedef, 3029);
+  esit(h.protein, 130);
+  esit(h.yag, 84);
+  esit(h.karb, 438);
+});
+
+await dene("kadın formülü -161 sabitini kullanır", async () => {
+  const u = kur({ simdi:"2026-09-06T09:00:00" });
+  const h = u.ic.kaloriHedefi(Object.assign({}, BP, { cinsiyet:"kadin" }));
+  esit(h.bmr, 1547);
+  esit(h.hedef, 2772);
+});
+
+await dene("eksik veya geçersiz profil null döner", async () => {
+  const u = kur({ simdi:"2026-09-06T09:00:00" });
+  esit(u.ic.kaloriHedefi(null), null);
+  esit(u.ic.kaloriHedefi(Object.assign({}, BP, { yas:0 })), null);
+  esit(u.ic.kaloriHedefi(Object.assign({}, BP, { cinsiyet:"belirsiz" })), null);
+  esit(u.ic.kaloriHedefi(Object.assign({}, BP, { aktivite:"uçmak" })), null);
+});
+
+await dene("haftalık hedef fazlayı belirler; 0 ise fazla yok", async () => {
+  const u = kur({ simdi:"2026-09-06T09:00:00" });
+  esit(u.ic.kaloriHedefi(Object.assign({}, BP, { haftalikHedef:0.5 })).fazla, 550);
+  esit(u.ic.kaloriHedefi(Object.assign({}, BP, { haftalikHedef:0 })).fazla, 0);
+});
+
+await dene("tartım: aynı güne ikincisi üzerine yazılır, tarih sıralı", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, beslenme:{ tartim:[
+      { tarih:"2026-09-01", kilo:71 }, { tarih:"2026-09-08", kilo:71.6 } ] } }) } });
+  await u.bekle();
+  u.ic.tartimEkle(72);
+  u.ic.tartimEkle(72.2);
+  const t = u.ic.UYG.veri.beslenme.tartim;
+  esit(t.length, 3);
+  esit(t[2].tarih, "2026-09-10");
+  esit(t[2].kilo, 72.2);
+  esit(u.ic.sonKilo(), 72.2);
+});
+
+await dene("kiloTrend en küçük karelerle kg/hafta eğimi verir", async () => {
+  const u = kur({ simdi:"2026-09-15T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, beslenme:{ tartim:[
+      { tarih:"2026-09-01", kilo:70 }, { tarih:"2026-09-08", kilo:70.5 },
+      { tarih:"2026-09-15", kilo:71 } ] } }) } });
+  await u.bekle();
+  const tr = u.ic.kiloTrend(30);
+  esit(tr.degisim, 1);
+  esit(tr.haftalik, 0.5);
+  esit(u.ic.kiloTrend(3), null, "<2 nokta");
+});
+
+await dene("guncelHedef son tartımı kullanır, profildeki kiloyu değil", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, beslenme:{
+      profil: BP, tartim:[{ tarih:"2026-09-09", kilo:74 }] } }) } });
+  await u.bekle();
+  esit(u.ic.guncelHedef().hedef, u.ic.kaloriHedefi(Object.assign({}, BP, { kilo:74 })).hedef);
+});
+
+await dene("gununBeslenme öğün kayıtlarını toplar", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, beslenme:{ kayit:{
+      "2026-09-10": [
+        { ad:"Yulaf", kalori:400, protein:15, karb:60, yag:8 },
+        { ad:"Tavuk", kalori:550, protein:45, karb:10, yag:20 } ] } } }) } });
+  await u.bekle();
+  const b = u.ic.gununBeslenme("2026-09-10");
+  esit(b.kalori, 950);
+  esit(b.protein, 60);
+});
+
+bolum("§15 — beslenme sekmesi");
+
+const PROFILLI = { surum:1, ayar:{}, beslenme:{ profil: BP } };
+
+await dene("profil yoksa form, varsa kalori hedefi gösterilir", async () => {
+  const bos = kur({ simdi:"2026-09-10T09:00:00" });
+  await bos.bekle();
+  icerir(bos.html("b-beslenme"), 'id="bp-boy"');
+  icerir(bos.html("b-beslenme"), 'id="bp-cinsiyet"');
+
+  const dolu = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify(PROFILLI) } });
+  await dolu.bekle();
+  const h = dolu.html("b-beslenme");
+  icerir(h, "3029");
+  icerir(h, "kcal / gün");
+  icerir(h, "protein 130 g");
+});
+
+await dene("profilKaydet: geçerli değerler kaydeder, ilk tartımı düşer", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.el("bp-boy").value = "178"; u.el("bp-kilo").value = "72"; u.el("bp-yas").value = "25";
+  u.el("bp-cinsiyet").value = "erkek"; u.el("bp-aktivite").value = "orta"; u.el("bp-hedef").value = "0.35";
+  u.ic.profilKaydet();
+  const b = u.ic.UYG.veri.beslenme;
+  esit(b.profil.boy, 178);
+  esit(b.profil.haftalikHedef, 0.35);
+  esit(b.tartim.length, 1, "ilk tartım profil kilosundan");
+  esit(b.tartim[0].kilo, 72);
+  esit(u.ic.guncelHedef().hedef, 3029);
+});
+
+await dene("profilKaydet: makul olmayan değerleri reddeder", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.el("bp-boy").value = "40"; u.el("bp-kilo").value = "72"; u.el("bp-yas").value = "25";
+  u.ic.profilKaydet();
+  esit(u.ic.UYG.veri.beslenme.profil, null);
+  icerir(u.html("b-beslenme"), "makul değerlerle");
+});
+
+await dene("beslenme 5. sekmedir; gorunum('beslenme') onu açar", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  dogru(u.ic.GORUNUM.beslenme, "GORUNUM'da beslenme olmalı");
+  u.ic.gorunum("beslenme");
+  esit(u.ctx.document.getElementById("b-beslenme").hidden, false);
+  esit(u.ctx.document.getElementById("b-namaz").hidden, true);
+});
+
+await dene("programUret: kota düşer, istek mod=program ve hedefi taşır", async () => {
+  const prog = { gunlukKalori:3020, makro:{protein:132,karb:430,yag:85},
+    ogunler:[{ ad:"Kahvaltı", yemekler:[
+      { ad:"Yulaf", miktar:"80 g", kalori:520, protein:22, karb:78, yag:12, tarif:"Pişir." } ] }],
+    not:"x" };
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify(PROFILLI) }, api:{ beslenme: prog } });
+  await u.bekle();
+  esit(u.ic.beslenmeHakki(), 3);
+  await u.ic.programUret();
+  esit(u.ic.beslenmeHakki(), 2, "kota düşmeli");
+  dogru(u.ic.UYG.veri.beslenme.program, "program kaydedilmeli");
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "beslenme").pop();
+  esit(c.govde.mod, "program");
+  esit(c.govde.hedef.hedef, 3029);
+  dogru("metin" in c.govde.profil, "serbest profil metni de gitmeli");
+  icerir(u.html("b-beslenme"), "Yulaf");
+});
+
+await dene("programUret: kota bitince istek atılmaz", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, ayar:{},
+      beslenme:{ profil:BP, sayac:{ "2026-09-10": 3 } } }) }, api:{ beslenme:{} } });
+  await u.bekle();
+  await u.ic.programUret();
+  esit(u.durum.apiCagrilari.filter(x => x.ad === "beslenme").length, 0);
+  icerir(u.html("b-beslenme"), "hakkı doldu");
+});
+
+await dene("yemekBegenmedim: yemeği değiştirir, sevmediklerine ekler", async () => {
+  const prog = { gunlukKalori:3000, makro:{protein:130,karb:400,yag:80},
+    ogunler:[{ ad:"Öğle", yemekler:[
+      { ad:"Kuru fasulye", miktar:"1 kase", kalori:520, protein:20, karb:60, yag:12, tarif:"Haşla." } ] }] };
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, ayar:{}, beslenme:{ profil:BP, program:prog } }) },
+    api:{ beslenme:{ ad:"Tavuklu pilav", miktar:"1 tabak", kalori:560, protein:40, karb:70, yag:12, tarif:"Pişir." } } });
+  await u.bekle();
+  await u.ic.yemekBegenmedim("0-0");
+  esit(u.ic.UYG.veri.beslenme.program.ogunler[0].yemekler[0].ad, "Tavuklu pilav");
+  dogru(u.ic.UYG.veri.beslenme.sevmedigim.indexOf("Kuru fasulye") !== -1);
+});
+
+await dene("tarifVideosu: api/tarif'ten gelen linki yemeğe önbellekler", async () => {
+  const prog = { gunlukKalori:3000, makro:{protein:1,karb:1,yag:1},
+    ogunler:[{ ad:"Kahvaltı", yemekler:[{ ad:"Menemen", miktar:"1", kalori:300, tarif:"." }] }] };
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, ayar:{}, beslenme:{ profil:BP, program:prog } }) },
+    api:{ tarif:{ url:"https://www.youtube.com/watch?v=abcdefghijk", kaynak:"api" } } });
+  await u.bekle();
+  await u.ic.tarifVideosu("0-0");
+  esit(u.ic.UYG.veri.beslenme.program.ogunler[0].yemekler[0].video,
+       "https://www.youtube.com/watch?v=abcdefghijk");
+});
+
+bolum("§15 — öğün günlüğü ve kalori halkası");
+
+await dene("b-ogun: profil ve kayıt yoksa gizli, profil varsa görünür", async () => {
+  const bos = kur({ simdi:"2026-09-10T09:00:00" });
+  await bos.bekle();
+  esit(bos.ctx.document.getElementById("b-ogun").hidden, true);
+
+  const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": JSON.stringify(PROFILLI) } });
+  await u.bekle();
+  esit(u.ctx.document.getElementById("b-ogun").hidden, false);
+  icerir(u.html("b-ogun"), "0 / 3029 kcal");
+});
+
+await dene("ogunEkle: kayıt eklenir, kalori halkası ve toplam güncellenir", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": JSON.stringify(PROFILLI) } });
+  await u.bekle();
+  dogru(u.ic.ogunEkle("Yulaf ezmesi", 420));
+  dogru(u.ic.ogunEkle("Tavuk + pilav", 680, { kaynak:"foto", protein:45 }));
+  esit(u.ic.gununOgunleri("2026-09-10").length, 2);
+  esit(u.ic.gununBeslenme("2026-09-10").kalori, 1100);
+  icerir(u.html("b-ogun"), "1100 / 3029 kcal");
+  icerir(u.html("b-gunluk"), ">1100<");            // kalori halkasının değeri
+  icerir(u.html("b-ogun"), "· fotoğraf");          // foto kaynaklı satır işaretli
+});
+
+await dene("ogunEkle: ad veya kalori eksikse eklenmez", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": JSON.stringify(PROFILLI) } });
+  await u.bekle();
+  dogru(!u.ic.ogunEkle("", 400));
+  dogru(!u.ic.ogunEkle("Elma", 0));
+  esit(u.ic.gununOgunleri("2026-09-10").length, 0);
+});
+
+await dene("ogunSil: kayıt silinir, toplam düşer", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": JSON.stringify(PROFILLI) } });
+  await u.bekle();
+  u.ic.ogunEkle("A", 300); u.ic.ogunEkle("B", 500);
+  u.ic.ogunSil(0);
+  esit(u.ic.gununOgunleri("2026-09-10").length, 1);
+  esit(u.ic.gununBeslenme("2026-09-10").kalori, 500);
+});
+
+await dene("fotoDegisti: tarayıcı yoksa sessizce elle girişe yönlendirir", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": JSON.stringify(PROFILLI) } });
+  await u.bekle();
+  await u.ic.fotoDegisti({ name:"tabak.jpg" });    // FileReader/Image test ortamında yok
+  const h = u.html("b-ogun");
+  icerir(h, "elle ekleyebilirsin");
+  esit(u.ic.gununOgunleri("2026-09-10").length, 0, "kayıt eklenmemeli");
+});
+
+await dene("kalori halkası profil yoksa çizilmez", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  icermez(u.html("b-gunluk"), "Kalori");
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

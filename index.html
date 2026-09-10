@@ -225,7 +225,8 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .seri-hafta i{ width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.13); }
 .seri-hafta i.on{ background:var(--alev); }
 
-.halkalar{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:14px; }
+.halkalar{ display:grid; grid-template-columns:repeat(auto-fit,minmax(0,1fr)); gap:8px; margin-top:14px; }
+.halka:nth-child(4) .cerceve .deger{ font-size:.72rem; }   /* kalori sayısı uzun */
 .halka{ display:flex; flex-direction:column; align-items:center; gap:7px; }
 .halka .cerceve{ position:relative; width:74px; height:74px; }
 .halka .cerceve .deger{
@@ -599,6 +600,59 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .rz.kilit{ opacity:.4; }
 .rz.kilit .ic{ background:rgba(255,255,255,.06); color:var(--sonuk); }
 
+/* --- §15 Beslenme ------------------------------------------- */
+.bes-form{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:2px 0 4px; }
+.bes-form label{ display:flex; flex-direction:column; gap:4px; font-size:.78rem; color:var(--sonuk); }
+.bes-form label.tam{ grid-column:1 / -1; }
+.bes-form input,.bes-form select{ font-size:.95rem; }
+.bes-form select{
+  appearance:none; -webkit-appearance:none;
+  background:rgba(255,255,255,.04); color:var(--metin);
+  border:1px solid var(--cam-cizgi); border-radius:11px; padding:10px 12px; width:100%;
+}
+
+.bes-oz{ display:flex; justify-content:space-between; gap:12px; padding:8px 0;
+  border-top:1px solid rgba(255,255,255,.06); font-size:.9rem; }
+.bes-oz:first-of-type{ border-top:0; }
+.bes-oz span{ color:var(--sonuk); }
+
+.bes-hedef{ margin-top:12px; padding:14px; border-radius:14px;
+  background:rgba(224,154,79,.08); border:1px solid rgba(224,154,79,.28); }
+.bes-hedef-say{ font-family:var(--bas); font-size:1.6rem; font-weight:700; color:var(--vakit); }
+.bes-hedef-say span{ font-family:var(--gov); font-size:.8rem; font-weight:400; color:var(--sonuk); }
+.bes-hedef-mk{ font-size:.85rem; margin-top:2px; }
+.mini{ font-size:.72rem; }
+
+.bes-ogun{ margin-top:12px; }
+.bes-ogun-bas{ font-family:var(--bas); font-weight:600; font-size:.95rem; margin-bottom:6px; }
+.bes-yemek{ padding:12px; border-radius:14px; background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.06); }
+.bes-yemek + .bes-yemek{ margin-top:8px; }
+.bes-yemek-bas{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.bes-yad{ font-weight:500; }
+.bes-kcal{ font-family:var(--bas); font-weight:600; color:var(--vakit); flex:0 0 auto; }
+.bes-mk{ display:flex; gap:6px; margin-top:6px; }
+.bes-mk .mk{ font-size:.68rem; color:var(--sonuk); padding:2px 7px; border-radius:999px;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.07); }
+.bes-yemek-alt{ display:flex; gap:7px; margin-top:10px; flex-wrap:wrap; }
+.bes-yemek-alt .dg{ min-height:32px; font-size:.78rem; padding:0 12px; }
+.bes-tarif{ margin:10px 0 0; font-size:.85rem; color:#B8C0C4; line-height:1.5; white-space:pre-wrap; }
+
+.bes-spark{ width:100%; height:36px; display:block; margin-top:4px; }
+
+/* §15 Öğün günlüğü */
+.og-satir{ display:flex; align-items:center; gap:10px; padding:9px 0;
+  border-top:1px solid rgba(255,255,255,.06); }
+.og-satir:first-of-type{ border-top:0; }
+.og-thumb{ width:34px; height:34px; border-radius:9px; object-fit:cover; flex:0 0 auto;
+  background:rgba(255,255,255,.05); }
+.og-thumb.bos{ border:1px dashed rgba(255,255,255,.12); }
+.og-ad{ flex:1 1 auto; font-size:.92rem; min-width:0; }
+.og-kcal{ font-family:var(--bas); font-weight:600; color:var(--vakit); flex:0 0 auto; }
+.og-satir .dg{ min-height:30px; padding:0 10px; font-size:1rem; flex:0 0 auto; }
+.og-onay{ margin:10px 0; padding:12px; border-radius:14px;
+  background:rgba(224,154,79,.08); border:1px solid rgba(224,154,79,.28); }
+
 .gizli{
   position:absolute; width:1px; height:1px;
   padding:0; margin:-1px; overflow:hidden;
@@ -626,6 +680,9 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   <!-- §3.3 Su -->
   <section id="b-su" class="bolum" aria-label="Su"></section>
 
+  <!-- §15 Bugün yenenler -->
+  <section id="b-ogun" class="bolum" aria-label="Öğünler" hidden></section>
+
   <!-- §3.4 Bugünün planı -->
   <section id="b-plan" class="bolum" aria-label="Bugünün planı"></section>
 
@@ -644,6 +701,9 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   <!-- Profil -->
   <section id="b-ayar" class="bolum" aria-label="Profil"></section>
 
+  <!-- §15 Beslenme -->
+  <section id="b-beslenme" class="bolum" aria-label="Beslenme" hidden></section>
+
   <!-- Ayarlar -->
   <section id="b-ayarlar" class="bolum" aria-label="Ayarlar"></section>
 
@@ -658,6 +718,9 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   </button>
   <button type="button" data-gor="plan" aria-label="Plan">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Plan
+  </button>
+  <button type="button" data-gor="beslenme" aria-label="Beslenme">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v8a3 3 0 0 0 6 0V3M8 3v18M18 3c-1.7 0-3 2-3 5s1.3 5 3 5m0 0v8"/></svg>Beslenme
   </button>
   <button type="button" data-gor="ayarlar" aria-label="Ayarlar">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.4"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Ayarlar
@@ -687,14 +750,26 @@ const VARSAYILAN = {
   profil: "",                                               // §9
   etkinlikler: [],                                          // §7
   sohbet: [],                                               // §10
-  ayar: {}
+  ayar: {},
+  beslenme: {                                             // §15
+    profil: null,        // {boy,kilo,yas,cinsiyet,aktivite,haftalikHedef}
+    program: null,       // modelin ürettiği beslenme programı
+    tartim: [],          // [{tarih, kilo}] — kilo günlüğü
+    kayit: {},           // "YYYY-MM-DD" -> öğün kayıtları
+    sevmedigim: [],      // kaçınılacak yemekler
+    sayac: {}            // "YYYY-MM-DD" -> program üretim sayısı (kota)
+  }
 };
 
 function yukle(){
   try{
     const ham = localStorage.getItem(ANAHTAR);
-    if(!ham) return structuredClone(VARSAYILAN);
-    return Object.assign(structuredClone(VARSAYILAN), JSON.parse(ham));
+    const v = ham
+      ? Object.assign(structuredClone(VARSAYILAN), JSON.parse(ham))
+      : structuredClone(VARSAYILAN);
+    // Object.assign sığ birleştirir: yeni alt alanlar için beslenme'yi tamamla.
+    v.beslenme = Object.assign(structuredClone(VARSAYILAN.beslenme), v.beslenme || {});
+    return v;
   }catch(e){
     console.warn("Depo okunamadı, sıfırdan başlanıyor.", e);
     return structuredClone(VARSAYILAN);
@@ -785,6 +860,101 @@ const ALEV_SVG =
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M12 3c1.6 2.8 4.5 4.4 4.5 8.2A4.5 4.5 0 0 1 7.5 12c0-1.6.7-2.9 1.6-3.7' +
   '-.1 1.3.5 2.3 1.4 2.7-.6-2.6.3-6 0-8.2z"></path></svg>';
+
+/* ===============================================================
+   §15 — Beslenme: kalori hesabı ve kilo günlüğü
+   Kalori/makro hedefi istemcide hesaplanır (Mifflin-St Jeor + aktivite
+   + kilo-alma fazlası). Deterministik, çevrimdışı çalışır, test edilir.
+   Model yalnız bu hedefe göre öğünleri kurar.
+   =============================================================== */
+
+const AKTIVITE = { hareketsiz:1.2, hafif:1.375, orta:1.55, yuksek:1.725 };
+const VARSAYILAN_HEDEF = 0.35;          // kg/hafta — ölçülü kilo alma
+
+/** Profil eksiksizse {bmr,tdee,fazla,hedef,protein,karb,yag}; değilse null. */
+function kaloriHedefi(p){
+  if(!p) return null;
+  const boy = +p.boy, kilo = +p.kilo, yas = +p.yas;
+  if(!(boy > 0) || !(kilo > 0) || !(yas > 0)) return null;
+  if(p.cinsiyet !== "erkek" && p.cinsiyet !== "kadin") return null;
+  const faktor = AKTIVITE[p.aktivite];
+  if(!faktor) return null;
+
+  // Mifflin-St Jeor
+  const bmr = 10 * kilo + 6.25 * boy - 5 * yas + (p.cinsiyet === "erkek" ? 5 : -161);
+  const tdee = bmr * faktor;
+
+  const haftalik = Number.isFinite(+p.haftalikHedef) ? +p.haftalikHedef : VARSAYILAN_HEDEF;
+  // 1 kg yağ dokusu ≈ 7700 kcal; günlük fazla = haftalık kg * 7700 / 7, 25'e yuvarlı.
+  const fazla = Math.max(0, Math.round(haftalik * 7700 / 7 / 25) * 25);
+  const hedef = Math.round(tdee) + fazla;
+
+  const protein = Math.round(1.8 * kilo);                 // g — kilo alma aralığı
+  const yag     = Math.round(hedef * 0.25 / 9);           // kalorinin %25'i
+  const karb    = Math.max(0, Math.round((hedef - protein * 4 - yag * 9) / 4));
+
+  return { bmr: Math.round(bmr), tdee: Math.round(tdee), fazla, hedef, protein, karb, yag };
+}
+
+/** Güncel kiloyla (varsa son tartım) hesaplanmış hedef. */
+function guncelHedef(){
+  const p = UYG.veri.beslenme.profil;
+  if(!p) return null;
+  return kaloriHedefi(Object.assign({}, p, { kilo: sonKilo() || p.kilo }));
+}
+
+function sonKilo(){
+  const t = UYG.veri.beslenme.tartim;
+  return (t && t.length) ? t[t.length - 1].kilo : (UYG.veri.beslenme.profil || {}).kilo || null;
+}
+
+/** Aynı güne ikinci tartım gelirse üzerine yazılır. En fazla 200 kayıt. */
+function tartimEkle(kilo){
+  const k = Math.round(+kilo * 10) / 10;
+  if(!(k > 0) || k > 400) return false;
+  const t = UYG.veri.beslenme.tartim;
+  const bugun = uygulamaGunu();
+  const v = t.find(x => x.tarih === bugun);
+  if(v) v.kilo = k;
+  else t.push({ tarih: bugun, kilo: k });
+  t.sort((a, b) => a.tarih.localeCompare(b.tarih));
+  if(t.length > 200) UYG.veri.beslenme.tartim = t.slice(-200);
+  kaydet();
+  return true;
+}
+
+/** Son `gun` günün kilo eğilimi (en küçük kareler eğimi → kg/hafta). */
+function kiloTrend(gun){
+  const sinir = gunKaydir(uygulamaGunu(), -(gun || 30));
+  const nokta = (UYG.veri.beslenme.tartim || []).filter(x => x.tarih >= sinir);
+  if(nokta.length < 2) return null;
+  // x = gün sayısı (ilk noktaya göre), y = kilo
+  const t0 = new Date(nokta[0].tarih + "T12:00:00").getTime();
+  const xs = nokta.map(n => (new Date(n.tarih + "T12:00:00").getTime() - t0) / 86400000);
+  const ys = nokta.map(n => n.kilo);
+  const n = xs.length;
+  const sx = xs.reduce((a, b) => a + b, 0), sy = ys.reduce((a, b) => a + b, 0);
+  const sxx = xs.reduce((a, b) => a + b * b, 0);
+  const sxy = xs.reduce((a, b, i) => a + b * ys[i], 0);
+  const payda = n * sxx - sx * sx;
+  const egim = payda === 0 ? 0 : (n * sxy - sx * sy) / payda;    // kg/gün
+  return {
+    ilk: ys[0], son: ys[ys.length - 1],
+    degisim: Math.round((ys[ys.length - 1] - ys[0]) * 10) / 10,
+    haftalik: Math.round(egim * 7 * 100) / 100
+  };
+}
+
+/** Bir günün öğün kayıtlarından toplam kalori / makro. */
+function gununBeslenme(tarih){
+  const l = (UYG.veri.beslenme.kayit && UYG.veri.beslenme.kayit[tarih]) || [];
+  return l.reduce((t, o) => ({
+    kalori:  t.kalori  + (+o.kalori  || 0),
+    protein: t.protein + (+o.protein || 0),
+    karb:    t.karb    + (+o.karb    || 0),
+    yag:     t.yag     + (+o.yag     || 0)
+  }), { kalori: 0, protein: 0, karb: 0, yag: 0 });
+}
 
 /* ===============================================================
    §4 — Namaz modülü
@@ -1018,10 +1188,13 @@ function gunlukCiz(){
             : seri === 0 ? "bugünü tamamla, seriyi başlat"
             : "bugünün " + (5 - nOk) + " vakti kaldı";
 
-  const kutu = (d, t, renk, ad) =>
+  const kutu = (d, t, renk, ad, metin) =>
     '<div class="halka"><div class="cerceve">' + halkaSVG(d, t, renk) +
-    '<span class="deger">' + d + '/' + t + '</span></div>' +
+    '<span class="deger">' + (metin != null ? metin : d + '/' + t) + '</span></div>' +
     '<span class="etiket">' + ad + '</span></div>';
+
+  const kh = guncelHedef();
+  const kal = kh ? gununBeslenme(bugun).kalori : 0;
 
   $gunluk.innerHTML =
     '<div class="seri-bant">' +
@@ -1034,6 +1207,7 @@ function gunlukCiz(){
       kutu(nOk, 5, "var(--vakit)", "Namaz") +
       kutu(su, SU_HEDEFI, "var(--su)", "Su") +
       kutu(mOk, md.length || 1, "var(--tamam)", "Plan") +
+      (kh ? kutu(kal, kh.hedef, "var(--alev)", "Kalori", "" + kal) : "") +
     '</div>';
 }
 
@@ -2838,13 +3012,529 @@ $istatistik.addEventListener("click", e => {
 });
 
 /* ===============================================================
+   §15 — Beslenme sekmesi
+   Profil formu → istemci kalori hedefi → model programı.
+   Program içinde tarif, YouTube linki, "beğenmedim → alternatif".
+   Altında tartım girişi ve kilo eğrisi.
+   =============================================================== */
+
+const $beslenme = document.getElementById("b-beslenme");
+const PROGRAM_SINIR = 3;                       // günde en fazla program üretimi
+const AKTIVITE_ETIKET = {
+  hareketsiz: "hareketsiz (masa başı)", hafif: "hafif (haftada 1-3 gün)",
+  orta: "orta (haftada 3-5 gün)", yuksek: "yüksek (haftada 6-7 gün)"
+};
+
+let beslenmeMesaj = "", profilAcik = false;
+let acikTarif = null;                          // "oi-yi" — tarifi açık yemek
+
+function beslenmeHakki(){
+  const s = UYG.veri.beslenme.sayac || {};
+  return PROGRAM_SINIR - (s[uygulamaGunu()] || 0);
+}
+function beslenmeHakkiDus(){
+  const s = UYG.veri.beslenme.sayac || (UYG.veri.beslenme.sayac = {});
+  const t = uygulamaGunu();
+  s[t] = (s[t] || 0) + 1;
+  for(const k of Object.keys(s)) if(k < gunKaydir(t, -7)) delete s[k];
+}
+
+/* --- Çizim --------------------------------------------------- */
+function makroCip(y){
+  return '<span class="mk">P' + (y.protein || 0) + '</span>' +
+         '<span class="mk">K' + (y.karb || 0) + '</span>' +
+         '<span class="mk">Y' + (y.yag || 0) + '</span>';
+}
+
+function profilBolum(){
+  const p = UYG.veri.beslenme.profil;
+  const h = guncelHedef();
+
+  if(!p || profilAcik){
+    const v = p || {};
+    const sec = (id, secenekler, secili) =>
+      '<select id="' + id + '">' +
+        Object.keys(secenekler).map(k =>
+          '<option value="' + k + '"' + (k === secili ? " selected" : "") + '>' +
+          kacir(secenekler[k]) + '</option>').join("") +
+      '</select>';
+    return '<h2 class="bolum-bas">Profil</h2>' +
+      '<div class="bes-form">' +
+        '<label>Boy (cm)<input type="number" id="bp-boy" inputmode="numeric" value="' + (v.boy || "") + '"></label>' +
+        '<label>Kilo (kg)<input type="number" id="bp-kilo" inputmode="decimal" step="0.1" value="' + (v.kilo || "") + '"></label>' +
+        '<label>Yaş<input type="number" id="bp-yas" inputmode="numeric" value="' + (v.yas || "") + '"></label>' +
+        '<label>Cinsiyet' + sec("bp-cinsiyet", { erkek:"erkek", kadin:"kadın" }, v.cinsiyet) + '</label>' +
+        '<label class="tam">Aktivite' + sec("bp-aktivite", AKTIVITE_ETIKET, v.aktivite || "orta") + '</label>' +
+        '<label class="tam">Haftalık hedef (kg)' +
+          '<input type="number" id="bp-hedef" inputmode="decimal" step="0.05" value="' +
+          (v.haftalikHedef != null ? v.haftalikHedef : VARSAYILAN_HEDEF) + '"></label>' +
+      '</div>' +
+      '<div class="plan-alt">' +
+        '<button class="dg dg-bir" id="bp-kaydet">kaydet</button>' +
+        (p ? '<button class="dg dg-sonuk" id="bp-vazgec">vazgeç</button>' : "") +
+        (beslenmeMesaj ? '<span class="sonuk">' + kacir(beslenmeMesaj) + '</span>' : "") +
+      '</div>';
+  }
+
+  const satir = (a, b) => '<div class="bes-oz"><span>' + a + '</span><b>' + b + '</b></div>';
+  return '<h2 class="bolum-bas">Profil' +
+      '<button class="dg dg-sonuk" id="bp-duzenle" style="margin-left:auto">düzenle</button>' +
+    '</h2>' +
+    satir("Boy / kilo", p.boy + " cm · " + (sonKilo() || p.kilo) + " kg") +
+    satir("Aktivite", kacir((AKTIVITE_ETIKET[p.aktivite] || p.aktivite || "").split(" ")[0])) +
+    satir("Haftalık hedef", "+" + (p.haftalikHedef != null ? p.haftalikHedef : VARSAYILAN_HEDEF) + " kg") +
+    (h
+      ? '<div class="bes-hedef">' +
+          '<div class="bes-hedef-say">' + h.hedef + ' <span>kcal / gün</span></div>' +
+          '<div class="bes-hedef-mk">protein ' + h.protein + ' g · karb ' + h.karb +
+            ' g · yağ ' + h.yag + ' g</div>' +
+          '<div class="sonuk mini">BMR ' + h.bmr + ' · TDEE ' + h.tdee + ' · fazla +' + h.fazla + '</div>' +
+        '</div>'
+      : '');
+}
+
+function programBolum(){
+  const pr = UYG.veri.beslenme.program;
+  const hak = beslenmeHakki();
+  const hazir = UYG.veri.beslenme.profil && guncelHedef();
+
+  const dugme =
+    '<div class="plan-alt">' +
+      '<button class="dg ' + (pr ? "dg-sonuk" : "dg-bir") + '" id="bes-uret"' +
+        (UYG.programUretiliyor || hak <= 0 || !hazir ? " disabled" : "") + '>' +
+        (UYG.programUretiliyor ? "üretiliyor…" : (pr ? "programı yeniden üret" : "program üret")) +
+      '</button>' +
+      (!hazir ? '<span class="sonuk">önce profili doldur</span>'
+        : hak < PROGRAM_SINIR && hak > 0 ? '<span class="sonuk">' + hak + ' hak kaldı</span>' : "") +
+      (beslenmeMesaj && !profilAcik ? '<span class="sonuk">' + kacir(beslenmeMesaj) + '</span>' : "") +
+    '</div>';
+
+  if(!pr) return '<h2 class="bolum-bas">Program</h2>' +
+    '<p class="sonuk" style="margin:0 0 4px">Profili doldurunca yapay zeka günlük ' +
+    'bir beslenme programı çıkarır: öğünler, kalori, tarif ve tarif videosu.</p>' + dugme;
+
+  const ogunler = (pr.ogunler || []).map((o, oi) =>
+    '<div class="bes-ogun">' +
+      '<div class="bes-ogun-bas">' + kacir(o.ad) +
+        (o.saat ? ' <span class="sonuk">' + o.saat + '</span>' : '') + '</div>' +
+      (o.yemekler || []).map((y, yi) => {
+        const id = oi + "-" + yi;
+        const acik = acikTarif === id;
+        return '<div class="bes-yemek">' +
+          '<div class="bes-yemek-bas">' +
+            '<div><span class="bes-yad">' + kacir(y.ad) + '</span>' +
+              '<span class="sonuk mini"> · ' + kacir(y.miktar) + '</span></div>' +
+            '<span class="bes-kcal">' + (y.kalori || 0) + '</span>' +
+          '</div>' +
+          '<div class="bes-mk">' + makroCip(y) + '</div>' +
+          '<div class="bes-yemek-alt">' +
+            '<button class="dg dg-sonuk" data-tarif="' + id + '" aria-expanded="' + (acik ? "true" : "false") + '">tarif</button>' +
+            '<button class="dg dg-sonuk" data-video="' + id + '">' +
+              (y.video ? "videoyu aç" : "tarif videosu") + '</button>' +
+            '<button class="dg dg-sonuk" data-begenmedim="' + id + '"' +
+              (UYG.alternatifBekliyor === id ? " disabled" : "") + '>' +
+              (UYG.alternatifBekliyor === id ? "değişiyor…" : "beğenmedim") + '</button>' +
+          '</div>' +
+          (acik && y.tarif ? '<p class="bes-tarif">' + kacir(y.tarif) + '</p>' : '') +
+        '</div>';
+      }).join("") +
+    '</div>').join("");
+
+  return '<h2 class="bolum-bas">Program' +
+      '<span class="yan">' + (pr.gunlukKalori || 0) + ' kcal</span></h2>' +
+    (pr.not ? '<p class="sonuk" style="margin:0 0 12px">' + kacir(pr.not) + '</p>' : '') +
+    ogunler + dugme;
+}
+
+function kiloSparkline(){
+  const t = UYG.veri.beslenme.tartim || [];
+  if(t.length < 2) return '';
+  const son = t.slice(-24);
+  const ys = son.map(x => x.kilo);
+  const enAz = Math.min(...ys), enCok = Math.max(...ys);
+  const aralik = (enCok - enAz) || 1;
+  const nokta = son.map((x, i) => {
+    const px = son.length === 1 ? 0 : (i / (son.length - 1)) * 100;
+    const py = 30 - ((x.kilo - enAz) / aralik) * 26 - 2;
+    return px.toFixed(1) + "," + py.toFixed(1);
+  }).join(" ");
+  return '<svg class="bes-spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">' +
+    '<polyline points="' + nokta + '" fill="none" stroke="var(--vakit)" stroke-width="1.5" ' +
+    'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></polyline></svg>';
+}
+
+function tartimBolum(){
+  const tr = kiloTrend(30);
+  const sk = sonKilo();
+  return '<h2 class="bolum-bas">Tartım' +
+      (sk ? '<span class="yan">' + sk + ' kg</span>' : '') + '</h2>' +
+    kiloSparkline() +
+    (tr
+      ? '<p class="sonuk" style="margin:8px 0 0">Son 30 günde ' +
+        (tr.degisim >= 0 ? "+" : "") + tr.degisim + ' kg, yaklaşık ' +
+        (tr.haftalik >= 0 ? "+" : "") + tr.haftalik + ' kg/hafta.</p>'
+      : '<p class="sonuk" style="margin:8px 0 0">En az iki tartım girince eğilim çıkar.</p>') +
+    '<div class="plan-ekle">' +
+      '<input type="number" id="bes-kilo" inputmode="decimal" step="0.1" placeholder="bugünkü kilo" aria-label="kilo">' +
+      '<button class="dg" id="bes-kilo-kaydet">kaydet</button>' +
+    '</div>';
+}
+
+function beslenmeCiz(){
+  if(!UYG.veri) return;
+  $beslenme.innerHTML =
+    '<div class="ist-blok">' + profilBolum() + '</div>' +
+    '<div class="ist-blok bosluk">' + programBolum() + '</div>' +
+    '<div class="ist-blok bosluk">' + tartimBolum() + '</div>';
+}
+
+/* --- Eylemler ----------------------------------------------- */
+function profilKaydet(){
+  const al = id => (document.getElementById(id) || {}).value;
+  const boy  = parseInt(al("bp-boy"), 10);
+  const kilo = parseFloat(al("bp-kilo"));
+  const yas  = parseInt(al("bp-yas"), 10);
+  const cinsiyet = al("bp-cinsiyet") || "erkek";
+  const aktivite = al("bp-aktivite") || "orta";
+  let hedef = parseFloat(al("bp-hedef"));
+  if(!Number.isFinite(hedef)) hedef = VARSAYILAN_HEDEF;
+
+  if(!(boy > 100 && boy < 250) || !(kilo > 30 && kilo < 400) || !(yas > 10 && yas < 100)){
+    beslenmeMesaj = "Boy, kilo ve yaşı makul değerlerle gir.";
+    beslenmeCiz();
+    return;
+  }
+  UYG.veri.beslenme.profil = {
+    boy: boy, kilo: Math.round(kilo * 10) / 10, yas: yas,
+    cinsiyet: cinsiyet === "kadin" ? "kadin" : "erkek",
+    aktivite: AKTIVITE[aktivite] ? aktivite : "orta",
+    haftalikHedef: Math.max(0, Math.min(1, Math.round(hedef * 100) / 100))
+  };
+  // İlk profil kilosu tartım günlüğüne de düşsün ki eğri bir yerden başlasın.
+  if(!(UYG.veri.beslenme.tartim || []).length) tartimEkle(UYG.veri.beslenme.profil.kilo);
+  profilAcik = false;
+  beslenmeMesaj = "";
+  kaydet();
+  beslenmeCiz();
+}
+
+async function programUret(){
+  if(beslenmeHakki() <= 0){
+    beslenmeMesaj = "Bugün program üretme hakkı doldu (günde " + PROGRAM_SINIR + ").";
+    beslenmeCiz();
+    return;
+  }
+  const h = guncelHedef();
+  if(!h){ beslenmeMesaj = "Önce profili doldur."; beslenmeCiz(); return; }
+
+  UYG.programUretiliyor = true;
+  beslenmeMesaj = "";
+  beslenmeCiz();
+  try{
+    const p = UYG.veri.beslenme.profil;
+    const pr = await modelIste("beslenme", {
+      mod: "program",
+      profil: { boy:p.boy, kilo:sonKilo() || p.kilo, yas:p.yas, cinsiyet:p.cinsiyet,
+                aktivite:p.aktivite, haftalikHedef:p.haftalikHedef,
+                metin: UYG.veri.profil || "" },
+      hedef: h,
+      sevmedigim: UYG.veri.beslenme.sevmedigim || [],
+      mevcut: UYG.veri.beslenme.program || null
+    });
+    beslenmeHakkiDus();
+    UYG.veri.beslenme.program = pr;
+    UYG.veri.ayar.yapayZeka = true;
+    acikTarif = null;
+    kaydet();
+  }catch(e){
+    console.warn("program üretilemedi", e);
+    beslenmeMesaj = hataMetni(e, "Program üretilemedi.") +
+      (UYG.veri.beslenme.program ? " Eldeki program duruyor." : "");
+  }finally{
+    UYG.programUretiliyor = false;
+    beslenmeCiz();
+  }
+}
+
+function sevmedigimEkle(ad){
+  const l = UYG.veri.beslenme.sevmedigim || (UYG.veri.beslenme.sevmedigim = []);
+  const a = String(ad || "").trim();
+  if(a && l.map(x => x.toLowerCase()).indexOf(a.toLowerCase()) === -1){
+    l.push(a);
+    if(l.length > 40) UYG.veri.beslenme.sevmedigim = l.slice(-40);
+  }
+}
+
+async function yemekBegenmedim(id){
+  const [oi, yi] = id.split("-").map(Number);
+  const pr = UYG.veri.beslenme.program;
+  const y = pr && pr.ogunler[oi] && pr.ogunler[oi].yemekler[yi];
+  if(!y) return;
+
+  UYG.alternatifBekliyor = id;
+  beslenmeMesaj = "";
+  beslenmeCiz();
+  try{
+    const alt = await modelIste("beslenme", {
+      mod: "alternatif",
+      yemek: y,
+      ogun: pr.ogunler[oi].ad,
+      sevmedigim: (UYG.veri.beslenme.sevmedigim || []).concat([y.ad])
+    });
+    sevmedigimEkle(y.ad);
+    pr.ogunler[oi].yemekler[yi] = alt;
+    kaydet();
+  }catch(e){
+    console.warn("alternatif alınamadı", e);
+    beslenmeMesaj = hataMetni(e, "Alternatif alınamadı.");
+  }finally{
+    UYG.alternatifBekliyor = null;
+    beslenmeCiz();
+  }
+}
+
+async function tarifVideosu(id){
+  const [oi, yi] = id.split("-").map(Number);
+  const pr = UYG.veri.beslenme.program;
+  const y = pr && pr.ogunler[oi] && pr.ogunler[oi].yemekler[yi];
+  if(!y) return;
+
+  if(!y.video){
+    try{
+      const c = await fetch("api/tarif", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ yemek: y.ad })
+      });
+      const j = await c.json().catch(() => ({}));
+      if(j && j.url){ y.video = j.url; kaydet(); }
+    }catch(e){
+      y.video = "https://www.youtube.com/results?search_query=" +
+        encodeURIComponent(y.ad + " tarif");
+    }
+  }
+  if(y.video && typeof open === "function"){
+    try{ open(y.video, "_blank", "noopener"); }catch(e){ location.href = y.video; }
+  }
+  beslenmeCiz();
+}
+
+function tartimGirisGonder(){
+  const alan = document.getElementById("bes-kilo");
+  if(!alan || !alan.value) return;
+  if(tartimEkle(alan.value)){ alan.value = ""; beslenmeCiz(); }
+}
+
+$beslenme.addEventListener("click", e => {
+  const d = e.target.closest("button");
+  if(!d) return;
+  if(d.id === "bp-kaydet")        profilKaydet();
+  else if(d.id === "bp-duzenle"){ profilAcik = true; beslenmeMesaj = ""; beslenmeCiz(); }
+  else if(d.id === "bp-vazgec"){  profilAcik = false; beslenmeMesaj = ""; beslenmeCiz(); }
+  else if(d.id === "bes-uret")    programUret();
+  else if(d.id === "bes-kilo-kaydet") tartimGirisGonder();
+  else if(d.dataset.tarif){ acikTarif = (acikTarif === d.dataset.tarif) ? null : d.dataset.tarif; beslenmeCiz(); }
+  else if(d.dataset.video)       tarifVideosu(d.dataset.video);
+  else if(d.dataset.begenmedim)  yemekBegenmedim(d.dataset.begenmedim);
+});
+$beslenme.addEventListener("keydown", e => {
+  if(e.key === "Enter" && e.target.id === "bes-kilo"){ e.preventDefault(); tartimGirisGonder(); }
+});
+
+/* ===============================================================
+   §15 — "Bugün" öğün günlüğü (elle giriş + fotoğraftan kalori)
+   =============================================================== */
+
+const $ogun = document.getElementById("b-ogun");
+let fotoOnay = null, fotoBekliyor = false, ogunMesaj = "";
+
+function gununOgunleri(tarih){
+  const k = UYG.veri.beslenme.kayit;
+  return (k && k[tarih]) || [];
+}
+
+function ogunCiz(){
+  if(!UYG.veri) return;
+  const bugun = uygulamaGunu();
+  const liste = gununOgunleri(bugun);
+  const h = guncelHedef();
+
+  // Profil de yoksa, kayıt da yoksa: bölüm görünmez.
+  if(!h && !liste.length && !fotoOnay){
+    $ogun.hidden = true;
+    $ogun.innerHTML = "";
+    return;
+  }
+  $ogun.hidden = false;
+
+  const b = gununBeslenme(bugun);
+  const satirlar = liste.map((o, i) =>
+    '<div class="og-satir">' +
+      (o.thumb ? '<img class="og-thumb" src="' + kacir(o.thumb) + '" alt="">' : '<span class="og-thumb bos"></span>') +
+      '<div class="og-ad">' + kacir(o.ad) +
+        (o.kaynak === "foto" ? ' <span class="sonuk mini">· fotoğraf</span>' : '') + '</div>' +
+      '<span class="og-kcal">' + (o.kalori || 0) + '</span>' +
+      '<button class="dg dg-sonuk" data-osil="' + i + '" aria-label="sil">×</button>' +
+    '</div>').join("");
+
+  const onay = fotoOnay
+    ? '<div class="og-onay">' +
+        '<p class="sonuk" style="margin:0 0 8px">Fotoğraftan tahmin — düzeltip onayla' +
+          (fotoOnay.guven ? ' (güven: ' + fotoOnay.guven + ')' : '') + '.' +
+          (fotoOnay.not ? ' ' + kacir(fotoOnay.not) : '') + '</p>' +
+        '<div class="plan-ekle">' +
+          '<input type="text" id="of-ad" value="' + kacir(fotoOnay.yemek || "") + '" aria-label="yemek">' +
+          '<input type="number" id="of-kcal" inputmode="numeric" value="' + (fotoOnay.kalori || "") + '" aria-label="kalori" style="width:5.5em">' +
+        '</div>' +
+        '<div class="plan-alt">' +
+          '<button class="dg dg-bir" id="of-onay">ekle</button>' +
+          '<button class="dg dg-sonuk" id="of-vazgec">vazgeç</button>' +
+        '</div>' +
+      '</div>'
+    : '';
+
+  $ogun.innerHTML =
+    '<h2 class="bolum-bas">Öğünler' +
+      (h ? '<span class="yan">' + b.kalori + ' / ' + h.hedef + ' kcal</span>' : '') + '</h2>' +
+    (satirlar || (fotoOnay ? '' : '<p class="sonuk" style="margin:0 0 4px">Bugün ne yediğini ekle.</p>')) +
+    onay +
+    (fotoBekliyor ? '<p class="sonuk" style="margin:8px 0 0">fotoğraf çözümleniyor…</p>' : '') +
+    (ogunMesaj ? '<p class="sonuk" style="margin:8px 0 0">' + kacir(ogunMesaj) + '</p>' : '') +
+    '<div class="plan-ekle">' +
+      '<input type="text" id="og-ad" placeholder="ne yedin" autocomplete="off" aria-label="yemek">' +
+      '<input type="number" id="og-kcal" inputmode="numeric" placeholder="kcal" aria-label="kalori" style="width:5.5em">' +
+      '<button class="dg" id="og-ekle">ekle</button>' +
+    '</div>' +
+    '<div class="plan-alt">' +
+      '<button class="dg dg-sonuk" id="og-foto-ac">fotoğraftan ekle</button>' +
+    '</div>' +
+    '<input type="file" id="og-foto" accept="image/*" capture="environment" class="gizli">';
+}
+
+function ogunEkle(ad, kalori, ek){
+  const a = String(ad || "").trim().slice(0, 80);
+  const k = Math.max(0, Math.round(+kalori || 0));
+  if(!a || !k) return false;
+  const bugun = uygulamaGunu();
+  const kayit = UYG.veri.beslenme.kayit || (UYG.veri.beslenme.kayit = {});
+  (kayit[bugun] || (kayit[bugun] = [])).push(Object.assign(
+    { ad: a, kalori: k, kaynak: "elle", zaman: Date.now() }, ek || {}));
+  // Kayıt sonsuza kadar büyümesin: 60 günden eski günler silinir.
+  const sinir = gunKaydir(bugun, -60);
+  for(const t of Object.keys(kayit)) if(t < sinir) delete kayit[t];
+  kaydet();
+  ogunCiz();
+  gunlukCiz();
+  return true;
+}
+
+function ogunSil(i){
+  const bugun = uygulamaGunu();
+  const l = (UYG.veri.beslenme.kayit || {})[bugun];
+  if(!l || !l[i]) return;
+  l.splice(i, 1);
+  kaydet();
+  ogunCiz();
+  gunlukCiz();
+}
+
+function ogunGirisGonder(){
+  const ad = document.getElementById("og-ad");
+  const kc = document.getElementById("og-kcal");
+  if(!ad || !kc) return;
+  if(ogunEkle(ad.value, kc.value)){ ad.value = ""; kc.value = ""; }
+  else { ogunMesaj = "Yemek adı ve kalori gerekli."; ogunCiz(); }
+}
+
+/* Fotoğrafı tarayıcıda küçült; API'ye bare base64, önizlemeye data URI. */
+function fotoKucult(dosya, boy){
+  return new Promise((coz, ret) => {
+    if(typeof FileReader === "undefined" || typeof Image === "undefined")
+      return ret(new Error("tarayıcı gerekli"));
+    const okuyucu = new FileReader();
+    okuyucu.onerror = () => ret(new Error("dosya okunamadı"));
+    okuyucu.onload = () => {
+      const im = new Image();
+      im.onerror = () => ret(new Error("görsel açılamadı"));
+      im.onload = () => {
+        const oran = Math.min(1, boy / Math.max(im.width, im.height));
+        const w = Math.round(im.width * oran), hh = Math.round(im.height * oran);
+        const c = document.createElement("canvas");
+        c.width = w; c.height = hh;
+        const ctx = c.getContext && c.getContext("2d");
+        if(!ctx) return ret(new Error("canvas yok"));
+        ctx.drawImage(im, 0, 0, w, hh);
+        coz(c.toDataURL("image/jpeg", 0.72));
+      };
+      im.src = okuyucu.result;
+    };
+    okuyucu.readAsDataURL(dosya);
+  });
+}
+
+async function fotoDegisti(dosya){
+  if(!dosya) return;
+  fotoBekliyor = true;
+  fotoOnay = null;
+  ogunMesaj = "";
+  ogunCiz();
+  try{
+    const buyuk = await fotoKucult(dosya, 768);
+    const kucuk = await fotoKucult(dosya, 256).catch(() => null);
+    const veri = buyuk.replace(/^data:[^,]+,/, "");
+    const c = await modelIste("beslenme", { mod: "foto", foto: veri, mime: "image/jpeg" });
+    fotoOnay = {
+      yemek: c.yemek || "", kalori: c.kalori || 0,
+      protein: c.protein || 0, karb: c.karb || 0, yag: c.yag || 0,
+      guven: c.guven || "", not: c.not || "", thumb: kucuk || null
+    };
+  }catch(e){
+    console.warn("foto çözümlenemedi", e);
+    ogunMesaj = hataMetni(e, "Fotoğraf çözümlenemedi; elle ekleyebilirsin.");
+  }finally{
+    fotoBekliyor = false;
+    ogunCiz();
+  }
+}
+
+function fotoOnayla(){
+  if(!fotoOnay) return;
+  const ad = (document.getElementById("of-ad") || {}).value || fotoOnay.yemek;
+  const kc = (document.getElementById("of-kcal") || {}).value || fotoOnay.kalori;
+  const ek = { kaynak: "foto", protein: fotoOnay.protein, karb: fotoOnay.karb, yag: fotoOnay.yag };
+  if(fotoOnay.thumb) ek.thumb = fotoOnay.thumb;
+  if(ogunEkle(ad, kc, ek)){ fotoOnay = null; ogunCiz(); }
+  else { ogunMesaj = "Yemek adı ve kalori gerekli."; ogunCiz(); }
+}
+
+$ogun.addEventListener("click", e => {
+  const d = e.target.closest("button");
+  if(!d) return;
+  if(d.id === "og-ekle")            ogunGirisGonder();
+  else if(d.id === "og-foto-ac"){ const f = document.getElementById("og-foto"); if(f && f.click) f.click(); }
+  else if(d.id === "of-onay")       fotoOnayla();
+  else if(d.id === "of-vazgec"){    fotoOnay = null; ogunMesaj = ""; ogunCiz(); }
+  else if(d.dataset.osil != null)   ogunSil(+d.dataset.osil);
+});
+$ogun.addEventListener("change", e => {
+  if(e.target.id === "og-foto" && e.target.files && e.target.files[0])
+    fotoDegisti(e.target.files[0]);
+});
+$ogun.addEventListener("keydown", e => {
+  if(e.key === "Enter" && (e.target.id === "og-ad" || e.target.id === "og-kcal")){
+    e.preventDefault(); ogunGirisGonder();
+  }
+});
+
+/* ===============================================================
    Görünüm (alt tab bar): tek sayfa, bölümler sekmeye göre gösterilir.
    =============================================================== */
 const GORUNUM = {
-  bugun:   ["b-gunluk", "b-namaz", "b-kaza", "b-su"],
-  seri:    ["b-istatistik"],
-  plan:    ["b-plan", "b-etkinlik", "b-degerlendirme", "b-sohbet"],
-  ayarlar: ["b-alarm", "b-ayar", "b-ayarlar"]
+  bugun:    ["b-gunluk", "b-namaz", "b-kaza", "b-su", "b-ogun"],
+  seri:     ["b-istatistik"],
+  plan:     ["b-plan", "b-etkinlik", "b-degerlendirme", "b-sohbet"],
+  beslenme: ["b-beslenme"],
+  ayarlar:  ["b-alarm", "b-ayar", "b-ayarlar"]
 };
 const TUM_BOLUMLER = Object.keys(GORUNUM).reduce((a, k) => a.concat(GORUNUM[k]), []);
 let aktifGorunum = "bugun";
@@ -2859,9 +3549,10 @@ function gorunum(sekme){
     if(el) el.hidden = GORUNUM[sekme].indexOf(id) === -1;
   }
   // İçeriğe göre kendini gizleyen bölümler yeniden karar versin.
-  if(sekme === "bugun") kazaCiz();
-  if(sekme === "plan")  etkinlikCiz();
-  if(sekme === "seri")  istatistikCiz();
+  if(sekme === "bugun"){   kazaCiz(); ogunCiz(); }
+  if(sekme === "plan")     etkinlikCiz();
+  if(sekme === "seri")     istatistikCiz();
+  if(sekme === "beslenme") beslenmeCiz();
 
   const nav = document.getElementById("alt-nav");
   if(nav && nav.querySelectorAll){
@@ -2898,6 +3589,8 @@ function baslat(){
   ayarCiz();
   ayarlarCiz();
   istatistikCiz();
+  beslenmeCiz();
+  ogunCiz();
   gorunum((UYG.veri.ayar && UYG.veri.ayar.sekme) || "bugun");
 
   // Plan üretimi vakitleri de gönderir (§6), o yüzden namazKur'dan sonra.

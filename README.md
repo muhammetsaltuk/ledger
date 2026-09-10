@@ -111,14 +111,16 @@ plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
 ## Yapı
 
 ```
-index.html      uygulamanın tamamı — tek sayfa, alt tab bar ile dört görünüm
+index.html      uygulamanın tamamı — tek sayfa, alt tab bar ile beş görünüm
 manifest.json
-sw.js           çevrimdışı kabuk (SURUM tema değişince artırılır)
+sw.js           çevrimdışı kabuk (SURUM tema/özellik değişince artırılır)
 icons/
 api/plan.js     Gemini — günlük plan üretir
 api/review.js   Gemini — gün sonu değerlendirmesi
 api/chat.js     Gemini — sohbet, plan/profil düzenleme
 api/parse.js    Gemini — serbest metni etkinliğe çevirir
+api/beslenme.js Gemini — §15 program / alternatif yemek / fotoğraftan kalori
+api/tarif.js    §15 — bir yemek için çalışan YouTube tarif linki
 api/push.js     ntfy'ye bildirim gönderir
 ```
 
@@ -173,6 +175,52 @@ Korunan §13 maddeleri: tek sütun, ortalı düzen; `tabular-nums` ile titremeye
 rakamlar; `prefers-reduced-motion` desteği; klavye erişimi ve görünür odak
 halkası; hiçbir metnin kullanıcıyı övmemesi ve emoji kullanılmaması (§14).
 
+## §15 — Beslenme (kilo alma odaklı)
+
+Alt tab bar'a beşinci sekme **Beslenme**. Arkada Gemini; profil → kalori/makro
+hedefi → günlük beslenme programı → öğün ve kilo takibi.
+
+**Kalori hedefi istemcide hesaplanır.** Boy, kilo, yaş, cinsiyet ve aktivite ile
+Mifflin-St Jeor BMR, aktivite faktörüyle çarpılıp TDEE; haftalık kilo hedefine
+karşılık gelen kalori fazlası eklenir (`+0.35 kg/hafta ≈ +385 kcal`, 25'e
+yuvarlı). Protein 1,8 g/kg, yağ kalorinin %25'i, karb kalanı. Deterministik,
+çevrimdışı çalışır, test edilir (`kaloriHedefi`). Model bu hedefi bir girdi
+olarak alır, kendi hesaplamaz. Güncel kilo son tartımdan gelir.
+
+**Program** (`api/beslenme` `mod:program`). Profil + hedef + sevmediklerin +
+(varsa) mevcut program → 4-6 öğün, her yemek için gramaj, kalori, makro ve kısa
+bir tarif. Yapılandırılmış çıktı (`responseSchema`) zorunlu. Günde en fazla 3
+üretim; sayaç istemcide (`beslenme.sayac`), `PLAN_SINIR` ile aynı kalıp.
+`GEMINI_API_KEY` yoksa üretim kapanır; elle öğün girişi ve tartım çalışır.
+Ağ/model hatasında eldeki program silinmez.
+
+**Alternatif** (`mod:alternatif`). Bir yemeğe "beğenmedim" dersen, kalorisi ve
+makroları yakın (±80 kcal) tek bir yemek gelir, yerine geçer; beğenmediğin yemek
+`beslenme.sevmedigim`'e yazılır ve sonraki programlar da kaçınır.
+
+**Tarif videosu** (`api/tarif`). Yemek adı → **çalışan** bir YouTube linki.
+Katmanlı: `YOUTUBE_API_KEY` varsa Data API araması (kesin `watch?v=` linki);
+yoksa `youtube.com/results` sayfasından ilk `videoId` çekilir; o da olmazsa arama
+linkine düşer. Sonuç yemeğin içine önbelleklenir; ikinci açışta istek gitmez.
+Bu uç nokta `GEMINI_API_KEY`'e bağlı değil.
+
+**Öğün günlüğü.** "Bugün" görünümünde namaz/su/plan halkalarının yanına dördüncü
+bir **kalori halkası** (bugün yenen / hedef) ve **Öğünler** kartı gelir (profil
+varsa). Ne yediğini elle (ad + kcal) ya da **fotoğraftan** eklersin: istemci
+görseli canvas ile ~768 px'e küçültüp `mod:foto` ile gönderir (Gemini görsel
+destekli), yemek + kalori + makro tahmini döner, sen düzeltip onaylarsın.
+`localStorage` şişmesin diye tam çözünürlük saklanmaz — ~256 px'lik bir önizleme
+ve çözümlenen değerler tutulur. Fotoğraf akışı yalnız tarayıcıda çalışır;
+`FileReader`/canvas yoksa sessizce elle girişe yönlendirir.
+
+**Tartım.** Kilo günlüğü (`beslenme.tartim`), aynı güne ikinci giriş üzerine
+yazılır. Küçük bir SVG eğri ve en küçük karelerle hesaplanan kg/hafta eğilimi
+gösterilir — hedef hızıyla karşılaştırmak için.
+
+**Felsefe.** §13/§14 ile aynı: övgü ve emoji yok ("2400 / 3029 kcal", "yaklaşık
++0.3 kg/hafta" gibi kuru olgu); veri telefonda; anahtarsız da temel işlevler
+çalışır; sunucu durumsuz; kota istemcide.
+
 ## Yayına alma
 
 **Canlı:** <https://ledger-muhammetsaltuks-projects.vercel.app>
@@ -212,9 +260,25 @@ bir dağıtım daha gerekir. Anahtar ücretsiz, kredi kartı istemiyor:
 git geçmişinde yer almaz.
 
 `GEMINI_API_KEY` tanımlı olmasa da uygulama çalışır: namaz vakitleri, kaza borcu,
-su, plan işaretleme ve notlar yapay zekâ olmadan işler. Sadece plan üretimi,
-değerlendirme, sohbet ve etkinlik çözümleme devre dışı kalır — arayüzde
-"Yapay zeka kapalı (GEMINI_API_KEY tanımlı değil)" yazar.
+su, plan işaretleme, notlar, **beslenme kalori hedefi, elle öğün girişi ve
+tartım** yapay zekâ olmadan işler. Sadece plan üretimi, değerlendirme, sohbet,
+etkinlik çözümleme ve **beslenme programı / fotoğraftan kalori** devre dışı
+kalır — arayüzde "Yapay zeka kapalı (GEMINI_API_KEY tanımlı değil)" yazar.
+
+### İsteğe bağlı — YOUTUBE_API_KEY (§15)
+
+Beslenme programındaki her yemek için gerçek bir YouTube tarif videosu linki
+istiyorsan:
+
+```bash
+npx vercel env add YOUTUBE_API_KEY production
+npx vercel deploy --prod
+```
+
+Anahtar [Google Cloud Console](https://console.cloud.google.com) → "YouTube Data
+API v3" etkinleştir → "API key" ile alınır; ücretsiz katman günde 100 arama.
+Tanımlı değilse `api/tarif` yine çalışır: `youtube.com/results` sayfasından ilk
+videoyu çeker, o da olmazsa arama linkine düşer.
 
 ### İsteğe bağlı — ntfy (§8.2)
 
@@ -250,7 +314,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (125 test) ve `node test/api.js` (35 test) ile fiilen
+`node test/hepsi.js` (150 test) ve `node test/api.js` (46 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor.
 
 | Kriter | Durum |
@@ -274,6 +338,15 @@ deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor.
 | İstatistik çizimi boş gün kaydı oluşturmaz | ✓ test |
 | Alt tab: "seri" istatistiği açar, Bugün bölümlerini gizler | ✓ test |
 | Açılışta saklı sekme geri yüklenir | ✓ test |
+| §15 kalori hedefi Mifflin-St Jeor + aktivite + fazla ile hesaplanır | ✓ test |
+| §15 eksik/geçersiz profil hedefi vermez; kadın formülü ayrı | ✓ test |
+| §15 tartım aynı güne üzerine yazar; kg/hafta eğilimi en küçük kareler | ✓ test |
+| §15 program isteği hedefi taşır, kota 3/gün ve istemcide | ✓ test |
+| §15 "beğenmedim" yemeği değiştirir, sevmediklerine ekler | ✓ test |
+| §15 api/tarif: anahtar varsa Data API, yoksa kazıma, sonra arama linki | ✓ test |
+| §15 fotoğraf: görsel parça API'ye gider; güven geçersizse "dusuk" | ✓ test |
+| §15 kalori halkası öğün toplamını yansıtır; profil yoksa çizilmez | ✓ test |
+| §15 fotoğraf akışı tarayıcı yoksa sessizce elle girişe düşer | ✓ test |
 | Hiçbir metin kullanıcıyı övmüyor, emoji yok | ✓ test |
 | Vurgu tek kaynaktan (`--vakit`) gelir, su şeridine bulaşmaz | ✓ test |
 | Ana ekrana eklenince adres çubuğu görünmez | ✓ manifest |
@@ -285,7 +358,10 @@ Alarm intent'i gerçek bir Android telefonda denenmedi — bunu ancak sen
 doğrulayabilirsin: **Ayarlar** sekmesindeki **Yarın** kartında "kur" düğmesine
 bas, saat uygulamasını aç, alarm görünüyor mu bak. Sonucu bu dosyaya yaz.
 Yeni tema gerçek bir telefonda göz denetiminden geçmedi (cam yüzeylerin
-`backdrop-filter` görünümü, alt tab bar'ın güvenli alan payı).
+`backdrop-filter` görünümü, alt tab bar'ın güvenli alan payı). §15 fotoğraf
+akışı (canvas küçültme, `capture` ile kamera, Gemini görsel çözümlemesi) ve
+`api/tarif`'in gerçek YouTube kazıması da gerçek cihazda / gerçek ağda
+denenmedi — sahte DOM'da yalnız çevresi test edildi.
 
 ### Erişilebilirlik ölçümleri
 
