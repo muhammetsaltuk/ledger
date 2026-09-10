@@ -420,6 +420,19 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .s-giris{ display:flex; gap:8px; align-items:center; }
 .s-giris input{ flex:1 1 auto; }
 
+/* Tek dokunuşluk hazır istek çipleri */
+.cip-satir{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; }
+.cip{
+  min-height:34px; padding:0 13px;
+  border-radius:999px; font-size:.82rem; font-weight:500;
+  color:var(--vakit);
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--vakit);
+  white-space:nowrap; flex-shrink:0;
+}
+.cip:hover{ filter:brightness(1.12); }
+.cip[disabled]{ opacity:.45; }
+
 /* --- §9 / §12 Profil ve değerlendirme ------------------------ */
 .deger-metin,.profil-metin{
   margin:0 0 14px;
@@ -717,11 +730,11 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   <!-- §3.4 Bugünün planı -->
   <section id="b-plan" class="bolum" aria-label="Bugünün planı"></section>
 
+  <!-- §3.6 Planı konuş (yapay zekayla) — plan maddelerinin hemen altında -->
+  <section id="b-sohbet" class="bolum" aria-label="Planı konuş"></section>
+
   <!-- §3.5 Yaklaşan etkinlikler -->
   <section id="b-etkinlik" class="bolum" aria-label="Yaklaşan etkinlikler" hidden></section>
-
-  <!-- §3.6 Sohbet -->
-  <section id="b-sohbet" class="bolum" aria-label="Sohbet"></section>
 
   <!-- §3.7 Gün sonu değerlendirmesi -->
   <section id="b-degerlendirme" class="bolum" aria-label="Gün sonu değerlendirmesi"></section>
@@ -2017,7 +2030,15 @@ function yedegiIndir(){
 
 const $sohbet = document.getElementById("b-sohbet");
 const SOHBET_SINIR = 20;                        // son 20 mesaj saklanır (§10)
-let sohbetAcik = false, sohbetMesaj = "";
+let sohbetAcik = true, sohbetMesaj = "";     // plan sekmesinde varsayılan açık
+
+/* Tek dokunuşluk hazır istekler — doğrudan api/chat'e gider, planı günceller. */
+const HIZLI_SOHBET = [
+  { et: "yorgunum",      cumle: "Bugün yorgunum, planı hafiflet." },
+  { et: "koda +1 saat",  cumle: "Kod bloğuna bir saat daha ekle." },
+  { et: "koşu akşama",   cumle: "Koşuyu akşama al." },
+  { et: "erken yat",     cumle: "Bu gece erken yatmam lazım, akşamı buna göre ayarla." }
+];
 
 function sohbetYaz(kim, metin){
   UYG.veri.sohbet.push({ kim: kim, metin: metin, zaman: Date.now() });
@@ -2099,7 +2120,7 @@ function sohbetCiz(){
   if(!sohbetAcik){
     $sohbet.innerHTML =
       '<button class="dg dg-sonuk" id="s-ac" aria-expanded="false">' +
-        'Sohbet' + (mesajlar.length ? ' · ' + mesajlar.length + ' mesaj' : "") +
+        'Planı konuş' + (mesajlar.length ? ' · ' + mesajlar.length + ' mesaj' : "") +
       '</button>';
     return;
   }
@@ -2108,13 +2129,20 @@ function sohbetCiz(){
     '<li class="s-' + (m.kim === "ben" ? "ben" : "model") + '">' + kacir(m.metin) + '</li>'
   ).join("");
 
+  const cipler = HIZLI_SOHBET.map(h =>
+    '<button class="cip" data-cip="' + kacir(h.cumle) + '"' +
+      (UYG.sohbetBekliyor ? " disabled" : "") + '>' + kacir(h.et) + '</button>'
+  ).join("");
+
   $sohbet.innerHTML =
-    '<h2 class="bolum-bas">Sohbet' +
-      '<button class="dg dg-sonuk" id="s-kapat" style="float:right">kapat</button>' +
+    '<h2 class="bolum-bas">Planı konuş' +
+      '<button class="dg dg-sonuk" id="s-kapat" style="margin-left:auto">kapat</button>' +
     '</h2>' +
-    (mesajlar.length ? '<ul class="sohbet-liste">' + satirlar + '</ul>'
-                     : '<p class="sonuk">Plan değişikliği, randevu veya soru yazabilirsin.</p>') +
+    '<p class="sonuk" style="margin:0 0 10px">Planı değiştir, bir maddeyi sor, ' +
+      'randevu ekle — yazdıkların bugünün planına ve profiline işler.</p>' +
+    (mesajlar.length ? '<ul class="sohbet-liste">' + satirlar + '</ul>' : "") +
     (UYG.sohbetBekliyor ? '<p class="sonuk">yazılıyor…</p>' : "") +
+    '<div class="cip-satir">' + cipler + '</div>' +
     '<div class="s-giris">' +
       '<input type="text" id="s-metin" placeholder="Sabahları koşamıyorum, akşama alalım." ' +
         'autocomplete="off" aria-label="mesaj">' +
@@ -2129,6 +2157,7 @@ $sohbet.addEventListener("click", e => {
   if(d.id === "s-ac") sohbetAc();
   else if(d.id === "s-kapat"){ sohbetAcik = false; sohbetCiz(); }
   else if(d.id === "s-gonder") sohbetGirisGonder();
+  else if(d.dataset.cip){ if(!UYG.sohbetBekliyor) sohbetGonder(d.dataset.cip); }
 });
 $sohbet.addEventListener("keydown", e => {
   if(e.key === "Enter" && e.target.id === "s-metin"){ e.preventDefault(); sohbetGirisGonder(); }
@@ -2145,6 +2174,23 @@ function sohbetGirisGonder(){
   const metin = alan.value.trim();
   alan.value = "";
   sohbetGonder(metin);
+}
+
+/* Plan maddesinden "sor": sohbeti açar ve girişe maddeyi ön-doldurur. */
+function maddeSor(id){
+  const m = maddeBul(id);
+  if(!m) return;
+  sohbetAcik = true;
+  sohbetCiz();
+  const alan = document.getElementById("s-metin");
+  if(alan){
+    alan.value = (m.saat ? m.saat + " " : "") + m.baslik + " — ";
+    alan.focus();
+    if(typeof alan.setSelectionRange === "function")
+      try{ alan.setSelectionRange(alan.value.length, alan.value.length); }catch(e){}
+  }
+  if($sohbet && typeof $sohbet.scrollIntoView === "function")
+    try{ $sohbet.scrollIntoView({ block:"start", behavior:"smooth" }); }catch(e){}
 }
 
 /* ===============================================================
@@ -2664,6 +2710,7 @@ function planCiz(){
         ? '<div class="p-not">' +
             '<input type="text" data-not="' + m.id + '" value="' + kacir(m.not || "") + '" ' +
               'placeholder="not: nasıl geçti?" autocomplete="off">' +
+            '<button class="dg dg-sonuk" data-sor="' + m.id + '">sor</button>' +
             '<button class="dg dg-sonuk" data-sil="' + m.id + '">sil</button>' +
           '</div>'
         : (m.not ? '<span class="p-notozet">' + kacir(m.not) + '</span>' : "")) +
@@ -2725,6 +2772,7 @@ $plan.addEventListener("click", e => {
   if(!d) return;
   if(d.dataset.yap) maddeIsaretle(d.dataset.yap);
   else if(d.dataset.sil) maddeSil(d.dataset.sil);
+  else if(d.dataset.sor) maddeSor(d.dataset.sor);
   else if(d.dataset.ac){
     acikNot = (acikNot === d.dataset.ac) ? null : d.dataset.ac;
     planCiz();
@@ -3624,7 +3672,7 @@ $ogun.addEventListener("keydown", e => {
 const GORUNUM = {
   bugun:    ["b-gunluk", "b-namaz", "b-kaza", "b-su", "b-ogun"],
   seri:     ["b-istatistik"],
-  plan:     ["b-plan", "b-etkinlik", "b-degerlendirme", "b-sohbet"],
+  plan:     ["b-plan", "b-sohbet", "b-etkinlik", "b-degerlendirme"],
   beslenme: ["b-beslenme"],
   ayarlar:  ["b-alarm", "b-ayar", "b-ayarlar"]
 };

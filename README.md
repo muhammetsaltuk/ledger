@@ -149,6 +149,19 @@ basınca** önce "dün nasıl geçti? (bir cümle)" kutusu çıkar; cümle hem d
 kaydına yazılır hem de isteğe gider. "Bu adımı geç" ile atlanabilir; her iki
 durumda o gün tekrar sorulmaz.
 
+### Planı konuş (§6, §10)
+
+Plan sekmesi bir etkileşim merkezi. Sohbet (`api/chat` — planı ve profili
+düzenler) plan maddelerinin hemen altında, **açık** duruyor ("Planı konuş"),
+kapalı bir düğmenin arkasında değil. Üç giriş:
+
+- **Serbest metin:** "Sabahları koşamıyorum, akşama alalım." → plan güncellenir.
+- **Hızlı çipler:** "yorgunum", "koda +1 saat", "koşu akşama", "erken yat" —
+  tek dokunuşla `api/chat`'e gider.
+- **Madde bazlı:** bir plan maddesine dokun → not alanının yanındaki **"sor"**
+  düğmesi sohbet girişine `08:20 Ev sporu — ` diye ön-doldurur, o maddeyi
+  konuşmaya başlarsın.
+
 ## Model (§12)
 
 Arka planda **Google Gemini**, ücretsiz katman. `api/_ortak.js` bütün AI
@@ -362,7 +375,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (157 test) ve `node test/api.js` (56 test) ile fiilen
+`node test/hepsi.js` (159 test) ve `node test/api.js` (56 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
 gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
@@ -379,6 +392,9 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §6 plan düne uyar: "Dün" bölümü + gün sonu değerlendirmesi isteme girer | ✓ test |
 | §6 "plan üret" değerlendirme yoksa önce "dün nasıl geçti?" sorar | ✓ test |
 | "Koşuyu akşama al" hem planı hem profili değiştirir | ✓ test |
+| §6/§10 "Planı konuş" paneli plan sekmesinde açık başlar | ✓ test |
+| §6 hızlı çip doğrudan api/chat'e gider | ✓ test |
+| §6 plan maddesinden "sor" sohbet girişini ön-doldurur | ✓ test |
 | "12 Eylül saat 14'te berber" doğru çevrilir | ✓ test |
 | Vurgu rengi ikindide turuncuya döner | ✓ test |
 | `GEMINI_API_KEY` yokken uygulama çalışır | ✓ test |
