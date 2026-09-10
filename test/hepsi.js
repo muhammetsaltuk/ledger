@@ -1896,6 +1896,20 @@ await dene("program yoksa ve mutfak boşsa market bölümü çizilmez", async ()
   icermez(u.html("b-beslenme"), "Market listesi");
 });
 
+await dene("eski program (malzemesiz): yeniden üret uyarısı çıkar", async () => {
+  const ESKI = { gunlukKalori:3000, makro:{protein:130,karb:400,yag:80},
+    ogunler:[{ ad:"Kahvaltı", yemekler:[
+      { ad:"Menemen", miktar:"1 tabak", kalori:320, tarif:"Kavur." } ] }] };   // malzemeler yok
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, ayar:{}, beslenme:{ profil:BP, program:ESKI } }) } });
+  await u.bekle();
+  esit(u.ic.programMalzemeliMi(), false);
+  u.tikla({ dataset:{ tarif:"0-0" } });
+  const h = u.html("b-beslenme");
+  icerir(h, "malzeme listesi içermiyor");        // market bölümü uyarısı
+  icerir(h, "Bu tarif eski");                     // tarif kartı uyarısı
+});
+
 bolum("§15 — öğün günlüğü ve kalori halkası");
 
 await dene("b-ogun: profil ve kayıt yoksa gizli, profil varsa görünür", async () => {

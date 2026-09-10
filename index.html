@@ -3212,6 +3212,11 @@ function programMalzemeleri(){
   return liste;
 }
 function alinacaklar(){ return programMalzemeleri().filter(m => !mutfaktaVar(m)); }
+function programMalzemeliMi(){
+  const pr = UYG.veri.beslenme.program;
+  return !!pr && (pr.ogunler || []).some(o =>
+    (o.yemekler || []).some(y => (y.malzemeler || []).length));
+}
 function mutfagaAl(ad){
   const a = String(ad || "").trim().slice(0, 60);
   if(!a || mutfaktaVar(a)) return false;
@@ -3352,6 +3357,8 @@ function malzemeVeTarif(y){
     govde += '<div class="bes-malz">' + satirlar + '</div>' +
       '<p class="sonuk mini malz-ipuc">İşaretle: mutfağında var. İşaretsizler market listesine düşer.</p>';
   }
+  else govde += '<p class="sonuk mini malz-ipuc">Bu tarif eski; malzeme listesi yok. ' +
+    'Programı yeniden üretince malzemeler gelir.</p>';
   if(y.tarif) govde += '<p class="bes-tarif">' + kacir(y.tarif) + '</p>';
   return govde;
 }
@@ -3369,8 +3376,11 @@ function marketBolum(){
 
   const ag = alinacak.length
     ? alinacak.map(ad => satir(ad, false)).join("")
-    : '<p class="sonuk mini" style="margin:2px 0 0">Program malzemelerinin hepsi işaretli. ' +
-      'Bir tarifte işareti kaldırdığın malzeme buraya gelir.</p>';
+    : (programMalzemeliMi() || !UYG.veri.beslenme.program
+        ? '<p class="sonuk mini" style="margin:2px 0 0">Program malzemelerinin hepsi işaretli. ' +
+          'Bir tarifte işareti kaldırdığın malzeme buraya gelir.</p>'
+        : '<p class="sonuk mini" style="margin:2px 0 0">Eldeki program malzeme listesi içermiyor. ' +
+          'Yukarıdan “programı yeniden üret” de; yeni programlar malzemeleriyle gelir.</p>');
 
   const dg = dolap.length
     ? dolap.map(ad => satir(ad, true)).join("")
