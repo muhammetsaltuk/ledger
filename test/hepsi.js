@@ -1823,7 +1823,7 @@ await dene("tarifVideosu: api/tarif'ten gelen linki yemeğe önbellekler", async
        "https://www.youtube.com/watch?v=abcdefghijk");
 });
 
-bolum("§15 — market (mutfak dolabı + alınacaklar listesi)");
+bolum("§15 — market (tarif malzemeleri onay kutusu + alışveriş listesi)");
 
 const MPROG = { gunlukKalori:3000, makro:{protein:130,karb:400,yag:80},
   ogunler:[{ ad:"Kahvaltı", yemekler:[
@@ -1835,74 +1835,65 @@ function marketliDepo(ek){
     beslenme: Object.assign({ profil:BP, program:MPROG }, ek || {}) });
 }
 
-await dene("tarif açılınca malzemeler listelenir; mutfaktakiler işaretli", async () => {
+await dene("tarif açılınca malzemeler onay kutusu olur; mutfaktaki işaretli gelir", async () => {
   const u = kur({ simdi:"2026-09-10T09:00:00",
     depo:{ "ledger/v1": marketliDepo({ market:["Yumurta"] }) } });
   await u.bekle();
   u.tikla({ dataset:{ tarif:"0-0" } });
   const h = u.html("b-beslenme");
-  icerir(h, "domates");
-  icerir(h, "listeye ekle");
-  icerir(h, "mutfakta");                       // yumurta zaten dolapta
+  icerir(h, 'type="checkbox" data-malz="domates"');
+  icerir(h, 'data-malz="yumurta" checked');    // mutfakta → işaretli
+  icermez(h, "listeye ekle");                   // elle giriş / buton yok
 });
 
-await dene("malzeme 'listeye ekle': market listesine düşer, çift eklenmez", async () => {
+await dene("malzeme kutusu işaretlenince mutfağa, kaldırılınca listeye döner", async () => {
   const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": marketliDepo() } });
   await u.bekle();
   u.tikla({ dataset:{ tarif:"0-0" } });
-  u.tikla({ dataset:{ malzEkle:"domates" } });
-  u.tikla({ dataset:{ malzEkle:"domates" } });
-  esit(u.ic.UYG.veri.beslenme.marketListesi.length, 1);
-  esit(u.ic.UYG.veri.beslenme.marketListesi[0], "domates");
-  icerir(u.html("b-beslenme"), "listede");
-  esit(JSON.parse(u.durum.depo.get("ledger/v1")).beslenme.marketListesi[0], "domates");
+  u.degisim({ dataset:{ malz:"domates" }, checked:true });
+  esit(u.ic.mutfaktaVar("domates"), true);
+  esit(u.ic.alinacaklar().indexOf("domates"), -1, "işaretli malzeme alışverişte olmamalı");
+  esit(JSON.parse(u.durum.depo.get("ledger/v1")).beslenme.market.join(","), "domates");
+  u.degisim({ dataset:{ malz:"Domates" }, checked:false });   // harf duyarsız eşleşme
+  esit(u.ic.mutfaktaVar("domates"), false);
+  esit(u.ic.alinacaklar().indexOf("domates") !== -1, true);
 });
 
-await dene("malzHepsiEkle: eksik malzemelerin hepsini listeye atar", async () => {
+await dene("alışveriş listesi = programdaki işaretsiz malzemeler (tekilleştirilmiş)", async () => {
   const u = kur({ simdi:"2026-09-10T09:00:00",
     depo:{ "ledger/v1": marketliDepo({ market:["zeytinyağı"] }) } });
   await u.bekle();
-  u.tikla({ dataset:{ tarif:"0-0" } });
-  u.tikla({ dataset:{ malzHepsi:"0-0" } });
-  esit(u.ic.UYG.veri.beslenme.marketListesi.sort().join(","),
-       "domates,yeşil biber,yumurta");         // zeytinyağı dolapta olduğu için hariç
+  esit(u.ic.alinacaklar().join(","), "yumurta,domates,yeşil biber");
+  const h = u.html("b-beslenme");
+  icerir(h, "Market listesi");
+  icerir(h, 'data-mkt="yumurta"');
+  icerir(h, "Mutfağımda");
+  icerir(h, 'data-mkt="zeytinyağı" checked');
 });
 
-await dene("market listesi 'aldım': üründen mutfağa taşır", async () => {
-  const u = kur({ simdi:"2026-09-10T09:00:00",
-    depo:{ "ledger/v1": marketliDepo({ marketListesi:["süt","yulaf"] }) } });
+await dene("Market listesinde işaretlemek ürünü mutfağa taşır", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": marketliDepo() } });
   await u.bekle();
-  u.tikla({ dataset:{ mktAldim:"0" } });
-  esit(u.ic.UYG.veri.beslenme.market.indexOf("süt") !== -1, true);
-  esit(u.ic.UYG.veri.beslenme.marketListesi.join(","), "yulaf");
+  u.degisim({ dataset:{ mkt:"yumurta" }, checked:true });
+  esit(u.ic.mutfaktaVar("yumurta"), true);
+  esit(u.ic.alinacaklar().join(","), "domates,yeşil biber,zeytinyağı");
 });
 
-await dene("market listesi 'sil' ve mutfak 'çıkar' öğeyi kaldırır", async () => {
+await dene("Mutfağımda işareti kaldırmak ürünü alışveriş listesine geri koyar", async () => {
   const u = kur({ simdi:"2026-09-10T09:00:00",
-    depo:{ "ledger/v1": marketliDepo({ marketListesi:["süt"], market:["un"] }) } });
+    depo:{ "ledger/v1": marketliDepo({ market:["yumurta","domates","yeşil biber","zeytinyağı"] }) } });
   await u.bekle();
-  u.tikla({ dataset:{ mktSil:"0" } });
-  u.tikla({ dataset:{ dolapSil:"0" } });
-  esit(u.ic.UYG.veri.beslenme.marketListesi.length, 0);
-  esit(u.ic.UYG.veri.beslenme.market.length, 0);
+  esit(u.ic.alinacaklar().length, 0);
+  u.degisim({ dataset:{ mkt:"domates" }, checked:false });
+  esit(u.ic.UYG.veri.beslenme.market.indexOf("domates"), -1);
+  esit(u.ic.alinacaklar().join(","), "domates");
 });
 
-await dene("mutfağa elle eklenen malzeme listeden düşer (büyük/küçük harf)", async () => {
+await dene("program yoksa ve mutfak boşsa market bölümü çizilmez", async () => {
   const u = kur({ simdi:"2026-09-10T09:00:00",
-    depo:{ "ledger/v1": marketliDepo({ marketListesi:["Domates"] }) } });
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, ayar:{}, beslenme:{ profil:BP } }) } });
   await u.bekle();
-  u.el("dolap-giris").value = "domates";
-  u.tikla({ id:"dolap-ekle" });
-  esit(u.ic.UYG.veri.beslenme.market.join(","), "domates");
-  esit(u.ic.UYG.veri.beslenme.marketListesi.length, 0, "aynı ürün listede kalmamalı");
-});
-
-await dene("mutfakta olan malzeme market listesine eklenmez", async () => {
-  const u = kur({ simdi:"2026-09-10T09:00:00",
-    depo:{ "ledger/v1": marketliDepo({ market:["domates"] }) } });
-  await u.bekle();
-  esit(u.ic.marketListeEkle("Domates"), false);
-  esit(u.ic.UYG.veri.beslenme.marketListesi.length, 0);
+  icermez(u.html("b-beslenme"), "Market listesi");
 });
 
 bolum("§15 — öğün günlüğü ve kalori halkası");

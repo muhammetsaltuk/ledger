@@ -240,7 +240,7 @@ function kur(se = {}){
     "aktifAralik","siradakiAralik","vakitGetir","namazKur","namazCiz","namazIsaretle",
     "gunKaydi","sureMetni","konumuKullan","konumSor","kaydet","yukle","VAKITLER",
     "borcTara","kazaCiz","toplamBorc","islenmisMi","borcDegistir","vakitleriHazirla",
-    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","planUreteBasla","dunUyumSorulsun","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR","etkinlikCozumle","etkinlikKaydet","etkinlikSil","etkinlikCiz","tarihYaz","degerlendir","degerCiz","profilGuncelle","profilZamaniMi","ayarCiz","modelIste","sohbetGonder","sohbetCiz","sohbetYaz","sohbetAc","maddeSor","HIZLI_SOHBET","SOHBET_SINIR","intentAdresi","kisayolAdresi","kisayolAdi","anaEkrandaMi","alarmAdresi","alarmBilgisi","iosMu","platform","kalkisSaati","yarininImsagi","alarmKur","alarmKuruldu","alarmCiz","icsUret","bildirimTara","bildirimGonder","bildirimDurumu","topicUret","cronAdresi","ayarlarCiz","SU_ARALIK","CIKISA_KALA","gunTamMi","gununNamazSayisi","seriHesapla","enUzunSeri","gunlukCiz","istatistikCiz","gorunum","GORUNUM","halkaSVG","kaloriHedefi","guncelHedef","sonKilo","tartimEkle","kiloTrend","gununBeslenme","AKTIVITE","VARSAYILAN_HEDEF","beslenmeCiz","profilKaydet","programUret","beslenmeHakki","yemekBegenmedim","tarifVideosu","tartimGirisGonder","PROGRAM_SINIR","sevmedigimEkle","ogunCiz","ogunEkle","ogunSil","ogunGirisGonder","fotoDegisti","fotoOnayla","gununOgunleri","marketBolum","malzemeVeTarif","malzNorm","mutfaktaVar","listedeVar","marketListeEkle","mutfagaEkle","malzHepsiEkle"
+    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","planUreteBasla","dunUyumSorulsun","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR","etkinlikCozumle","etkinlikKaydet","etkinlikSil","etkinlikCiz","tarihYaz","degerlendir","degerCiz","profilGuncelle","profilZamaniMi","ayarCiz","modelIste","sohbetGonder","sohbetCiz","sohbetYaz","sohbetAc","maddeSor","HIZLI_SOHBET","SOHBET_SINIR","intentAdresi","kisayolAdresi","kisayolAdi","anaEkrandaMi","alarmAdresi","alarmBilgisi","iosMu","platform","kalkisSaati","yarininImsagi","alarmKur","alarmKuruldu","alarmCiz","icsUret","bildirimTara","bildirimGonder","bildirimDurumu","topicUret","cronAdresi","ayarlarCiz","SU_ARALIK","CIKISA_KALA","gunTamMi","gununNamazSayisi","seriHesapla","enUzunSeri","gunlukCiz","istatistikCiz","gorunum","GORUNUM","halkaSVG","kaloriHedefi","guncelHedef","sonKilo","tartimEkle","kiloTrend","gununBeslenme","AKTIVITE","VARSAYILAN_HEDEF","beslenmeCiz","profilKaydet","programUret","beslenmeHakki","yemekBegenmedim","tarifVideosu","tartimGirisGonder","PROGRAM_SINIR","sevmedigimEkle","ogunCiz","ogunEkle","ogunSil","ogunGirisGonder","fotoDegisti","fotoOnayla","gununOgunleri","marketBolum","malzemeVeTarif","malzNorm","mutfaktaVar","programMalzemeleri","alinacaklar","mutfagaAl","mutfaktanCikar","malzIsaretle"
   ].join(",") + " };", ctx, { filename:"index.html<script>" });
 
   return {
@@ -277,6 +277,14 @@ function kur(se = {}){
       for(const e of belge._elemanlar.values())
         for(const f of (e.dinleyiciler.click || [])){ f({ target: btn, preventDefault(){} }); calisti = true; }
       if(!calisti) throw new Error("click dinleyicisi yok");
+    },
+    /** Bir onay kutusunun değişimini taklit eder. spec: {dataset:{...}, checked}. */
+    degisim(spec){
+      const t = Object.assign({ id: "", dataset: {}, checked: false, closest(){ return null; } }, spec || {});
+      let calisti = false;
+      for(const e of belge._elemanlar.values())
+        for(const f of (e.dinleyiciler.change || [])){ f({ target: t }); calisti = true; }
+      if(!calisti) throw new Error("change dinleyicisi yok");
     },
     /** Bir id'ye ait sahte elemanı (varsa) döndürür — .value yazmak için. */
     el(id){ return belge._elemanlar.get(id) || null; },
