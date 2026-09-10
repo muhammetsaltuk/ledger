@@ -1057,11 +1057,31 @@ await dene("sohbet başarısız olursa kullanıcı görür, mesajı kaybolmaz", 
   esit(u.veri().sohbet.length, 1, "kullanıcının mesajı kayıtta kalmalı");
 });
 
-await dene("sohbet paneli kapalı başlar", async () => {
+await dene("planı konuş paneli açık başlar: giriş + hızlı çipler görünür", async () => {
   const u = await ac({ simdi:"2026-09-06T14:00:00", api:{ plan:SAHTE_PLAN } });
   const h = u.html("b-sohbet");
-  icerir(h, 'id="s-ac"');
-  icermez(h, 'id="s-metin"');
+  icerir(h, "Planı konuş");
+  icerir(h, 'id="s-metin"');
+  icerir(h, 'data-cip="Koşuyu akşama al."');       // tek dokunuşluk hazır istek
+  icermez(h, 'id="s-ac"');                          // kapalı düğme yok, açık
+});
+
+await dene("hızlı çip doğrudan api/chat'e gider", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{
+    plan:SAHTE_PLAN, chat:{ cevap:"Koşuyu 19:30'a aldım." } } });
+  u.ic.sohbetGonder("Koşuyu akşama al.");
+  await bekleCok(u, 10);
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "chat").pop();
+  esit(c.govde.metin, "Koşuyu akşama al.");
+  dogru(u.veri().sohbet.some(m => m.metin === "Koşuyu akşama al."), "mesaj geçmişe yazıldı");
+});
+
+await dene("plan maddesinden 'sor': sohbet girişine madde ön-doldurulur", async () => {
+  const u = await ac({ simdi:"2026-09-06T14:00:00", api:{ plan:SAHTE_PLAN } });
+  const m = u.veri().gunler["2026-09-06"].maddeler.find(x => x.baslik.indexOf("Ev sporu") !== -1);
+  dogru(m, "ev sporu maddesi var");
+  u.ic.maddeSor(m.id);
+  esit(u.ctx.document.getElementById("s-metin").value, "08:20 Ev sporu — ");
 });
 
 /* ---------------------------------------------------------------
