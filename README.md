@@ -151,13 +151,15 @@ O yüzden sağlayıcı değil, dayanıklılık sertleştirildi.
 ### Model zinciri
 
 ```
-MODELLER = ["gemini-3.6-flash", "gemini-2.5-flash"]
+MODELLER = ["gemini-2.5-flash", "gemini-3.6-flash"]
 ```
 
-`gemini-2.0-flash` bir kez emekliye ayrılıp API'yi 404'e düşürmüştü. Artık
-birincil model 404 dönerse **anında** ikincile geçilir (retry yok); ikisi de
-aynı istek şeklini destekliyor (`responseSchema`, `systemInstruction`, görsel
-parça).
+Birincil **`gemini-2.5-flash`**: ücretsiz katmanda kararlı, vision +
+yapılandırılmış çıktı var. `gemini-3.6-flash` yedekte (`3.6` üretimde
+güvenilmez göründü; `2.0` ise bir kez emekliye ayrılıp API'yi 404'e
+düşürmüştü). Birincil model 404 dönerse **anında** sonrakine geçilir (retry
+yok); hepsi aynı istek şeklini destekliyor (`responseSchema`,
+`systemInstruction`, görsel parça).
 
 ### Geçici hatada yeniden deneme
 

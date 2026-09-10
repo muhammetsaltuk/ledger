@@ -143,13 +143,13 @@ await dene("sistem promptu §12'deki kurallarla gider", async () => {
   icerir(sis, "suçlayıcı veya utandırıcı");
 });
 
-await dene("yapılandırılmış çıktı zorunlu, model gemini-3.6-flash", async () => {
+await dene("yapılandırılmış çıktı zorunlu, birincil model gemini-2.5-flash", async () => {
   const kayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
   await plan(istek(ORNEK_GOVDE), cevap());
   const g = kayit.istekler[0].govde;
   esit(g.generationConfig.responseMimeType, "application/json");
   dogru(g.generationConfig.responseSchema, "responseSchema gitmeli");
-  icerir(kayit.istekler[0].url, "gemini-3.6-flash:generateContent");
+  icerir(kayit.istekler[0].url, "gemini-2.5-flash:generateContent");
   icerir(kayit.istekler[0].url, "key=test-anahtari");
 });
 
@@ -235,7 +235,7 @@ await dene("503 sonra başarı: kendini toparlar, kullanıcı hata görmez", asy
   await plan(istek(ORNEK_GOVDE), c);
   esit(c.kod, 200, "ikinci denemede başarılı");
   esit(kayit.istekler.length, 2);
-  esit(cagriModelleri(kayit)[1], "gemini-3.6-flash", "aynı modelde yeniden denendi");
+  esit(cagriModelleri(kayit)[1], "gemini-2.5-flash", "aynı modelde yeniden denendi");
 });
 
 await dene("ağ/timeout hatası da geçici sayılır, yeniden denenir", async () => {
@@ -248,14 +248,14 @@ await dene("ağ/timeout hatası da geçici sayılır, yeniden denenir", async ()
 
 await dene("birincil model 404 (emekli) → retry yok, ikincil modele düşer", async () => {
   const kayit = geminiTaklit((g, n) => n === 1
-    ? { durum:404, metin:"models/gemini-3.6-flash is not found" }
+    ? { durum:404, metin:"models/gemini-2.5-flash is not found" }
     : { metin: PLAN_CEVABI });
   const c = cevap();
   await plan(istek(ORNEK_GOVDE), c);
   esit(c.kod, 200);
   esit(kayit.istekler.length, 2, "404'te aynı modelde tekrar denenmez");
-  esit(cagriModelleri(kayit)[0], "gemini-3.6-flash");
-  esit(cagriModelleri(kayit)[1], "gemini-2.5-flash", "ikincil modele geçildi");
+  esit(cagriModelleri(kayit)[0], "gemini-2.5-flash");
+  esit(cagriModelleri(kayit)[1], "gemini-3.6-flash", "ikincil modele geçildi");
 });
 
 await dene("birincil model geçici hatada tükenince ikincile geçilir", async () => {
@@ -264,8 +264,8 @@ await dene("birincil model geçici hatada tükenince ikincile geçilir", async (
   await plan(istek(ORNEK_GOVDE), c);
   esit(c.kod, 200);
   esit(kayit.istekler.length, 4, "birincil 3 deneme + ikincil 1");
-  esit(cagriModelleri(kayit).slice(0,3).join(","), "gemini-3.6-flash,gemini-3.6-flash,gemini-3.6-flash");
-  esit(cagriModelleri(kayit)[3], "gemini-2.5-flash");
+  esit(cagriModelleri(kayit).slice(0,3).join(","), "gemini-2.5-flash,gemini-2.5-flash,gemini-2.5-flash");
+  esit(cagriModelleri(kayit)[3], "gemini-3.6-flash");
 });
 
 await dene("her iki model de 503: zincir tükenince 503 döner, kota ile karışmaz", async () => {

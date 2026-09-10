@@ -5,11 +5,12 @@
    sunucu tarafında okunur. */
 
 /* §12 — model zinciri. Birincil model 404 dönerse (emekliye ayrıldıysa) ya da
-   geçici hata denemeleri tükenirse ikincile düşülür. İkisi de aynı istek
-   şeklini destekliyor: responseSchema, systemInstruction, görsel parça.
-   "gemini-2.0-flash" bir kez emekliye ayrılıp uygulamayı durdurmuştu; zincir
-   bunun tekrarını sessizce toparlar. */
-const MODELLER = ["gemini-3.6-flash", "gemini-2.5-flash"];
+   geçici hata denemeleri tükenirse sonrakine düşülür. Hepsi aynı istek şeklini
+   destekliyor: responseSchema, systemInstruction, görsel parça.
+   Birincil = gemini-2.5-flash: kararlı, ücretsiz katmanda, vision + yapılandırılmış
+   çıktı var. gemini-3.6-flash yedekte — "gemini-2.0-flash" bir kez emekliye
+   ayrılıp uygulamayı durdurmuştu, zincir bunun tekrarını sessizce toparlar. */
+const MODELLER = ["gemini-2.5-flash", "gemini-3.6-flash"];
 const TABAN = "https://generativelanguage.googleapis.com/v1beta/models/";
 
 /* --- Sertleştirme (§12) ------------------------------------------
