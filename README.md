@@ -122,6 +122,7 @@ api/parse.js    Gemini — serbest metni etkinliğe çevirir
 api/beslenme.js Gemini — §15 program / alternatif yemek / fotoğraftan kalori
 api/tarif.js    §15 — bir yemek için çalışan YouTube tarif linki
 api/push.js     ntfy'ye bildirim gönderir
+api/veri.js     §16 — Supabase senkronu (Gemini'ye bağlı değil)
 ```
 
 ## Canlı doğrulama
@@ -297,6 +298,49 @@ gösterilir — hedef hızıyla karşılaştırmak için.
 +0.3 kg/hafta" gibi kuru olgu); veri telefonda; anahtarsız da temel işlevler
 çalışır; sunucu durumsuz; kota istemcide.
 
+## §16 — Bulut senkronu (Supabase, giriş ekranı yok)
+
+Tüm veri (`UYG.veri` — namaz, plan, su, beslenme/market, ayarlar, tek blob)
+varsayılan olarak yalnız `localStorage`'da durur: tarayıcı verisi silinirse
+kayıt da gider. Ayarlar → Veri'de **"buluta senkronu aç"** ile isteğe bağlı bir
+yedek açılır — hesap, şifre, giriş ekranı yok.
+
+**Nasıl çalışır.** İstemci `crypto.getRandomValues` ile 48 karakterlik rastgele
+bir anahtar üretir, yalnız o tarayıcının `localStorage`'ında saklar. İlk
+`api/veri` çağrısında (`x-ledger-anahtar` başlığıyla) sunucu bu anahtarın
+SHA-256 hash'ini Supabase'teki tek satıra yazar — **ilk yazan sahiplenir**
+(bootstrap kilidi). Sonraki her istek aynı hash'i taşımak zorunda; uymayan
+istek 401 alır. Anahtarın kendisi sunucuda hiç saklanmaz, yalnız hash'i;
+Supabase'e de yalnız `SUPABASE_SERVICE_ROLE_KEY` ile, sunucudan erişilir — bu
+anahtar hiçbir koşulda istemciye gitmez. `veri` tablosunda RLS açık ve hiç
+policy yok, yani `anon`/`authenticated` rolleri için varsayılan tam ret;
+yalnız service_role (RLS'i atlar) okuyup yazabilir.
+
+**Akış.** `kaydet()` önce `localStorage`'a yazar (hız + çevrimdışı çalışsın
+diye — Service Worker zaten çevrimdışı destekliyor), sonra 1.5 sn debounce'lu
+olarak buluta da gönderir. Açılışta yerel veri hemen gösterilir; arka planda
+`senkronYukle()` buluttaki `guncellendi` zaman damgası yerelden yeniyse
+(`ledger/senkron-zaman`) yereli buluttakiyle değiştirip yeniden çizer — normal
+kullanımda hep yerel kazanır, yalnız "tarayıcı verisi silinip kurtarma
+linkiyle dönülmüş" durumunda buluttaki devreye girer.
+
+**Kurtarma linki — tek gerçek kurtarma yolu.** Tarayıcı verisi silinince
+anahtar da localStorage'dan gider; başka hiçbir otomatik yol onu geri getiremez
+(login yok). Ayarlar'daki **"kurtarma linkini kopyala"** düğmesi
+`https://.../?anahtar=<anahtar>` linkini panoya kopyalar. Bu linki not
+uygulamana ya da parola yöneticine kaydet — tarayıcı verisi silinirse o linki
+açman yeter: `?anahtar=` işlenip yerele yazılır, adresten temizlenir
+(`history.replaceState`), sonra `senkronYukle()` buluttaki veriyi geri getirir.
+İkinci bir cihazda da aynı hesaba bağlanmak için o cihazda da bu linki aç —
+"buluta senkronu aç"a tekrar basma, yeni bir anahtar üretip bootstrap kilidine
+takılırsın (401).
+
+**Tablo:** `public.veri(id text pk default 'tek', icerik jsonb, anahtar_ozet
+text, guncellendi timestamptz)` — Supabase projesi `ledger`
+(`xkomkawyqekhdxjngrws`, `us-east-1`, ücretsiz katman). Test:
+`test/api.js` içinde `api/veri`'yi Supabase'i taklit ederek (`test/hepsi.js`
+içinde de istemci tarafını) çalıştırıyor, gerçek isteğe gerek yok.
+
 ## Yayına alma
 
 **Canlı:** <https://ledger-muhammetsaltuks-projects.vercel.app>
@@ -356,6 +400,26 @@ API v3" etkinleştir → "API key" ile alınır; ücretsiz katman günde 100 ara
 Tanımlı değilse `api/tarif` yine çalışır: `youtube.com/results` sayfasından ilk
 videoyu çeker, o da olmazsa arama linkine düşer.
 
+### İsteğe bağlı — SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (§16)
+
+Bulut senkronu için iki değişken gerekir; ikisi de gizli değil ama
+`SUPABASE_SERVICE_ROLE_KEY` sunucu-yalnız bir sır, kodda/git'te yer almamalı:
+
+```bash
+npx vercel env add SUPABASE_URL production
+# değer: https://xkomkawyqekhdxjngrws.supabase.co
+
+npx vercel env add SUPABASE_SERVICE_ROLE_KEY production
+# değer: Supabase Dashboard → Project Settings → API → service_role secret
+# https://supabase.com/dashboard/project/xkomkawyqekhdxjngrws/settings/api-keys
+
+npx vercel deploy --prod        # veya main'e boş bir commit push et
+```
+
+Tanımlı değilse `api/veri` 503 döner; Ayarlar → Veri'deki "buluta senkronu aç"
+düğmesi görünür kalır ama senkron sessizce başarısız olur — geri kalan her şey
+etkilenmeden çalışır.
+
 ### İsteğe bağlı — ntfy (§8.2)
 
 1. Telefona [ntfy](https://ntfy.sh) uygulamasını kur.
@@ -390,7 +454,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (166 test) ve `node test/api.js` (58 test) ile fiilen
+`node test/hepsi.js` (178 test) ve `node test/api.js` (68 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
 gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
@@ -431,6 +495,11 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §15 tarif malzemeleri onay kutusu; işaretsizler türetilmiş alışveriş listesi | ✓ test |
 | §15 Market listesi ⇄ Mutfağımda kutuları aynı `beslenme.market` durumunu paylaşır | ✓ test |
 | §15 malzemesiz eski program: tarif ve Market listesi "yeniden üret" uyarır | ✓ test |
+| §16 api/veri: ilk yazan anahtarı sahiplenir (bootstrap); başka anahtar 401 | ✓ test |
+| §16 senkron anahtarı yoksa buluta zamanlayıcı kurulmaz; varsa kurulur | ✓ test |
+| §16 senkronGonder x-ledger-anahtar başlığıyla POST eder, guncellendi'yi saklar | ✓ test |
+| §16 senkronYukle: bulut yereldan yeniyse yereli değiştirir, eşit/eskiyse dokunmaz | ✓ test |
+| §16 ?anahtar=... URL'si localStorage'a yazılır; kurtarma linki origin+anahtar | ✓ test |
 | §15 program/alternatif istemi `malzemeler` ister, dizi olarak temizlenir | ✓ test |
 | §15 api/tarif: anahtar varsa Data API, yoksa kazıma, sonra arama linki | ✓ test |
 | §15 fotoğraf: görsel parça API'ye gider; güven geçersizse "dusuk" | ✓ test |
