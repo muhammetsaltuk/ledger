@@ -1923,14 +1923,16 @@ await dene("eski program (malzemesiz): yeniden üret uyarısı çıkar", async (
 
 bolum("§15 — öğün günlüğü ve kalori halkası");
 
-await dene("b-ogun: profil ve kayıt yoksa gizli, profil varsa görünür", async () => {
+await dene("b-ogun: Beslenme sekmesinde; Bugün'de (doğru sekme değilken) gizli", async () => {
   const bos = kur({ simdi:"2026-09-10T09:00:00" });
   await bos.bekle();
   esit(bos.ctx.document.getElementById("b-ogun").hidden, true);
 
   const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": JSON.stringify(PROFILLI) } });
   await u.bekle();
-  esit(u.ctx.document.getElementById("b-ogun").hidden, false);
+  esit(u.ctx.document.getElementById("b-ogun").hidden, true, "Bugün sekmesindeyken gizli olmalı");
+  u.ic.gorunum("beslenme");
+  esit(u.ctx.document.getElementById("b-ogun").hidden, false, "Beslenme sekmesinde, profil varken görünmeli");
   icerir(u.html("b-ogun"), "0 / 3029 kcal");
 });
 

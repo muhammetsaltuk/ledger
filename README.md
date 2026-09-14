@@ -225,12 +225,14 @@ Değişen kararlar:
   ardışık *tam gün* sayısı (beş vaktin hepsi işaretli) ve üç halka: namaz, su,
   plan. Seri bugün bitmediyse dünden sayılır. Tonu olgu: "bugün tamam",
   "bugünün N vakti kaldı" — kutlama, "seri bozuldu", emoji yok (§14 hâlâ koruyor).
-- **Alt tab bar.** Tek sayfa beş görünüme bölündü: **Bugün** (özet + namaz +
-  kaza + su + öğünler), **Seri** (istatistik), **Plan** (plan + etkinlik +
-  sohbet + gün sonu değerlendirmesi + **yarının alarmları** — akşam yapılan
-  işler bir arada, günü kapatıp yarına hazırlanma sırasıyla), **Beslenme**
-  (profil + program + market + tartım), **Ayarlar** (yalnız kalıcı
-  yapılandırma: profil metni + bildirim/ntfy/senkron). Seçilen sekme saklanır.
+- **Alt tab bar.** Tek sayfa beş görünüme bölündü: **Bugün** (özet halkaları +
+  namaz + kaza + su — kalori halkası da burada özet olarak kalıyor), **Seri**
+  (istatistik), **Plan** (plan + etkinlik + sohbet + gün sonu değerlendirmesi +
+  **yarının alarmları** — akşam yapılan işler bir arada, günü kapatıp yarına
+  hazırlanma sırasıyla), **Beslenme** (**öğün günlüğü** + profil + program +
+  market + tartım — beslenmeyle ilgili her şey tek yerde), **Ayarlar** (yalnız
+  kalıcı yapılandırma: profil metni + bildirim/ntfy/senkron). Seçilen sekme
+  saklanır.
 - **Seri / istatistik ekranı.** Ay takvimi (tam gün / kısmi / boş), son 7 günün
   başarı yüzdesi ve mini sütun grafiği, vakit bazında oranlar (her vakit kendi
   renginde), rozetler (7 gün kesintisiz, N tam gün, kaza kalmadı…). Hepsi mevcut
@@ -285,8 +287,9 @@ linkine düşer. Sonuç yemeğin içine önbelleklenir; ikinci açışta istek g
 Bu uç nokta `GEMINI_API_KEY`'e bağlı değil.
 
 **Öğün günlüğü.** "Bugün" görünümünde namaz/su/plan halkalarının yanına dördüncü
-bir **kalori halkası** (bugün yenen / hedef) ve **Öğünler** kartı gelir (profil
-varsa). Ne yediğini elle (ad + kcal) ya da **fotoğraftan** eklersin: istemci
+bir **kalori halkası** (bugün yenen / hedef) gelir; günlüğün kendisi —
+**Öğünler** kartı — Beslenme sekmesinde (profil varsa). Ne yediğini elle
+(ad + kcal) ya da **fotoğraftan** eklersin: istemci
 görseli canvas ile ~768 px'e küçültüp `mod:foto` ile gönderir (Gemini görsel
 destekli), yemek + kalori + makro tahmini döner, sen düzeltip onaylarsın.
 `localStorage` şişmesin diye tam çözünürlük saklanmaz — ~256 px'lik bir önizleme
@@ -501,6 +504,7 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §16 api/veri: ilk yazan anahtarı sahiplenir (bootstrap); başka anahtar 401 | ✓ test |
 | §16 SUPABASE_URL tanımsızsa gömülü proje adresine düşer; yalnız KEY zorunlu | ✓ test |
 | Yarının alarmları Plan sekmesinde (gün sonu sonrası), Ayarlar yalnız kalıcı ayar | ✓ test |
+| Öğün günlüğü Beslenme sekmesinde; Bugün'de yalnız kalori halkası özeti kalır | ✓ test |
 | §16 senkron anahtarı yoksa buluta zamanlayıcı kurulmaz; varsa kurulur | ✓ test |
 | §16 senkronGonder x-ledger-anahtar başlığıyla POST eder, guncellendi'yi saklar | ✓ test |
 | §16 senkronYukle: bulut yereldan yeniyse yereli değiştirir, eşit/eskiyse dokunmaz | ✓ test |

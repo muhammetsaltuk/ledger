@@ -739,7 +739,8 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   <!-- §3.3 Su -->
   <section id="b-su" class="bolum" aria-label="Su"></section>
 
-  <!-- §15 Bugün yenenler -->
+  <!-- §15 Bugün yenenler — Beslenme sekmesinde; kalori halkası (b-gunluk)
+       yine Bugün'de özet olarak kalıyor. -->
   <section id="b-ogun" class="bolum" aria-label="Öğünler" hidden></section>
 
   <!-- §3.4 Bugünün planı -->
@@ -3949,12 +3950,14 @@ $ogun.addEventListener("keydown", e => {
    Görünüm (alt tab bar): tek sayfa, bölümler sekmeye göre gösterilir.
    =============================================================== */
 const GORUNUM = {
-  bugun:    ["b-gunluk", "b-namaz", "b-kaza", "b-su", "b-ogun"],
+  bugun:    ["b-gunluk", "b-namaz", "b-kaza", "b-su"],
   seri:     ["b-istatistik"],
   // Yarının alarmları akşam yapılan bir iş — gün sonu değerlendirmesinin
   // hemen ardından, Plan'ın sonunda; Ayarlar yalnız kalıcı yapılandırma kalsın.
   plan:     ["b-plan", "b-sohbet", "b-etkinlik", "b-degerlendirme", "b-alarm"],
-  beslenme: ["b-beslenme"],
+  // Öğün günlüğü beslenmeyle ilgili; kalori halkası (b-gunluk) yine Bugün'de
+  // özet olarak kalıyor, yalnız günlüğün kendisi Beslenme'ye taşındı.
+  beslenme: ["b-ogun", "b-beslenme"],
   ayarlar:  ["b-ayar", "b-ayarlar"]
 };
 const TUM_BOLUMLER = Object.keys(GORUNUM).reduce((a, k) => a.concat(GORUNUM[k]), []);
@@ -3970,10 +3973,10 @@ function gorunum(sekme){
     if(el) el.hidden = GORUNUM[sekme].indexOf(id) === -1;
   }
   // İçeriğe göre kendini gizleyen bölümler yeniden karar versin.
-  if(sekme === "bugun"){   kazaCiz(); ogunCiz(); }
+  if(sekme === "bugun")    kazaCiz();
   if(sekme === "plan")     etkinlikCiz();
   if(sekme === "seri")     istatistikCiz();
-  if(sekme === "beslenme") beslenmeCiz();
+  if(sekme === "beslenme"){ beslenmeCiz(); ogunCiz(); }
 
   const nav = document.getElementById("alt-nav");
   if(nav && nav.querySelectorAll){
