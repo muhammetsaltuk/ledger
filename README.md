@@ -400,15 +400,15 @@ API v3" etkinleştir → "API key" ile alınır; ücretsiz katman günde 100 ara
 Tanımlı değilse `api/tarif` yine çalışır: `youtube.com/results` sayfasından ilk
 videoyu çeker, o da olmazsa arama linkine düşer.
 
-### İsteğe bağlı — SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (§16)
+### İsteğe bağlı — SUPABASE_SERVICE_ROLE_KEY (§16)
 
-Bulut senkronu için iki değişken gerekir; ikisi de gizli değil ama
-`SUPABASE_SERVICE_ROLE_KEY` sunucu-yalnız bir sır, kodda/git'te yer almamalı:
+Bulut senkronu için gerçekte tek bir gizli değişken gerekir. Proje adresi
+(`SUPABASE_URL`) gizli değil, `api/veri.js` içine gömülü varsayılan olarak
+duruyor; ortam değişkeni tanımlarsan o üstün gelir ama zorunlu değil.
+`SUPABASE_SERVICE_ROLE_KEY` ise sunucu-yalnız bir sır, kodda/git'te asla yer
+almamalı:
 
 ```bash
-npx vercel env add SUPABASE_URL production
-# değer: https://xkomkawyqekhdxjngrws.supabase.co
-
 npx vercel env add SUPABASE_SERVICE_ROLE_KEY production
 # değer: Supabase Dashboard → Project Settings → API → service_role secret
 # https://supabase.com/dashboard/project/xkomkawyqekhdxjngrws/settings/api-keys
@@ -454,7 +454,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (178 test) ve `node test/api.js` (68 test) ile fiilen
+`node test/hepsi.js` (178 test) ve `node test/api.js` (69 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
 gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
@@ -496,6 +496,7 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §15 Market listesi ⇄ Mutfağımda kutuları aynı `beslenme.market` durumunu paylaşır | ✓ test |
 | §15 malzemesiz eski program: tarif ve Market listesi "yeniden üret" uyarır | ✓ test |
 | §16 api/veri: ilk yazan anahtarı sahiplenir (bootstrap); başka anahtar 401 | ✓ test |
+| §16 SUPABASE_URL tanımsızsa gömülü proje adresine düşer; yalnız KEY zorunlu | ✓ test |
 | §16 senkron anahtarı yoksa buluta zamanlayıcı kurulmaz; varsa kurulur | ✓ test |
 | §16 senkronGonder x-ledger-anahtar başlığıyla POST eder, guncellendi'yi saklar | ✓ test |
 | §16 senkronYukle: bulut yereldan yeniyse yereli değiştirir, eşit/eskiyse dokunmaz | ✓ test |
