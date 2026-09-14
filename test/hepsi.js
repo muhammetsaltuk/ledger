@@ -1174,17 +1174,19 @@ await dene("iPhone'da kısayol bağlantısı basılır ve saati taşır", async 
   icerir(h, "kur");
 });
 
-await dene("x-success her zaman verilir; ana ekrandan açılınca da kısayoldan sonra Ledger'a dönülür", async () => {
-  // x-success https adresini Safari'de açar — ana ekrandan (PWA) açıksa
-  // standalone kabuğa değil tarayıcı kopyasına düşülür, ama kullanıcı hiç
-  // dönülmemesini bundan daha rahatsız edici bulduğu için otomatik dönüş
-  // artık koşulsuz.
+await dene("ana ekrandan açılınca x-success verilmez", async () => {
+  // Safari'de x-success sayfaya geri getiriyor. Ana ekrandan (PWA) açıksa
+  // iOS'ta bir https linki hiçbir zaman standalone kabuğu açamıyor — Safari'ye
+  // düşmek yerine kısayolda kalınıp gerçek PWA'ya elle (uygulama geçiş
+  // ekranından) dönülüyor.
   const tarayici = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
+  esit(tarayici.ic.anaEkrandaMi(), false);
   icerir(tarayici.html("b-alarm"), "x-success=");
 
   const anaEkran = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios", anaEkran:true });
+  esit(anaEkran.ic.anaEkrandaMi(), true);
   const h = anaEkran.html("b-alarm");
-  icerir(h, "x-success=");
+  icermez(h, "x-success");
   icerir(h, "shortcuts://x-callback-url/run-shortcut");   // kısayol yine çalışıyor
   icerir(h, "text=05%3A02");
 });
