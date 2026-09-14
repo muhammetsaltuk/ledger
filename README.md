@@ -225,9 +225,12 @@ Değişen kararlar:
   ardışık *tam gün* sayısı (beş vaktin hepsi işaretli) ve üç halka: namaz, su,
   plan. Seri bugün bitmediyse dünden sayılır. Tonu olgu: "bugün tamam",
   "bugünün N vakti kaldı" — kutlama, "seri bozuldu", emoji yok (§14 hâlâ koruyor).
-- **Alt tab bar.** Tek sayfa dört görünüme bölündü: **Bugün** (özet + namaz +
-  kaza + su), **Seri** (istatistik), **Plan** (plan + etkinlik + gün sonu +
-  sohbet), **Ayarlar** (yarın + profil + ayarlar). Seçilen sekme saklanır.
+- **Alt tab bar.** Tek sayfa beş görünüme bölündü: **Bugün** (özet + namaz +
+  kaza + su + öğünler), **Seri** (istatistik), **Plan** (plan + etkinlik +
+  sohbet + gün sonu değerlendirmesi + **yarının alarmları** — akşam yapılan
+  işler bir arada, günü kapatıp yarına hazırlanma sırasıyla), **Beslenme**
+  (profil + program + market + tartım), **Ayarlar** (yalnız kalıcı
+  yapılandırma: profil metni + bildirim/ntfy/senkron). Seçilen sekme saklanır.
 - **Seri / istatistik ekranı.** Ay takvimi (tam gün / kısmi / boş), son 7 günün
   başarı yüzdesi ve mini sütun grafiği, vakit bazında oranlar (her vakit kendi
   renginde), rozetler (7 gün kesintisiz, N tam gün, kaza kalmadı…). Hepsi mevcut
@@ -454,7 +457,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (178 test) ve `node test/api.js` (69 test) ile fiilen
+`node test/hepsi.js` (179 test) ve `node test/api.js` (69 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
 gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
@@ -497,6 +500,7 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §15 malzemesiz eski program: tarif ve Market listesi "yeniden üret" uyarır | ✓ test |
 | §16 api/veri: ilk yazan anahtarı sahiplenir (bootstrap); başka anahtar 401 | ✓ test |
 | §16 SUPABASE_URL tanımsızsa gömülü proje adresine düşer; yalnız KEY zorunlu | ✓ test |
+| Yarının alarmları Plan sekmesinde (gün sonu sonrası), Ayarlar yalnız kalıcı ayar | ✓ test |
 | §16 senkron anahtarı yoksa buluta zamanlayıcı kurulmaz; varsa kurulur | ✓ test |
 | §16 senkronGonder x-ledger-anahtar başlığıyla POST eder, guncellendi'yi saklar | ✓ test |
 | §16 senkronYukle: bulut yereldan yeniyse yereli değiştirir, eşit/eskiyse dokunmaz | ✓ test |

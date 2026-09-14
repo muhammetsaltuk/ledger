@@ -1769,6 +1769,17 @@ await dene("beslenme 5. sekmedir; gorunum('beslenme') onu açar", async () => {
   esit(u.ctx.document.getElementById("b-namaz").hidden, true);
 });
 
+await dene("§8 yarının alarmları artık Plan sekmesinde, Ayarlar'da değil", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.ic.gorunum("plan");
+  esit(u.ctx.document.getElementById("b-alarm").hidden, false, "Plan'da görünmeli");
+  u.ic.gorunum("ayarlar");
+  esit(u.ctx.document.getElementById("b-alarm").hidden, true, "Ayarlar'da gizlenmeli");
+  esit(u.ctx.document.getElementById("b-ayar").hidden, false, "Profil Ayarlar'da kalmalı");
+  esit(u.ctx.document.getElementById("b-ayarlar").hidden, false, "Ayarlar bölümü Ayarlar'da kalmalı");
+});
+
 await dene("programUret: kota düşer, istek mod=program ve hedefi taşır", async () => {
   const prog = { gunlukKalori:3020, makro:{protein:132,karb:430,yag:85},
     ogunler:[{ ad:"Kahvaltı", yemekler:[
