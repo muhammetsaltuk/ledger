@@ -754,7 +754,8 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   <!-- §3.7 Gün sonu değerlendirmesi -->
   <section id="b-degerlendirme" class="bolum" aria-label="Gün sonu değerlendirmesi"></section>
 
-  <!-- §8 Yarının alarmları -->
+  <!-- §8 Yarının alarmları — Plan görünümünün sonunda: gün sonu değerlendirmesi
+       gibi akşam yapılan, o günün planını kapatıp yarına hazırlanan bir iş. -->
   <section id="b-alarm" class="bolum cam" aria-label="Yarının alarmları"></section>
 
   <!-- Profil -->
@@ -3950,9 +3951,11 @@ $ogun.addEventListener("keydown", e => {
 const GORUNUM = {
   bugun:    ["b-gunluk", "b-namaz", "b-kaza", "b-su", "b-ogun"],
   seri:     ["b-istatistik"],
-  plan:     ["b-plan", "b-sohbet", "b-etkinlik", "b-degerlendirme"],
+  // Yarının alarmları akşam yapılan bir iş — gün sonu değerlendirmesinin
+  // hemen ardından, Plan'ın sonunda; Ayarlar yalnız kalıcı yapılandırma kalsın.
+  plan:     ["b-plan", "b-sohbet", "b-etkinlik", "b-degerlendirme", "b-alarm"],
   beslenme: ["b-beslenme"],
-  ayarlar:  ["b-alarm", "b-ayar", "b-ayarlar"]
+  ayarlar:  ["b-ayar", "b-ayarlar"]
 };
 const TUM_BOLUMLER = Object.keys(GORUNUM).reduce((a, k) => a.concat(GORUNUM[k]), []);
 let aktifGorunum = "bugun";
