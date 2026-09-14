@@ -1967,6 +1967,126 @@ await dene("kalori halkası profil yoksa çizilmez", async () => {
   icermez(u.html("b-gunluk"), "Kalori");
 });
 
+bolum("§16 — bulut senkronu (Supabase, giriş ekranı yok)");
+
+const S_ANAHTAR = "z".repeat(48);
+
+await dene("kaydet(): senkron anahtarı yoksa buluta zamanlayıcı kurulmaz", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  const once = u.durum.zamanlayicilar.length;
+  u.ic.kaydet();
+  esit(u.durum.zamanlayicilar.length, once);
+});
+
+await dene("kaydet(): senkron anahtarı varsa debounce zamanlayıcısı kurulur", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  const once = u.durum.zamanlayicilar.length;
+  u.ic.kaydet();
+  dogru(u.durum.zamanlayicilar.length > once, "zamanlayıcı kurulmalı");
+});
+
+await dene("senkronGonder: UYG.veri'yi x-ledger-anahtar başlığıyla buluta POST eder", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    api:{ veri: { tamam:true, guncellendi:"2026-09-10T09:00:05.000Z" } } });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  u.ic.UYG.veri.profil = "yeni profil";
+  await u.ic.senkronGonder();
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "veri").pop();
+  dogru(c, "veri çağrısı yapılmalı");
+  esit(c.headers["x-ledger-anahtar"], S_ANAHTAR);
+  esit(c.govde.icerik.profil, "yeni profil");
+  esit(u.ic.senkronZamaniOku(), "2026-09-10T09:00:05.000Z");
+});
+
+await dene("senkronGonder: sunucu 401 dönerse sessizce geçer, çökmez", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00", api:{ veri: { durum:401 } } });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  await u.ic.senkronGonder();
+  dogru(true, "hata fırlatmamalı");
+});
+
+await dene("senkronAc: anahtar yoksa üretir ve ilk push'u yapar", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    api:{ veri: { tamam:true, guncellendi:"2026-09-10T09:05:00.000Z" } } });
+  await u.bekle();
+  esit(u.ic.senkronAnahtari(), "");
+  await u.ic.senkronAc();
+  dogru(u.ic.senkronAnahtari().length >= 16, "rastgele anahtar üretilmeli");
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "veri").pop();
+  dogru(c, "ilk push yapılmalı");
+  esit(c.headers["x-ledger-anahtar"], u.ic.senkronAnahtari());
+});
+
+await dene("senkronYukle: bulut daha yeniyse yereli değiştirir, yeniden çizer", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    api:{ veri: { icerik:{ profil:"buluttan gelen metin" },
+                  guncellendi:"2026-09-10T09:00:05.000Z" } } });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  esit(u.ic.senkronZamaniOku(), "");
+  await u.ic.senkronYukle();
+  esit(u.ic.UYG.veri.profil, "buluttan gelen metin");
+  esit(u.ic.senkronZamaniOku(), "2026-09-10T09:00:05.000Z");
+});
+
+await dene("senkronYukle: yerel eşit/daha yeniyse dokunmaz", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    api:{ veri: { icerik:{ profil:"eski bulut" }, guncellendi:"2026-09-10T09:00:00.000Z" } } });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  u.ic.senkronZamaniYaz("2026-09-10T09:05:00.000Z");     // yerel daha yeni
+  u.ic.UYG.veri.profil = "yerel metin";
+  await u.ic.senkronYukle();
+  esit(u.ic.UYG.veri.profil, "yerel metin", "buluttaki eski veri yereli ezmemeli");
+});
+
+await dene("?anahtar=... URL'si gelirse localStorage'a kaydedilir", async () => {
+  const deger = "k".repeat(40);
+  const u = kur({ simdi:"2026-09-10T09:00:00", url:"https://ledger.test/?anahtar=" + deger });
+  await u.bekle();
+  esit(u.ic.senkronAnahtari(), deger);
+});
+
+await dene("kurtarmaLinki: origin + pathname + anahtar", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla("abc123");
+  esit(u.ic.kurtarmaLinki(), "https://ledger.test/?anahtar=abc123");
+});
+
+await dene("Ayarlar: senkron kapalıyken 'buluta senkronu aç' görünür, kurtarma yok", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  const h = u.html("b-ayarlar");
+  icerir(h, 'id="ay-senkron-ac"');
+  icermez(h, "kurtarma linkini kopyala");
+});
+
+await dene("Ayarlar: senkron açıkken kurtarma linki ve kapatma düğmesi görünür", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  u.ic.ayarlarCiz();
+  const h = u.html("b-ayarlar");
+  icerir(h, "bulutla senkron");
+  icerir(h, 'id="ay-kurtarma"');
+  icerir(h, 'id="ay-senkron-kapat"');
+});
+
+await dene("senkronKapat: anahtarı temizler, buton tekrar 'aç' olur", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  u.ic.senkronKapat();
+  esit(u.ic.senkronAnahtari(), "");
+  icerir(u.html("b-ayarlar"), 'id="ay-senkron-ac"');
+});
+
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
 process.exit(kalan ? 1 : 0);
 

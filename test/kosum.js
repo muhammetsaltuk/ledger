@@ -87,6 +87,7 @@ function kur(se = {}){
     apiCagrilari: [],
     bildirimler: [],
     gidilenAdres: null,
+    baslangicAdres: se.url || "https://ledger.test/",   // §16 — ?anahtar=... testi için
     depo: new Map(Object.entries(se.depo || {})),
     zamanlayicilar: []
   };
@@ -137,9 +138,11 @@ function kur(se = {}){
     document: belge,
     location: {
       origin: "https://ledger.test",
-      get href(){ return durum.gidilenAdres || "https://ledger.test/"; },
+      pathname: "/",
+      get href(){ return durum.gidilenAdres || durum.baslangicAdres; },
       set href(v){ durum.gidilenAdres = v; }        // intent:// navigasyonu
     },
+    history: { replaceState(){} },                  // §16 — ?anahtar=... temizleme, testte izlenmiyor
     matchMedia: sorgu => ({
       matches: se.anaEkran === true && /standalone/.test(String(sorgu || "")),
       addEventListener(){}, addListener(){}
@@ -181,7 +184,11 @@ function kur(se = {}){
          olmadan da çalıştığını her testte doğrulamış oluyoruz (§12). */
       if(String(url).indexOf("api/") === 0){
         const ad = String(url).slice(4);
-        durum.apiCagrilari.push({ ad, govde: secenek && JSON.parse(secenek.body || "{}") });
+        durum.apiCagrilari.push({
+          ad,
+          govde: secenek && JSON.parse(secenek.body || "{}"),
+          headers: (secenek && secenek.headers) || {}
+        });
         const sahte = se.api && se.api[ad];
         if(!sahte)
           return Promise.resolve({ ok:false, status:503,
@@ -240,7 +247,7 @@ function kur(se = {}){
     "aktifAralik","siradakiAralik","vakitGetir","namazKur","namazCiz","namazIsaretle",
     "gunKaydi","sureMetni","konumuKullan","konumSor","kaydet","yukle","VAKITLER",
     "borcTara","kazaCiz","toplamBorc","islenmisMi","borcDegistir","vakitleriHazirla",
-    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","planUreteBasla","dunUyumSorulsun","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR","etkinlikCozumle","etkinlikKaydet","etkinlikSil","etkinlikCiz","tarihYaz","degerlendir","degerCiz","profilGuncelle","profilZamaniMi","ayarCiz","modelIste","sohbetGonder","sohbetCiz","sohbetYaz","sohbetAc","maddeSor","HIZLI_SOHBET","SOHBET_SINIR","intentAdresi","kisayolAdresi","kisayolAdi","anaEkrandaMi","alarmAdresi","alarmBilgisi","iosMu","platform","kalkisSaati","yarininImsagi","alarmKur","alarmKuruldu","alarmCiz","icsUret","bildirimTara","bildirimGonder","bildirimDurumu","topicUret","cronAdresi","ayarlarCiz","SU_ARALIK","CIKISA_KALA","gunTamMi","gununNamazSayisi","seriHesapla","enUzunSeri","gunlukCiz","istatistikCiz","gorunum","GORUNUM","halkaSVG","kaloriHedefi","guncelHedef","sonKilo","tartimEkle","kiloTrend","gununBeslenme","AKTIVITE","VARSAYILAN_HEDEF","beslenmeCiz","profilKaydet","programUret","beslenmeHakki","yemekBegenmedim","tarifVideosu","tartimGirisGonder","PROGRAM_SINIR","sevmedigimEkle","ogunCiz","ogunEkle","ogunSil","ogunGirisGonder","fotoDegisti","fotoOnayla","gununOgunleri","marketBolum","malzemeVeTarif","malzNorm","mutfaktaVar","programMalzemeleri","programMalzemeliMi","alinacaklar","mutfagaAl","mutfaktanCikar","malzIsaretle"
+    "ayGetir","baslat","suDegistir","suCiz","SU_HEDEFI","maddeEkle","maddeSil","maddeIsaretle","maddeNot","planCiz","planKopyala","planHazirla","planUreteBasla","dunUyumSorulsun","saatSirala","TURLER","planUret","planHakki","son14Gun","kursSaati","gunAdi","yaklasanEtkinlikler","PLAN_SINIR","etkinlikCozumle","etkinlikKaydet","etkinlikSil","etkinlikCiz","tarihYaz","degerlendir","degerCiz","profilGuncelle","profilZamaniMi","ayarCiz","modelIste","sohbetGonder","sohbetCiz","sohbetYaz","sohbetAc","maddeSor","HIZLI_SOHBET","SOHBET_SINIR","intentAdresi","kisayolAdresi","kisayolAdi","anaEkrandaMi","alarmAdresi","alarmBilgisi","iosMu","platform","kalkisSaati","yarininImsagi","alarmKur","alarmKuruldu","alarmCiz","icsUret","bildirimTara","bildirimGonder","bildirimDurumu","topicUret","cronAdresi","ayarlarCiz","SU_ARALIK","CIKISA_KALA","gunTamMi","gununNamazSayisi","seriHesapla","enUzunSeri","gunlukCiz","istatistikCiz","gorunum","GORUNUM","halkaSVG","kaloriHedefi","guncelHedef","sonKilo","tartimEkle","kiloTrend","gununBeslenme","AKTIVITE","VARSAYILAN_HEDEF","beslenmeCiz","profilKaydet","programUret","beslenmeHakki","yemekBegenmedim","tarifVideosu","tartimGirisGonder","PROGRAM_SINIR","sevmedigimEkle","ogunCiz","ogunEkle","ogunSil","ogunGirisGonder","fotoDegisti","fotoOnayla","gununOgunleri","marketBolum","malzemeVeTarif","malzNorm","mutfaktaVar","programMalzemeleri","programMalzemeliMi","alinacaklar","mutfagaAl","mutfaktanCikar","malzIsaretle","tumunuCiz","kaydetYerel","senkronAnahtari","senkronAnahtariAyarla","senkronZamaniOku","senkronZamaniYaz","rastgeleAnahtar","kurtarmaLinki","senkronPlanla","senkronGonder","senkronYukle","senkronAc","senkronKapat","kurtarmaLinkiKopyala","veriBolum"
   ].join(",") + " };", ctx, { filename:"index.html<script>" });
 
   return {
@@ -290,6 +297,13 @@ function kur(se = {}){
     el(id){ return belge._elemanlar.get(id) || null; },
     /** Kayıtlı setInterval geri çağrılarını bir kez çalıştır. */
     tik(){ durum.zamanlayicilar.filter(z => z.aralik).forEach(z => z.f()); },
+    /** Bekleyen tüm zamanlayıcıları (setTimeout dahil) bir kez çalıştırıp temizler
+        — §16 senkron debounce'unu testte "beklemeden" tetiklemek için. */
+    zamanlayicilariCalistir(){
+      const liste = durum.zamanlayicilar.filter(z => !z.aralik);
+      durum.zamanlayicilar = durum.zamanlayicilar.filter(z => z.aralik);
+      liste.forEach(z => z.f());
+    },
     bekle(){ return new Promise(r => setImmediate(r)); }
   };
 }
