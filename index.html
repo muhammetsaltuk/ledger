@@ -1721,18 +1721,23 @@ function kisayolAdi(tur){
     ? (UYG.veri.ayar.kisayolKalkis || KISAYOL_KALKIS_VARSAYILAN)
     : (UYG.veri.ayar.kisayol || KISAYOL_VARSAYILAN);
 }
-/* x-success her zaman veriliyor: kısayol bitince Ledger'a otomatik dönülsün.
-   Ana ekrandan (PWA) açıldığında iOS bu https adresini Safari'de açıyor —
-   yani standalone kabuğa değil, tarayıcı kopyasına düşülüyor. Önceden bu
-   yüzden ana ekrandayken x-success hiç verilmiyordu (kısayolda kalıp elle
-   geri dönülsün diye), ama kullanıcı geri dönülmemesini "elle kaydırma"dan
-   daha rahatsız edici buldu — otomatik dönüş, yanlış kabuğa düşmekten iyi. */
+/** Uygulama ana ekrandan mı açıldı (tarayıcı kabuğu yok). */
+function anaEkrandaMi(){
+  if(navigator.standalone === true) return true;      // iOS'un kendi bayrağı
+  return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+}
+/* x-success yalnız tarayıcıdayken veriliyor. iOS'ta bir https linki hiçbir
+   zaman standalone PWA kabuğunu açamıyor — her zaman Safari'de açılır. Ana
+   ekrandan (PWA) açıldığında x-success verirsek kullanıcı gerçek PWA'dan
+   Safari'ye düşer; vermezsek kısayol bitince Kısayollar'da kalınır, gerçek
+   PWA'ya dönmenin tek yolu (uygulama geçiş ekranından elle seçmek) hâlâ açık
+   kalır. Kullanıcı Safari'ye otomatik düşmek yerine bunu tercih etti. */
 function kisayolAdresi(saat, dakika, tur){
   return "shortcuts://x-callback-url/run-shortcut" +
     "?name=" + encodeURIComponent(kisayolAdi(tur)) +
     "&input=text" +
     "&text=" + encodeURIComponent(iki(saat) + ":" + iki(dakika)) +
-    "&x-success=" + encodeURIComponent(location.href.split("#")[0]);
+    (anaEkrandaMi() ? "" : "&x-success=" + encodeURIComponent(location.href.split("#")[0]));
 }
 /** Cihaza uygun alarm bağlantısı. Bilinmeyen cihazda intent denenir (§8.1).
     Android'de tekrar yok: SET_ALARM'ın DAYS ek bilgisi ArrayList<Integer> ve

@@ -101,11 +101,14 @@ plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
 >   artık üç hâl ayrı yazılı.
 > - Eylem adları cihazın diline göre değişiyor; Türkçe adlarla yazılmış yönerge
 >   İngilizce telefonda aranamıyordu. İkisi de yazılıyor.
-> - `x-success` kullanıcıyı ana ekrandaki uygulamadan Safari'ye atıyordu; bu
->   yüzden bir süre yalnız tarayıcıdayken veriliyordu. Ama kullanıcı geri hiç
->   dönülmemesini (kısayolda/Kısayollar'da kalıp elle geri dönmek) Safari'ye
->   düşmekten daha rahatsız edici buldu — artık koşulsuz her zaman veriliyor,
->   ana ekrandan açıldığında da kısayoldan sonra Safari'de Ledger açılıyor.
+> - `x-success` kullanıcıyı ana ekrandaki uygulamadan Safari'ye atıyordu; yalnız
+>   tarayıcıdayken verilmesi bunun düzeltmesi. Kısa bir süre koşulsuz her zaman
+>   verilmesi denendi (kısayoldan sonra hiç dönülmemesi de rahatsız ediciydi),
+>   ama iOS'ta bir https linki hiçbir zaman standalone PWA kabuğunu açamadığı
+>   için ("Safari'ye Aç" gibi bir yol yok) o otomatik dönüş her zaman web
+>   versiyonuna düşüyordu — kullanıcı bunu istemedi, eski davranışa dönüldü:
+>   ana ekrandan açıkken x-success verilmiyor, gerçek PWA'ya dönmenin tek yolu
+>   uygulama geçiş ekranından elle seçmek.
 >
 > **Hâlâ doğrulanmadı:** `Ledger Kalkış` kısayolunun `Her Gün` tekrarı ve
 > **Android intent akışının tamamı** — elde Android telefon yok. §8.1 için §14
