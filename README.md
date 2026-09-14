@@ -101,8 +101,11 @@ plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
 >   artık üç hâl ayrı yazılı.
 > - Eylem adları cihazın diline göre değişiyor; Türkçe adlarla yazılmış yönerge
 >   İngilizce telefonda aranamıyordu. İkisi de yazılıyor.
-> - `x-success` kullanıcıyı ana ekrandaki uygulamadan Safari'ye atıyordu; artık
->   yalnız tarayıcıdayken veriliyor.
+> - `x-success` kullanıcıyı ana ekrandaki uygulamadan Safari'ye atıyordu; bu
+>   yüzden bir süre yalnız tarayıcıdayken veriliyordu. Ama kullanıcı geri hiç
+>   dönülmemesini (kısayolda/Kısayollar'da kalıp elle geri dönmek) Safari'ye
+>   düşmekten daha rahatsız edici buldu — artık koşulsuz her zaman veriliyor,
+>   ana ekrandan açıldığında da kısayoldan sonra Safari'de Ledger açılıyor.
 >
 > **Hâlâ doğrulanmadı:** `Ledger Kalkış` kısayolunun `Her Gün` tekrarı ve
 > **Android intent akışının tamamı** — elde Android telefon yok. §8.1 için §14

@@ -1721,22 +1721,18 @@ function kisayolAdi(tur){
     ? (UYG.veri.ayar.kisayolKalkis || KISAYOL_KALKIS_VARSAYILAN)
     : (UYG.veri.ayar.kisayol || KISAYOL_VARSAYILAN);
 }
-/** Uygulama ana ekrandan mı açıldı (tarayıcı kabuğu yok). */
-function anaEkrandaMi(){
-  if(navigator.standalone === true) return true;      // iOS'un kendi bayrağı
-  return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
-}
-/* x-success yalnız tarayıcıdayken veriliyor. Ana ekrandan açıldığında iOS o
-   https adresini Safari'de açıyor ve kullanıcıyı uygulamanın tarayıcı
-   kopyasına düşürüyor — alarm kuruluyor ama yanlış uygulamada uyanıyorsun.
-   Parametre yokken kısayol bitince Kısayollar'da kalınıyor; geri dönüş bir
-   kaydırma, yanlış uygulamaya atılmaktan iyi. */
+/* x-success her zaman veriliyor: kısayol bitince Ledger'a otomatik dönülsün.
+   Ana ekrandan (PWA) açıldığında iOS bu https adresini Safari'de açıyor —
+   yani standalone kabuğa değil, tarayıcı kopyasına düşülüyor. Önceden bu
+   yüzden ana ekrandayken x-success hiç verilmiyordu (kısayolda kalıp elle
+   geri dönülsün diye), ama kullanıcı geri dönülmemesini "elle kaydırma"dan
+   daha rahatsız edici buldu — otomatik dönüş, yanlış kabuğa düşmekten iyi. */
 function kisayolAdresi(saat, dakika, tur){
   return "shortcuts://x-callback-url/run-shortcut" +
     "?name=" + encodeURIComponent(kisayolAdi(tur)) +
     "&input=text" +
     "&text=" + encodeURIComponent(iki(saat) + ":" + iki(dakika)) +
-    (anaEkrandaMi() ? "" : "&x-success=" + encodeURIComponent(location.href.split("#")[0]));
+    "&x-success=" + encodeURIComponent(location.href.split("#")[0]);
 }
 /** Cihaza uygun alarm bağlantısı. Bilinmeyen cihazda intent denenir (§8.1).
     Android'de tekrar yok: SET_ALARM'ın DAYS ek bilgisi ArrayList<Integer> ve
