@@ -13,8 +13,16 @@ const crypto = require("crypto");
 const SATIR_ID = "tek";
 const BOYUT_SINIRI = 2000000;              // 2 MB — tek kullanıcı için bol
 
+// Proje URL'i gizli değil (Supabase'in kendisi bunu istemciye zaten söyler);
+// env değişkeni tanımlıysa o üstün gelir, tanımsızsa buraya düşer — kurulumda
+// tek gerçek sır SUPABASE_SERVICE_ROLE_KEY olarak kalsın diye.
+const SUPABASE_URL_VARSAYILAN = "https://xkomkawyqekhdxjngrws.supabase.co";
+
+function supabaseUrl(){
+  return process.env.SUPABASE_URL || SUPABASE_URL_VARSAYILAN;
+}
 function supabaseAyarli(){
-  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
 function hashle(anahtar){
@@ -22,7 +30,7 @@ function hashle(anahtar){
 }
 
 async function supabaseIstek(yol, secenek){
-  const taban = String(process.env.SUPABASE_URL).replace(/\/$/, "");
+  const taban = supabaseUrl().replace(/\/$/, "");
   const servisAnahtari = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return fetch(taban + "/rest/v1/" + yol, Object.assign({}, secenek, {
     headers: Object.assign({
@@ -45,7 +53,7 @@ async function satiriOku(){
 module.exports = async (req, res) => {
   if(!supabaseAyarli()){
     res.status(503).json({ hata: "supabase-yok",
-      mesaj: "SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY tanımlı değil." });
+      mesaj: "SUPABASE_SERVICE_ROLE_KEY tanımlı değil." });
     return;
   }
 

@@ -902,8 +902,8 @@ function supabaseTaklit(baslangicSatir){
 const V_ANAHTAR_A = "a".repeat(48);
 const V_ANAHTAR_B = "b".repeat(48);
 
-await dene("SUPABASE_URL/SERVICE_ROLE_KEY yoksa 503", async () => {
-  delete process.env.SUPABASE_URL;
+await dene("SUPABASE_SERVICE_ROLE_KEY yoksa 503 (SUPABASE_URL olsa da)", async () => {
+  process.env.SUPABASE_URL = "https://xyz.supabase.co";
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   supabaseTaklit();
   const c = cevap();
@@ -911,8 +911,18 @@ await dene("SUPABASE_URL/SERVICE_ROLE_KEY yoksa 503", async () => {
   esit(c.kod, 503);
 });
 
-process.env.SUPABASE_URL = "https://xyz.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "servis-anahtari-test";
+
+await dene("SUPABASE_URL tanımsızsa gömülü proje adresine düşer", async () => {
+  delete process.env.SUPABASE_URL;
+  const s = supabaseTaklit(null);
+  const c = cevap();
+  await veri(veriIstek({ icerik:{ a:1 } }, V_ANAHTAR_A), c);
+  esit(c.kod, 200);
+  icerir(s.istekler[0].url, "https://xkomkawyqekhdxjngrws.supabase.co/rest/v1/");
+});
+
+process.env.SUPABASE_URL = "https://xyz.supabase.co";
 
 await dene("anahtar yoksa ya da çok kısaysa 400", async () => {
   supabaseTaklit();
