@@ -1,7 +1,7 @@
 /* Ledger — çevrimdışı kabuk (§2).
    Kabuk önbellekten, API çağrıları hep ağdan. Uçak modunda uygulama açılmalı (§14). */
 
-const SURUM  = "ledger-v6";   /* §17/§18/§19: Java eğitimi, Notion onayı, Yol Haritası */
+const SURUM  = "ledger-v7";   /* §19: roadmap erişimi Gemini'den bağımsız */
 const KABUK  = [
   "./",
   "./index.html",
