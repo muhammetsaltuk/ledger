@@ -137,7 +137,7 @@ await dene("istem §6'nın bütün girdilerini taşır", async () => {
   icerir(metin, "Kahvaltı, spordan sonraki 45 dakika içinde");   // çerçeve
 });
 
-await dene("§16 java yoksa istemde 'aktif değil' notu, java varsa hafta/faz/gün türü", async () => {
+await dene("§17 java yoksa istemde 'aktif değil' notu, java varsa hafta/faz/gün türü", async () => {
   const kayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
   await plan(istek(ORNEK_GOVDE), cevap());
   icerir(kayit.istekler[0].govde.contents[0].parts[0].text,
@@ -734,6 +734,38 @@ await dene("program: boş/başlıksız öğünler elenir, sayılar tamsayıya ç
   dogru(c.veri.not.length > 0);
 });
 
+await dene("program: istem malzeme listesi ister, malzemeler diziye çekilir", async () => {
+  const kayit = geminiTaklit(() => ({ metin: JSON.stringify({
+    gunlukKalori: 3000, makro:{ protein:130, karb:400, yag:80 },
+    ogunler: [
+      { ad:"Kahvaltı", yemekler:[
+        { ad:"Menemen", miktar:"1 tabak", kalori:320,
+          malzemeler:["yumurta"," domates ", "", "biber"], tarif:"Kavur." } ] },
+      { ad:"Öğle", yemekler:[
+        { ad:"Pilav", miktar:"1 kase", kalori:400, tarif:"Pişir." } ] }   // malzemeler yok
+    ]
+  }) }));
+  const c = cevap();
+  await beslenme(istek(BESLENME_GOVDE), c);
+  esit(c.kod, 200);
+  icerir(kayit.istekler[0].govde.contents[0].parts[0].text, "`malzemeler`");
+  esit(c.veri.ogunler[0].yemekler[0].malzemeler.join(","), "yumurta,domates,biber");
+  esit(Array.isArray(c.veri.ogunler[1].yemekler[0].malzemeler), true);
+  esit(c.veri.ogunler[1].yemekler[0].malzemeler.length, 0);
+});
+
+await dene("alternatif modu: malzemeler döner ve istemde istenir", async () => {
+  const kayit = geminiTaklit(() => ({ metin: JSON.stringify({
+    ad:"Tavuklu pilav", miktar:"1 tabak", kalori:560, protein:45, karb:70, yag:10,
+    malzemeler:["pirinç","tavuk göğsü","tereyağı"], tarif:"Pişir." }) }));
+  const c = cevap();
+  await beslenme(istek({ mod:"alternatif",
+    yemek:{ ad:"Kuru fasulye", miktar:"1 kase", kalori:520 }, ogun:"Öğle" }), c);
+  esit(c.kod, 200);
+  esit(c.veri.malzemeler.join(","), "pirinç,tavuk göğsü,tereyağı");
+  icerir(kayit.istekler[0].govde.contents[0].parts[0].text, "`malzemeler`");
+});
+
 await dene("program tamamen boş gelirse 502", async () => {
   geminiTaklit(() => ({ metin: JSON.stringify({ gunlukKalori:3000, makro:{}, ogunler:[] }) }));
   const c = cevap();
@@ -859,7 +891,7 @@ await dene("yemek adı boşsa 400", async () => {
   esit(c.kod, 400);
 });
 
-bolum("api/notion — §17 haftalık kontrol");
+bolum("api/notion — §18 haftalık kontrol");
 
 const notion = require("../api/notion");
 
@@ -1003,6 +1035,135 @@ await dene("çocuklar sayfalıysa (has_more) hepsi toplanır", async () => {
   esit(c.veri.toplam, 2, "iki sayfadaki iki to_do da bulunmalı");
   esit(patchler.length, 2);
   dogru(cagri >= 2, "ikinci sayfa da çekilmeli");
+});
+
+bolum("api/veri — §16 Supabase senkronu (bootstrap kilidi, giriş ekranı yok)");
+
+delete require.cache[require.resolve("../api/veri")];
+const veri = require("../api/veri");
+
+function veriIstek(govde, anahtar, yontem){
+  return { method: yontem || "POST", body: govde,
+    headers: anahtar != null ? { "x-ledger-anahtar": anahtar } : {} };
+}
+
+/** Supabase REST'ini (PostgREST) taklit eder: 'veri' tablosunun tek satırı belleğe simüle edilir. */
+function supabaseTaklit(baslangicSatir){
+  const durum = { satir: baslangicSatir || null, istekler: [] };
+  global.fetch = async (url, secenek) => {
+    durum.istekler.push({ url, secenek });
+    const yontem = (secenek && secenek.method) || "GET";
+    if(yontem === "GET"){
+      return { ok:true, status:200, json: async () => (durum.satir ? [durum.satir] : []) };
+    }
+    if(yontem === "POST"){
+      const [gelen] = JSON.parse(secenek.body);
+      durum.satir = gelen;
+      return { ok:true, status:201, json: async () => [gelen], text: async () => JSON.stringify([gelen]) };
+    }
+    return { ok:false, status:405, text: async () => "" };
+  };
+  return durum;
+}
+
+const V_ANAHTAR_A = "a".repeat(48);
+const V_ANAHTAR_B = "b".repeat(48);
+
+await dene("SUPABASE_SERVICE_ROLE_KEY yoksa 503 (SUPABASE_URL olsa da)", async () => {
+  process.env.SUPABASE_URL = "https://xyz.supabase.co";
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  supabaseTaklit();
+  const c = cevap();
+  await veri(veriIstek({ icerik:{ a:1 } }, V_ANAHTAR_A), c);
+  esit(c.kod, 503);
+});
+
+process.env.SUPABASE_SERVICE_ROLE_KEY = "servis-anahtari-test";
+
+await dene("SUPABASE_URL tanımsızsa gömülü proje adresine düşer", async () => {
+  delete process.env.SUPABASE_URL;
+  const s = supabaseTaklit(null);
+  const c = cevap();
+  await veri(veriIstek({ icerik:{ a:1 } }, V_ANAHTAR_A), c);
+  esit(c.kod, 200);
+  icerir(s.istekler[0].url, "https://xkomkawyqekhdxjngrws.supabase.co/rest/v1/");
+});
+
+process.env.SUPABASE_URL = "https://xyz.supabase.co";
+
+await dene("anahtar yoksa ya da çok kısaysa 400", async () => {
+  supabaseTaklit();
+  const c = cevap();
+  await veri(veriIstek({ icerik:{ a:1 } }, "kisa"), c);
+  esit(c.kod, 400);
+});
+
+await dene("GET: satır yoksa icerik null döner (400 değil)", async () => {
+  supabaseTaklit(null);
+  const c = cevap();
+  await veri(veriIstek(null, V_ANAHTAR_A, "GET"), c);
+  esit(c.kod, 200);
+  esit(c.veri.icerik, null);
+});
+
+await dene("POST: ilk yazma anahtarı sahiplenir (bootstrap)", async () => {
+  const s = supabaseTaklit(null);
+  const c = cevap();
+  await veri(veriIstek({ icerik:{ namaz:"x" } }, V_ANAHTAR_A), c);
+  esit(c.kod, 200);
+  dogru(c.veri.tamam);
+  dogru(!!c.veri.guncellendi);
+  dogru(!!s.satir.anahtar_ozet, "hash kaydedilmeli");
+  esit(s.satir.icerik.namaz, "x");
+});
+
+await dene("POST: aynı anahtar günceller, hash değişmez", async () => {
+  const s = supabaseTaklit(null);
+  await veri(veriIstek({ icerik:{ n:1 } }, V_ANAHTAR_A), cevap());
+  const ilkOzet = s.satir.anahtar_ozet;
+  const c = cevap();
+  await veri(veriIstek({ icerik:{ n:2 } }, V_ANAHTAR_A), c);
+  esit(c.kod, 200);
+  esit(s.satir.icerik.n, 2);
+  esit(s.satir.anahtar_ozet, ilkOzet);
+});
+
+await dene("POST: başka anahtar sahipli satırı değiştiremez (401)", async () => {
+  const s = supabaseTaklit(null);
+  await veri(veriIstek({ icerik:{ n:1 } }, V_ANAHTAR_A), cevap());
+  const c = cevap();
+  await veri(veriIstek({ icerik:{ n:99 } }, V_ANAHTAR_B), c);
+  esit(c.kod, 401);
+  esit(s.satir.icerik.n, 1, "yazılmamalı");
+});
+
+await dene("GET: başka anahtarla okuma 401", async () => {
+  const s = supabaseTaklit(null);
+  await veri(veriIstek({ icerik:{ n:1 } }, V_ANAHTAR_A), cevap());
+  const c = cevap();
+  await veri(veriIstek(null, V_ANAHTAR_B, "GET"), c);
+  esit(c.kod, 401);
+});
+
+await dene("POST: icerik eksikse 400", async () => {
+  supabaseTaklit(null);
+  const c = cevap();
+  await veri(veriIstek({}, V_ANAHTAR_A), c);
+  esit(c.kod, 400);
+});
+
+await dene("POST: çok büyük gövde 413", async () => {
+  supabaseTaklit(null);
+  const c = cevap();
+  await veri(veriIstek({ icerik: { blok: "x".repeat(2100000) } }, V_ANAHTAR_A), c);
+  esit(c.kod, 413);
+});
+
+await dene("desteklenmeyen yöntem 405", async () => {
+  supabaseTaklit(null);
+  const c = cevap();
+  await veri(veriIstek(null, V_ANAHTAR_A, "DELETE"), c);
+  esit(c.kod, 405);
 });
 
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");

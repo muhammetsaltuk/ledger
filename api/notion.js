@@ -1,7 +1,7 @@
-/* §17 — Java roadmap'inin haftalık kontrol checkbox'larını Notion'da işaretler.
+/* §18 — Java roadmap'inin haftalık kontrol checkbox'larını Notion'da işaretler.
    Yapay zeka fonksiyonlarından (api/_ortak.js) bağımsız: bu uçta model yok,
    yalnız Notion REST API'ye düz istek var. Otomatik tetiklenmez — istemci bunu
-   yalnız kullanıcı "bu haftayı gerçekten biliyorum" dediğinde çağırır (§16/§17
+   yalnız kullanıcı "bu haftayı gerçekten biliyorum" dediğinde çağırır (§17/§18
    README). Roadmap'in checkbox'ları "bakmadan" kendi kendine test sorularıdır;
    ledger'daki bir günü "yapıldı" işaretlemek "biliyorum" anlamına gelmez, o
    yüzden bağlantı tek yönlü ve elle onaylıdır. */
@@ -9,7 +9,7 @@
 const SURUM = "2022-06-28";
 const TABAN = "https://api.notion.com/v1";
 
-/* §17 — hangi hafta hangi Faz sayfasında. Sayfa ID'leri Notion URL'inin
+/* §18 — hangi hafta hangi Faz sayfasında. Sayfa ID'leri Notion URL'inin
    app.notion.com/p/<id> kısmından, tire olmadan. Roadmap'in kendisi
    (index.html'deki JAVA_FAZLAR) yalnız isim + hafta aralığı tutar; sayfa
    ID'leri istemciye gitmesin diye yalnız burada. */

@@ -101,8 +101,14 @@ plandayken) ve §8.2 ntfy (isteğe bağlı, kullanıcı kurarsa).
 >   artık üç hâl ayrı yazılı.
 > - Eylem adları cihazın diline göre değişiyor; Türkçe adlarla yazılmış yönerge
 >   İngilizce telefonda aranamıyordu. İkisi de yazılıyor.
-> - `x-success` kullanıcıyı ana ekrandaki uygulamadan Safari'ye atıyordu; artık
->   yalnız tarayıcıdayken veriliyor.
+> - `x-success` kullanıcıyı ana ekrandaki uygulamadan Safari'ye atıyordu; yalnız
+>   tarayıcıdayken verilmesi bunun düzeltmesi. Kısa bir süre koşulsuz her zaman
+>   verilmesi denendi (kısayoldan sonra hiç dönülmemesi de rahatsız ediciydi),
+>   ama iOS'ta bir https linki hiçbir zaman standalone PWA kabuğunu açamadığı
+>   için ("Safari'ye Aç" gibi bir yol yok) o otomatik dönüş her zaman web
+>   versiyonuna düşüyordu — kullanıcı bunu istemedi, eski davranışa dönüldü:
+>   ana ekrandan açıkken x-success verilmiyor, gerçek PWA'ya dönmenin tek yolu
+>   uygulama geçiş ekranından elle seçmek.
 >
 > **Hâlâ doğrulanmadı:** `Ledger Kalkış` kısayolunun `Her Gün` tekrarı ve
 > **Android intent akışının tamamı** — elde Android telefon yok. §8.1 için §14
@@ -122,7 +128,8 @@ api/parse.js    Gemini — serbest metni etkinliğe çevirir
 api/beslenme.js Gemini — §15 program / alternatif yemek / fotoğraftan kalori
 api/tarif.js    §15 — bir yemek için çalışan YouTube tarif linki
 api/push.js     ntfy'ye bildirim gönderir
-api/notion.js   §17 — haftalık kontrolü Notion'da işaretler (AI'siz)
+api/veri.js     §16 — Supabase senkronu (Gemini'ye bağlı değil)
+api/notion.js   §18 — haftalık kontrolü Notion'da işaretler (AI'siz)
 ```
 
 ## Canlı doğrulama
@@ -225,9 +232,14 @@ Değişen kararlar:
   ardışık *tam gün* sayısı (beş vaktin hepsi işaretli) ve üç halka: namaz, su,
   plan. Seri bugün bitmediyse dünden sayılır. Tonu olgu: "bugün tamam",
   "bugünün N vakti kaldı" — kutlama, "seri bozuldu", emoji yok (§14 hâlâ koruyor).
-- **Alt tab bar.** Tek sayfa dört görünüme bölündü: **Bugün** (özet + namaz +
-  kaza + su), **Seri** (istatistik), **Plan** (plan + etkinlik + gün sonu +
-  sohbet), **Ayarlar** (yarın + profil + ayarlar). Seçilen sekme saklanır.
+- **Alt tab bar.** Tek sayfa beş görünüme bölündü: **Bugün** (özet halkaları +
+  namaz + kaza + su — kalori halkası da burada özet olarak kalıyor), **Seri**
+  (istatistik), **Plan** (plan + etkinlik + sohbet + gün sonu değerlendirmesi +
+  **yarının alarmları** — akşam yapılan işler bir arada, günü kapatıp yarına
+  hazırlanma sırasıyla), **Beslenme** (**öğün günlüğü** + profil + program +
+  market + tartım — beslenmeyle ilgili her şey tek yerde), **Ayarlar** (yalnız
+  kalıcı yapılandırma: profil metni + bildirim/ntfy/senkron). Seçilen sekme
+  saklanır.
 - **Seri / istatistik ekranı.** Ay takvimi (tam gün / kısmi / boş), son 7 günün
   başarı yüzdesi ve mini sütun grafiği, vakit bazında oranlar (her vakit kendi
   renginde), rozetler (7 gün kesintisiz, N tam gün, kaza kalmadı…). Hepsi mevcut
@@ -250,11 +262,26 @@ yuvarlı). Protein 1,8 g/kg, yağ kalorinin %25'i, karb kalanı. Deterministik,
 olarak alır, kendi hesaplamaz. Güncel kilo son tartımdan gelir.
 
 **Program** (`api/beslenme` `mod:program`). Profil + hedef + sevmediklerin +
-(varsa) mevcut program → 4-6 öğün, her yemek için gramaj, kalori, makro ve kısa
-bir tarif. Yapılandırılmış çıktı (`responseSchema`) zorunlu. Günde en fazla 3
-üretim; sayaç istemcide (`beslenme.sayac`), `PLAN_SINIR` ile aynı kalıp.
-`GEMINI_API_KEY` yoksa üretim kapanır; elle öğün girişi ve tartım çalışır.
-Ağ/model hatasında eldeki program silinmez.
+(varsa) mevcut program → 4-6 öğün, her yemek için gramaj, kalori, makro, sade
+market adlarıyla `malzemeler` listesi ve kısa bir tarif. Yapılandırılmış çıktı
+(`responseSchema`) zorunlu. Günde en fazla 3 üretim; sayaç istemcide
+(`beslenme.sayac`), `PLAN_SINIR` ile aynı kalıp. `GEMINI_API_KEY` yoksa üretim
+kapanır; elle öğün girişi ve tartım çalışır. Ağ/model hatasında eldeki program
+silinmez.
+
+**Market (tarif malzemeleri + alışveriş listesi).** Elle malzeme girişi yok,
+her şey onay kutusu. Bir yemeğin tarifi açıldığında malzemeler onay kutusu
+olarak listelenir; işaretli = mutfağında var. Tek saklanan alan
+`beslenme.market` (işaretli malzemeler); **Market listesi** bundan türetilir:
+programdaki tüm malzemeler eksi işaretli olanlar (ada göre, büyük/küçük harf
+duyarsız — `toLocaleLowerCase("tr")` — ve tekilleştirilmiş). Program'ın altında
+iki blok: **Market listesi** (alınacaklar; işaretleyince mutfağa geçer) ve
+**Mutfağımda** (işareti kaldırınca alışveriş listesine geri döner). Bir tarifte,
+Market listesinde ve Mutfağımda'da aynı malzemenin kutusu hep aynı durumu
+gösterir. Program da mutfak da boşsa blok çizilmez. `malzemeler` alanı §15'e
+sonradan eklendi; daha önce üretilmiş bir programda bu alan yoktur — o zaman
+hem tarif kartı hem Market listesi "programı yeniden üret" uyarısı gösterir.
+Tamamen istemcide, `localStorage`'da; anahtar gerektirmez.
 
 **Alternatif** (`mod:alternatif`). Bir yemeğe "beğenmedim" dersen, kalorisi ve
 makroları yakın (±80 kcal) tek bir yemek gelir, yerine geçer; beğenmediğin yemek
@@ -267,8 +294,9 @@ linkine düşer. Sonuç yemeğin içine önbelleklenir; ikinci açışta istek g
 Bu uç nokta `GEMINI_API_KEY`'e bağlı değil.
 
 **Öğün günlüğü.** "Bugün" görünümünde namaz/su/plan halkalarının yanına dördüncü
-bir **kalori halkası** (bugün yenen / hedef) ve **Öğünler** kartı gelir (profil
-varsa). Ne yediğini elle (ad + kcal) ya da **fotoğraftan** eklersin: istemci
+bir **kalori halkası** (bugün yenen / hedef) gelir; günlüğün kendisi —
+**Öğünler** kartı — Beslenme sekmesinde (profil varsa). Ne yediğini elle
+(ad + kcal) ya da **fotoğraftan** eklersin: istemci
 görseli canvas ile ~768 px'e küçültüp `mod:foto` ile gönderir (Gemini görsel
 destekli), yemek + kalori + makro tahmini döner, sen düzeltip onaylarsın.
 `localStorage` şişmesin diye tam çözünürlük saklanmaz — ~256 px'lik bir önizleme
@@ -283,7 +311,50 @@ gösterilir — hedef hızıyla karşılaştırmak için.
 +0.3 kg/hafta" gibi kuru olgu); veri telefonda; anahtarsız da temel işlevler
 çalışır; sunucu durumsuz; kota istemcide.
 
-## §16 — Java eğitimi entegrasyonu
+## §16 — Bulut senkronu (Supabase, giriş ekranı yok)
+
+Tüm veri (`UYG.veri` — namaz, plan, su, beslenme/market, ayarlar, tek blob)
+varsayılan olarak yalnız `localStorage`'da durur: tarayıcı verisi silinirse
+kayıt da gider. Ayarlar → Veri'de **"buluta senkronu aç"** ile isteğe bağlı bir
+yedek açılır — hesap, şifre, giriş ekranı yok.
+
+**Nasıl çalışır.** İstemci `crypto.getRandomValues` ile 48 karakterlik rastgele
+bir anahtar üretir, yalnız o tarayıcının `localStorage`'ında saklar. İlk
+`api/veri` çağrısında (`x-ledger-anahtar` başlığıyla) sunucu bu anahtarın
+SHA-256 hash'ini Supabase'teki tek satıra yazar — **ilk yazan sahiplenir**
+(bootstrap kilidi). Sonraki her istek aynı hash'i taşımak zorunda; uymayan
+istek 401 alır. Anahtarın kendisi sunucuda hiç saklanmaz, yalnız hash'i;
+Supabase'e de yalnız `SUPABASE_SERVICE_ROLE_KEY` ile, sunucudan erişilir — bu
+anahtar hiçbir koşulda istemciye gitmez. `veri` tablosunda RLS açık ve hiç
+policy yok, yani `anon`/`authenticated` rolleri için varsayılan tam ret;
+yalnız service_role (RLS'i atlar) okuyup yazabilir.
+
+**Akış.** `kaydet()` önce `localStorage`'a yazar (hız + çevrimdışı çalışsın
+diye — Service Worker zaten çevrimdışı destekliyor), sonra 1.5 sn debounce'lu
+olarak buluta da gönderir. Açılışta yerel veri hemen gösterilir; arka planda
+`senkronYukle()` buluttaki `guncellendi` zaman damgası yerelden yeniyse
+(`ledger/senkron-zaman`) yereli buluttakiyle değiştirip yeniden çizer — normal
+kullanımda hep yerel kazanır, yalnız "tarayıcı verisi silinip kurtarma
+linkiyle dönülmüş" durumunda buluttaki devreye girer.
+
+**Kurtarma linki — tek gerçek kurtarma yolu.** Tarayıcı verisi silinince
+anahtar da localStorage'dan gider; başka hiçbir otomatik yol onu geri getiremez
+(login yok). Ayarlar'daki **"kurtarma linkini kopyala"** düğmesi
+`https://.../?anahtar=<anahtar>` linkini panoya kopyalar. Bu linki not
+uygulamana ya da parola yöneticine kaydet — tarayıcı verisi silinirse o linki
+açman yeter: `?anahtar=` işlenip yerele yazılır, adresten temizlenir
+(`history.replaceState`), sonra `senkronYukle()` buluttaki veriyi geri getirir.
+İkinci bir cihazda da aynı hesaba bağlanmak için o cihazda da bu linki aç —
+"buluta senkronu aç"a tekrar basma, yeni bir anahtar üretip bootstrap kilidine
+takılırsın (401).
+
+**Tablo:** `public.veri(id text pk default 'tek', icerik jsonb, anahtar_ozet
+text, guncellendi timestamptz)` — Supabase projesi `ledger`
+(`xkomkawyqekhdxjngrws`, `us-east-1`, ücretsiz katman). Test:
+`test/api.js` içinde `api/veri`'yi Supabase'i taklit ederek (`test/hepsi.js`
+içinde de istemci tarafını) çalıştırıyor, gerçek isteğe gerek yok.
+
+## §17 — Java eğitimi entegrasyonu
 
 Notion'daki 20 haftalık "Java Backend + DevOps Yol Haritası" (22 Eylül 2026
 başlangıç) `api/plan`'e kurs saatleri gibi ikinci bir **sabit katman** olarak
@@ -324,9 +395,9 @@ plan içeriğini değil yalnız profil + son 14 günün kaydını okuyor.
 
 Test: `javaDurumu` tarih aritmetiği (başlamadan önce/sonra, hafta sınırları,
 her üç gün türü, faz sınırları) ve `api/plan`'e giden gövdede `java` alanı
-— `test/hepsi.js`, "§16 — Java eğitimi" bölümü.
+— `test/hepsi.js`, "§17 — Java eğitimi" bölümü.
 
-## §17 — Java roadmap'i Notion'a bağlama
+## §18 — Java roadmap'i Notion'a bağlama
 
 Notion'daki her Faz sayfasının haftalık kontrolü var: `- [ ] Merge conflict'i
 kendi başıma çözebiliyorum...` gibi, **"bakmadan" kendi kendine test** eden
@@ -436,6 +507,26 @@ API v3" etkinleştir → "API key" ile alınır; ücretsiz katman günde 100 ara
 Tanımlı değilse `api/tarif` yine çalışır: `youtube.com/results` sayfasından ilk
 videoyu çeker, o da olmazsa arama linkine düşer.
 
+### İsteğe bağlı — SUPABASE_SERVICE_ROLE_KEY (§16)
+
+Bulut senkronu için gerçekte tek bir gizli değişken gerekir. Proje adresi
+(`SUPABASE_URL`) gizli değil, `api/veri.js` içine gömülü varsayılan olarak
+duruyor; ortam değişkeni tanımlarsan o üstün gelir ama zorunlu değil.
+`SUPABASE_SERVICE_ROLE_KEY` ise sunucu-yalnız bir sır, kodda/git'te asla yer
+almamalı:
+
+```bash
+npx vercel env add SUPABASE_SERVICE_ROLE_KEY production
+# değer: Supabase Dashboard → Project Settings → API → service_role secret
+# https://supabase.com/dashboard/project/xkomkawyqekhdxjngrws/settings/api-keys
+
+npx vercel deploy --prod        # veya main'e boş bir commit push et
+```
+
+Tanımlı değilse `api/veri` 503 döner; Ayarlar → Veri'deki "buluta senkronu aç"
+düğmesi görünür kalır ama senkron sessizce başarısız olur — geri kalan her şey
+etkilenmeden çalışır.
+
 ### İsteğe bağlı — ntfy (§8.2)
 
 1. Telefona [ntfy](https://ntfy.sh) uygulamasını kur.
@@ -470,7 +561,7 @@ Eylem: Alarm kur. Üretilen webhook adresini `api/push.js`'e ikinci hedef olarak
 
 ## Kabul kriterleri (§14)
 
-`node test/hepsi.js` (159 test) ve `node test/api.js` (56 test) ile fiilen
+`node test/hepsi.js` (179 test) ve `node test/api.js` (69 test) ile fiilen
 deneniyor; tarayıcı-görünümü kontrolleri sahte DOM'da koşuyor. Düzen ölçümü
 gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister).
 
@@ -485,12 +576,12 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | 00:30'da işaretlenen yatsı dünün kaydına yazılır | ✓ test |
 | Maddeye yazılan not ertesi günün plan isteğine girer | ✓ test |
 | §6 plan düne uyar: "Dün" bölümü + gün sonu değerlendirmesi isteme girer | ✓ test |
-| §16 `javaDurumu`: başlamadan önce/bittikten sonra null, hafta/faz/gün türü doğru | ✓ test |
-| §16 `api/plan` gövdesine `java` alanı gider, çerçevede sabit süre olarak geçer | ✓ test |
-| §17 Notion onay kartı yalnız tekrar/tatil gününde, onaylanmamış haftada çıkar | ✓ test |
-| §17 "evet, biliyorum" Notion'ı işaretler; "sonra" onaylamaz, yalnız oturumda gizler | ✓ test |
-| §17 `api/notion`: doğru haftanın checkbox'ları bulunur, zaten işaretli atlanır, sayfalama çalışır | ✓ test |
-| §17 `NOTION_API_KEY` yokken uygulama çalışır, yalnız onay düğmesi 503 verir | ✓ test |
+| §17 `javaDurumu`: başlamadan önce/bittikten sonra null, hafta/faz/gün türü doğru | ✓ test |
+| §17 `api/plan` gövdesine `java` alanı gider, çerçevede sabit süre olarak geçer | ✓ test |
+| §18 Notion onay kartı yalnız tekrar/tatil gününde, onaylanmamış haftada çıkar | ✓ test |
+| §18 "evet, biliyorum" Notion'ı işaretler; "sonra" onaylamaz, yalnız oturumda gizler | ✓ test |
+| §18 `api/notion`: doğru haftanın checkbox'ları bulunur, zaten işaretli atlanır, sayfalama çalışır | ✓ test |
+| §18 `NOTION_API_KEY` yokken uygulama çalışır, yalnız onay düğmesi 503 verir | ✓ test |
 | §6 "plan üret" değerlendirme yoksa önce "dün nasıl geçti?" sorar | ✓ test |
 | "Koşuyu akşama al" hem planı hem profili değiştirir | ✓ test |
 | §6/§10 "Planı konuş" paneli plan sekmesinde açık başlar | ✓ test |
@@ -514,6 +605,18 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §15 tartım aynı güne üzerine yazar; kg/hafta eğilimi en küçük kareler | ✓ test |
 | §15 program isteği hedefi taşır, kota 3/gün ve istemcide | ✓ test |
 | §15 "beğenmedim" yemeği değiştirir, sevmediklerine ekler | ✓ test |
+| §15 tarif malzemeleri onay kutusu; işaretsizler türetilmiş alışveriş listesi | ✓ test |
+| §15 Market listesi ⇄ Mutfağımda kutuları aynı `beslenme.market` durumunu paylaşır | ✓ test |
+| §15 malzemesiz eski program: tarif ve Market listesi "yeniden üret" uyarır | ✓ test |
+| §16 api/veri: ilk yazan anahtarı sahiplenir (bootstrap); başka anahtar 401 | ✓ test |
+| §16 SUPABASE_URL tanımsızsa gömülü proje adresine düşer; yalnız KEY zorunlu | ✓ test |
+| Yarının alarmları Plan sekmesinde (gün sonu sonrası), Ayarlar yalnız kalıcı ayar | ✓ test |
+| Öğün günlüğü Beslenme sekmesinde; Bugün'de yalnız kalori halkası özeti kalır | ✓ test |
+| §16 senkron anahtarı yoksa buluta zamanlayıcı kurulmaz; varsa kurulur | ✓ test |
+| §16 senkronGonder x-ledger-anahtar başlığıyla POST eder, guncellendi'yi saklar | ✓ test |
+| §16 senkronYukle: bulut yereldan yeniyse yereli değiştirir, eşit/eskiyse dokunmaz | ✓ test |
+| §16 ?anahtar=... URL'si localStorage'a yazılır; kurtarma linki origin+anahtar | ✓ test |
+| §15 program/alternatif istemi `malzemeler` ister, dizi olarak temizlenir | ✓ test |
 | §15 api/tarif: anahtar varsa Data API, yoksa kazıma, sonra arama linki | ✓ test |
 | §15 fotoğraf: görsel parça API'ye gider; güven geçersizse "dusuk" | ✓ test |
 | §15 kalori halkası öğün toplamını yansıtır; profil yoksa çizilmez | ✓ test |

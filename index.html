@@ -682,6 +682,21 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .bes-yemek-alt .dg{ min-height:32px; font-size:.78rem; padding:0 12px; }
 .bes-tarif{ margin:10px 0 0; font-size:.85rem; color:#B8C0C4; line-height:1.5; white-space:pre-wrap; }
 
+.bes-malz{ margin:10px 0 2px; display:flex; flex-direction:column; gap:1px; }
+.bes-malz .malz{ display:flex; align-items:center; gap:9px; padding:6px 0;
+  font-size:.85rem; color:var(--metin); cursor:pointer; }
+.bes-malz .malz > span{ min-width:0; overflow-wrap:anywhere; }
+.malz-ipuc{ margin:4px 0 0; }
+.bes-malz input[type="checkbox"],
+.mkt-satir input[type="checkbox"]{ width:18px; height:18px; flex:0 0 auto;
+  accent-color:var(--vakit); margin:0; cursor:pointer; }
+
+.mkt-liste{ display:flex; flex-direction:column; gap:1px; margin-top:4px; }
+.mkt-satir{ display:flex; align-items:center; gap:9px; padding:9px 0;
+  border-top:1px solid rgba(255,255,255,.06); font-size:.92rem; cursor:pointer; }
+.mkt-satir:first-child{ border-top:0; }
+.mkt-satir > span{ min-width:0; overflow-wrap:anywhere; }
+
 .bes-spark{ width:100%; height:36px; display:block; margin-top:4px; }
 
 /* §15 Öğün günlüğü */
@@ -724,7 +739,8 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   <!-- §3.3 Su -->
   <section id="b-su" class="bolum" aria-label="Su"></section>
 
-  <!-- §15 Bugün yenenler -->
+  <!-- §15 Bugün yenenler — Beslenme sekmesinde; kalori halkası (b-gunluk)
+       yine Bugün'de özet olarak kalıyor. -->
   <section id="b-ogun" class="bolum" aria-label="Öğünler" hidden></section>
 
   <!-- §3.4 Bugünün planı -->
@@ -739,7 +755,8 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
   <!-- §3.7 Gün sonu değerlendirmesi -->
   <section id="b-degerlendirme" class="bolum" aria-label="Gün sonu değerlendirmesi"></section>
 
-  <!-- §8 Yarının alarmları -->
+  <!-- §8 Yarının alarmları — Plan görünümünün sonunda: gün sonu değerlendirmesi
+       gibi akşam yapılan, o günün planını kapatıp yarına hazırlanan bir iş. -->
   <section id="b-alarm" class="bolum cam" aria-label="Yarının alarmları"></section>
 
   <!-- Profil -->
@@ -792,7 +809,7 @@ const VARSAYILAN = {
   islenmisVakitler: [],                                     // §5 — "tarih|vakit"
   sonKontrol: null,
   profil: "",                                               // §9
-  javaOnay: {},                                             // §17 — hafta -> onay zamanı
+  javaOnay: {},                                             // §18 — hafta -> onay zamanı
   etkinlikler: [],                                          // §7
   sohbet: [],                                               // §10
   ayar: {},
@@ -802,7 +819,8 @@ const VARSAYILAN = {
     tartim: [],          // [{tarih, kilo}] — kilo günlüğü
     kayit: {},           // "YYYY-MM-DD" -> öğün kayıtları
     sevmedigim: [],      // kaçınılacak yemekler
-    sayac: {}            // "YYYY-MM-DD" -> program üretim sayısı (kota)
+    sayac: {},           // "YYYY-MM-DD" -> program üretim sayısı (kota)
+    market: []           // mutfakta işaretli malzemeler; kalanlar alışveriş listesi
   }
 };
 
@@ -820,9 +838,144 @@ function yukle(){
     return structuredClone(VARSAYILAN);
   }
 }
-function kaydet(){
+function kaydetYerel(){
   try{ localStorage.setItem(ANAHTAR, JSON.stringify(UYG.veri)); }
   catch(e){ console.warn("Depoya yazılamadı.", e); }
+}
+function kaydet(){
+  kaydetYerel();
+  senkronPlanla();
+}
+
+/* ===============================================================
+   §16 — Bulut senkronu (Supabase). Giriş ekranı yok: istemci rastgele
+   bir anahtar üretir, ilk yazmada sunucu (api/veri.js) o anahtarı
+   sahiplenir. Anahtar yalnız bu tarayıcının localStorage'ında durur;
+   "kurtarma linki" (?anahtar=...) başka bir tarayıcıya/cihaza taşımanın
+   ya da tarayıcı verisi silindikten sonra geri dönmenin tek yolu.
+   =============================================================== */
+
+const SENKRON_ANAHTAR_ANAHTARI = "ledger/senkron-anahtar";
+const SENKRON_ZAMAN_ANAHTARI   = "ledger/senkron-zaman";
+
+function senkronAnahtari(){
+  try{ return localStorage.getItem(SENKRON_ANAHTAR_ANAHTARI) || ""; }catch(e){ return ""; }
+}
+function senkronAnahtariAyarla(deger){
+  try{
+    if(deger) localStorage.setItem(SENKRON_ANAHTAR_ANAHTARI, deger);
+    else localStorage.removeItem(SENKRON_ANAHTAR_ANAHTARI);
+  }catch(e){}
+}
+function senkronZamaniOku(){
+  try{ return localStorage.getItem(SENKRON_ZAMAN_ANAHTARI) || ""; }catch(e){ return ""; }
+}
+function senkronZamaniYaz(z){
+  try{
+    if(z) localStorage.setItem(SENKRON_ZAMAN_ANAHTARI, z);
+    else localStorage.removeItem(SENKRON_ZAMAN_ANAHTARI);
+  }catch(e){}
+}
+function rastgeleAnahtar(){
+  const dizi = new Uint8Array(24);
+  (self.crypto || window.crypto).getRandomValues(dizi);
+  return Array.from(dizi, b => b.toString(16).padStart(2, "0")).join("");
+}
+function kurtarmaLinki(){
+  return location.origin + location.pathname + "?anahtar=" + encodeURIComponent(senkronAnahtari());
+}
+
+// ?anahtar=... geldiyse (kurtarma linki) sakla ve adresten temizle.
+(function senkronBaglantisiniIsle(){
+  try{
+    const u = new URL(location.href);
+    const a = u.searchParams.get("anahtar");
+    if(a){
+      senkronAnahtariAyarla(a);
+      u.searchParams.delete("anahtar");
+      history.replaceState(null, "", u.pathname + u.search + u.hash);
+    }
+  }catch(e){}
+})();
+
+let senkronZamanlayici = null, senkronCalisiyor = false, senkronBekleyen = false;
+
+function senkronPlanla(){
+  if(!senkronAnahtari()) return;
+  clearTimeout(senkronZamanlayici);
+  senkronZamanlayici = setTimeout(senkronGonder, 1500);
+}
+
+/** Yereldeki UYG.veri'yi buluta yazar. İlk çağrıda anahtarı sahiplenir. */
+async function senkronGonder(){
+  const anahtar = senkronAnahtari();
+  if(!anahtar || !UYG.veri) return;
+  if(senkronCalisiyor){ senkronBekleyen = true; return; }
+  senkronCalisiyor = true;
+  try{
+    const cevap = await fetch("api/veri", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-ledger-anahtar": anahtar },
+      body: JSON.stringify({ icerik: UYG.veri })
+    });
+    if(cevap.ok){
+      const j = await cevap.json().catch(() => null);
+      if(j && j.guncellendi) senkronZamaniYaz(j.guncellendi);
+    }else if(cevap.status === 401){
+      console.warn("senkron: bu anahtar buluttaki kayda sahip değil");
+    }
+  }catch(e){ console.warn("senkron gönderilemedi", e); }
+  finally{
+    senkronCalisiyor = false;
+    if(senkronBekleyen){ senkronBekleyen = false; senkronGonder(); }
+  }
+}
+
+/** Açılışta buluttan okur; bulut yerelden daha yeniyse (ör. tarayıcı verisi
+    silinip kurtarma linkiyle dönülmüşse) yereli buluttakiyle değiştirir. */
+async function senkronYukle(){
+  const anahtar = senkronAnahtari();
+  if(!anahtar) return;
+  try{
+    const cevap = await fetch("api/veri", { headers: { "x-ledger-anahtar": anahtar } });
+    if(!cevap.ok) return;
+    const j = await cevap.json();
+    if(!j || !j.icerik || !j.guncellendi) return;
+    const yerelZaman = senkronZamaniOku();
+    if(yerelZaman && new Date(yerelZaman).getTime() >= new Date(j.guncellendi).getTime()) return;
+    UYG.veri = Object.assign(structuredClone(VARSAYILAN), j.icerik);
+    UYG.veri.beslenme = Object.assign(structuredClone(VARSAYILAN.beslenme), UYG.veri.beslenme || {});
+    kaydetYerel();
+    senkronZamaniYaz(j.guncellendi);
+    tumunuCiz();
+  }catch(e){ console.warn("senkron yüklenemedi", e); }
+}
+
+/** Ayarlar'dan "buluta senkronu aç": anahtar yoksa üretir, ilk push'u yollar. */
+async function senkronAc(){
+  if(!senkronAnahtari()) senkronAnahtariAyarla(rastgeleAnahtar());
+  ayarlarMesaj = "Senkron açılıyor…";
+  ayarlarCiz();
+  await senkronGonder();
+  ayarlarMesaj = "";
+  ayarlarCiz();
+}
+function senkronKapat(){
+  clearTimeout(senkronZamanlayici);
+  senkronAnahtariAyarla("");
+  senkronZamaniYaz("");
+  ayarlarMesaj = "Bulut senkronu bu tarayıcıda kapatıldı; bulut verisi silinmedi.";
+  ayarlarCiz();
+}
+async function kurtarmaLinkiKopyala(){
+  const link = kurtarmaLinki();
+  try{
+    await navigator.clipboard.writeText(link);
+    ayarlarMesaj = "Kurtarma linki kopyalandı. Notlarına ya da parola yöneticine kaydet.";
+  }catch(e){
+    ayarlarMesaj = "Kopyalanamadı: " + link;
+  }
+  ayarlarCiz();
 }
 
 /* --- Tarih yardımcıları --------------------------------------- */
@@ -1574,11 +1727,12 @@ function anaEkrandaMi(){
   if(navigator.standalone === true) return true;      // iOS'un kendi bayrağı
   return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
 }
-/* x-success yalnız tarayıcıdayken veriliyor. Ana ekrandan açıldığında iOS o
-   https adresini Safari'de açıyor ve kullanıcıyı uygulamanın tarayıcı
-   kopyasına düşürüyor — alarm kuruluyor ama yanlış uygulamada uyanıyorsun.
-   Parametre yokken kısayol bitince Kısayollar'da kalınıyor; geri dönüş bir
-   kaydırma, yanlış uygulamaya atılmaktan iyi. */
+/* x-success yalnız tarayıcıdayken veriliyor. iOS'ta bir https linki hiçbir
+   zaman standalone PWA kabuğunu açamıyor — her zaman Safari'de açılır. Ana
+   ekrandan (PWA) açıldığında x-success verirsek kullanıcı gerçek PWA'dan
+   Safari'ye düşer; vermezsek kısayol bitince Kısayollar'da kalınır, gerçek
+   PWA'ya dönmenin tek yolu (uygulama geçiş ekranından elle seçmek) hâlâ açık
+   kalır. Kullanıcı Safari'ye otomatik düşmek yerine bunu tercih etti. */
 function kisayolAdresi(saat, dakika, tur){
   return "shortcuts://x-callback-url/run-shortcut" +
     "?name=" + encodeURIComponent(kisayolAdi(tur)) +
@@ -1947,6 +2101,35 @@ async function ntfyDene(){
 const $ayarlar = document.getElementById("b-ayarlar");
 let ayarlarMesaj = "";
 
+/* §16 — Ayarlar'daki "Veri" bloğu: bulut senkron durumu + yerel yedek. */
+function veriBolum(){
+  const anahtar = senkronAnahtari();
+  const zaman = senkronZamaniOku();
+  const zamanMetni = zaman ? sureMetni(Date.now() - new Date(zaman).getTime()) + " önce" : "";
+
+  const govde = anahtar
+    ? '<p class="sonuk" style="margin:0 0 10px">Her değişiklik buluta da yazılıyor' +
+        (zamanMetni ? " (son senkron: " + zamanMetni + ")" : "") +
+        '. Tarayıcı verisini silersen, aşağıdaki kurtarma linkini açarak verine geri dönersin ' +
+        '— linki şimdi kopyalayıp notlarına ya da parola yöneticine kaydet.</p>' +
+      '<div class="ay-satir">' +
+        '<button class="dg dg-sonuk" id="ay-kurtarma">kurtarma linkini kopyala</button>' +
+        '<button class="dg dg-sonuk" id="ay-senkron-kapat">senkronu kapat</button>' +
+      '</div>'
+    : '<p class="sonuk" style="margin:0 0 10px">Her şey bu telefonda duruyor; ' +
+        'tarayıcı verisini silersen kayıt da gider. Buluta senkron açarsan, bir kurtarma ' +
+        'linkiyle her zaman geri dönebilirsin — giriş ekranı, şifre yok.</p>' +
+      '<button class="dg" id="ay-senkron-ac">buluta senkronu aç</button>';
+
+  return '<div class="ay-blok">' +
+      '<p class="ay-bas">Veri' + (anahtar ? ' <span class="sonuk">bulutla senkron</span>' : '') + '</p>' +
+      govde +
+      '<div class="ay-satir" style="margin-top:10px">' +
+        '<button class="dg dg-sonuk" id="ay-disari">yedeği indir</button>' +
+      '</div>' +
+    '</div>';
+}
+
 function ayarlarCiz(){
   const durum = bildirimDurumu();
   const topic = UYG.veri.ayar.ntfy || "";
@@ -1987,12 +2170,7 @@ function ayarlarCiz(){
         : "") +
     '</div>' +
 
-    '<div class="ay-blok">' +
-      '<p class="ay-bas">Veri</p>' +
-      '<p class="sonuk" style="margin:0 0 10px">Her şey bu telefonda duruyor; ' +
-        'hesap ve sunucu yok. Tarayıcı verisini silersen kayıt da gider.</p>' +
-      '<button class="dg dg-sonuk" id="ay-disari">yedeği indir</button>' +
-    '</div>' +
+    veriBolum() +
 
     (ayarlarMesaj ? '<p class="sonuk" style="margin:12px 0 0">' + kacir(ayarlarMesaj) + '</p>' : "");
 }
@@ -2007,6 +2185,9 @@ $ayarlar.addEventListener("click", e => {
   }
   else if(d.id === "ay-dene") ntfyDene();
   else if(d.id === "ay-disari") yedegiIndir();
+  else if(d.id === "ay-senkron-ac") senkronAc();
+  else if(d.id === "ay-senkron-kapat") senkronKapat();
+  else if(d.id === "ay-kurtarma") kurtarmaLinkiKopyala();
 });
 $ayarlar.addEventListener("change", e => {
   if(e.target.id === "ay-topic"){
@@ -2854,7 +3035,7 @@ function gunNesnesi(tarih){
 function kursSaati(tarih){ return KURS[gunNesnesi(tarih).getDay()] || null; }
 function gunAdi(tarih){ return GUN_ADI[gunNesnesi(tarih).getDay()]; }
 
-/* §16 — Java eğitimi: 22 Eylül 2026'da başlayan 20 haftalık öz-öğrenim
+/* §17 — Java eğitimi: 22 Eylül 2026'da başlayan 20 haftalık öz-öğrenim
    programı (Notion'daki yol haritasıyla aynı tarih ve fazlar). Hafta içi
    (Pazartesi-Cuma) sabit süreli bir çalışma günü, Cumartesi tekrar+proje,
    Pazar tam tatil — kurs saatleri gibi tarihe bağlı, sabit bir katman. */
@@ -2934,7 +3115,7 @@ function planHakkiDus(tarih){
 
 let planMesaj = "";
 
-/* §17 — haftalık Notion onayı. Roadmap'in checkbox'ları "bakmadan" kendi
+/* §18 — haftalık Notion onayı. Roadmap'in checkbox'ları "bakmadan" kendi
    kendine test sorularıdır; ledger'daki bir günü "yapıldı" işaretlemek
    "biliyorum" anlamına gelmez. Bu yüzden api/notion yalnız kullanıcı elle
    onaylayınca çağrılır — otomatik tetiklenmez. */
@@ -3273,6 +3454,48 @@ function beslenmeHakkiDus(){
   for(const k of Object.keys(s)) if(k < gunKaydir(t, -7)) delete s[k];
 }
 
+/* --- Market: tarif malzemeleri işaretlenir, işaretsizler alışveriş listesi -- */
+function malzNorm(s){ return String(s || "").trim().toLocaleLowerCase("tr"); }
+function mutfaktaVar(ad){
+  const n = malzNorm(ad);
+  return !!n && (UYG.veri.beslenme.market || []).some(x => malzNorm(x) === n);
+}
+function programMalzemeleri(){
+  const pr = UYG.veri.beslenme.program, gor = new Set(), liste = [];
+  if(!pr) return liste;
+  (pr.ogunler || []).forEach(o => (o.yemekler || []).forEach(y =>
+    (y.malzemeler || []).forEach(m => {
+      const n = malzNorm(m);
+      if(n && !gor.has(n)){ gor.add(n); liste.push(String(m).trim()); }
+    })));
+  return liste;
+}
+function alinacaklar(){ return programMalzemeleri().filter(m => !mutfaktaVar(m)); }
+function programMalzemeliMi(){
+  const pr = UYG.veri.beslenme.program;
+  return !!pr && (pr.ogunler || []).some(o =>
+    (o.yemekler || []).some(y => (y.malzemeler || []).length));
+}
+function mutfagaAl(ad){
+  const a = String(ad || "").trim().slice(0, 60);
+  if(!a || mutfaktaVar(a)) return false;
+  const d = UYG.veri.beslenme.market || (UYG.veri.beslenme.market = []);
+  d.push(a);
+  if(d.length > 300) UYG.veri.beslenme.market = d.slice(-300);
+  return true;
+}
+function mutfaktanCikar(ad){
+  const n = malzNorm(ad);
+  const d = UYG.veri.beslenme.market || [];
+  const i = d.findIndex(x => malzNorm(x) === n);
+  if(i === -1) return false;
+  d.splice(i, 1);
+  return true;
+}
+function malzIsaretle(ad, iceri){
+  if(iceri ? mutfagaAl(ad) : mutfaktanCikar(ad)){ kaydet(); beslenmeCiz(); }
+}
+
 /* --- Çizim --------------------------------------------------- */
 function makroCip(y){
   return '<span class="mk">P' + (y.protein || 0) + '</span>' +
@@ -3369,7 +3592,7 @@ function programBolum(){
               (UYG.alternatifBekliyor === id ? " disabled" : "") + '>' +
               (UYG.alternatifBekliyor === id ? "değişiyor…" : "beğenmedim") + '</button>' +
           '</div>' +
-          (acik && y.tarif ? '<p class="bes-tarif">' + kacir(y.tarif) + '</p>' : '') +
+          (acik ? malzemeVeTarif(y) : '') +
         '</div>';
       }).join("") +
     '</div>').join("");
@@ -3378,6 +3601,57 @@ function programBolum(){
       '<span class="yan">' + (pr.gunlukKalori || 0) + ' kcal</span></h2>' +
     (pr.not ? '<p class="sonuk" style="margin:0 0 12px">' + kacir(pr.not) + '</p>' : '') +
     ogunler + dugme;
+}
+
+function malzemeVeTarif(y){
+  const ml = (y.malzemeler || []).filter(Boolean);
+  let govde = "";
+  if(ml.length){
+    const satirlar = ml.map(m =>
+      '<label class="malz">' +
+        '<input type="checkbox" data-malz="' + kacir(m) + '"' +
+          (mutfaktaVar(m) ? ' checked' : '') + '>' +
+        '<span>' + kacir(m) + '</span>' +
+      '</label>').join("");
+    govde += '<div class="bes-malz">' + satirlar + '</div>' +
+      '<p class="sonuk mini malz-ipuc">İşaretle: mutfağında var. İşaretsizler market listesine düşer.</p>';
+  }
+  else govde += '<p class="sonuk mini malz-ipuc">Bu tarif eski; malzeme listesi yok. ' +
+    'Programı yeniden üretince malzemeler gelir.</p>';
+  if(y.tarif) govde += '<p class="bes-tarif">' + kacir(y.tarif) + '</p>';
+  return govde;
+}
+
+function marketBolum(){
+  const dolap = UYG.veri.beslenme.market || [];
+  const alinacak = alinacaklar();
+  if(!UYG.veri.beslenme.program && !dolap.length) return "";
+
+  const satir = (ad, iceri) =>
+    '<label class="mkt-satir">' +
+      '<input type="checkbox" data-mkt="' + kacir(ad) + '"' + (iceri ? " checked" : "") + '>' +
+      '<span>' + kacir(ad) + '</span>' +
+    '</label>';
+
+  const ag = alinacak.length
+    ? alinacak.map(ad => satir(ad, false)).join("")
+    : (programMalzemeliMi() || !UYG.veri.beslenme.program
+        ? '<p class="sonuk mini" style="margin:2px 0 0">Program malzemelerinin hepsi işaretli. ' +
+          'Bir tarifte işareti kaldırdığın malzeme buraya gelir.</p>'
+        : '<p class="sonuk mini" style="margin:2px 0 0">Eldeki program malzeme listesi içermiyor. ' +
+          'Yukarıdan “programı yeniden üret” de; yeni programlar malzemeleriyle gelir.</p>');
+
+  const dg = dolap.length
+    ? dolap.map(ad => satir(ad, true)).join("")
+    : '<p class="sonuk mini" style="margin:2px 0 0">Tariflerdeki malzemeleri işaretledikçe burada birikir.</p>';
+
+  return '<h2 class="bolum-bas">Market listesi' +
+      (alinacak.length ? '<span class="yan">' + alinacak.length + '</span>' : '') + '</h2>' +
+    '<p class="sonuk mini" style="margin:0 0 2px">Aldığını işaretle; mutfağına geçer.</p>' +
+    '<div class="mkt-liste">' + ag + '</div>' +
+    '<h2 class="bolum-bas" style="margin-top:18px">Mutfağımda' +
+      (dolap.length ? '<span class="yan">' + dolap.length + '</span>' : '') + '</h2>' +
+    '<div class="mkt-liste">' + dg + '</div>';
 }
 
 function kiloSparkline(){
@@ -3416,9 +3690,11 @@ function tartimBolum(){
 
 function beslenmeCiz(){
   if(!UYG.veri) return;
+  const mkt = marketBolum();
   $beslenme.innerHTML =
     '<div class="ist-blok">' + profilBolum() + '</div>' +
     '<div class="ist-blok bosluk">' + programBolum() + '</div>' +
+    (mkt ? '<div class="ist-blok bosluk">' + mkt + '</div>' : '') +
     '<div class="ist-blok bosluk">' + tartimBolum() + '</div>';
 }
 
@@ -3570,6 +3846,11 @@ $beslenme.addEventListener("click", e => {
   else if(d.dataset.tarif){ acikTarif = (acikTarif === d.dataset.tarif) ? null : d.dataset.tarif; beslenmeCiz(); }
   else if(d.dataset.video)       tarifVideosu(d.dataset.video);
   else if(d.dataset.begenmedim)  yemekBegenmedim(d.dataset.begenmedim);
+});
+$beslenme.addEventListener("change", e => {
+  const ds = e.target.dataset;
+  const ad = ds && (ds.malz || ds.mkt);
+  if(ad != null) malzIsaretle(ad, !!e.target.checked);
 });
 $beslenme.addEventListener("keydown", e => {
   if(e.key === "Enter" && e.target.id === "bes-kilo"){ e.preventDefault(); tartimGirisGonder(); }
@@ -3764,11 +4045,15 @@ $ogun.addEventListener("keydown", e => {
    Görünüm (alt tab bar): tek sayfa, bölümler sekmeye göre gösterilir.
    =============================================================== */
 const GORUNUM = {
-  bugun:    ["b-gunluk", "b-namaz", "b-kaza", "b-su", "b-ogun"],
+  bugun:    ["b-gunluk", "b-namaz", "b-kaza", "b-su"],
   seri:     ["b-istatistik"],
-  plan:     ["b-plan", "b-sohbet", "b-etkinlik", "b-degerlendirme"],
-  beslenme: ["b-beslenme"],
-  ayarlar:  ["b-alarm", "b-ayar", "b-ayarlar"]
+  // Yarının alarmları akşam yapılan bir iş — gün sonu değerlendirmesinin
+  // hemen ardından, Plan'ın sonunda; Ayarlar yalnız kalıcı yapılandırma kalsın.
+  plan:     ["b-plan", "b-sohbet", "b-etkinlik", "b-degerlendirme", "b-alarm"],
+  // Öğün günlüğü beslenmeyle ilgili; kalori halkası (b-gunluk) yine Bugün'de
+  // özet olarak kalıyor, yalnız günlüğün kendisi Beslenme'ye taşındı.
+  beslenme: ["b-ogun", "b-beslenme"],
+  ayarlar:  ["b-ayar", "b-ayarlar"]
 };
 const TUM_BOLUMLER = Object.keys(GORUNUM).reduce((a, k) => a.concat(GORUNUM[k]), []);
 let aktifGorunum = "bugun";
@@ -3783,10 +4068,10 @@ function gorunum(sekme){
     if(el) el.hidden = GORUNUM[sekme].indexOf(id) === -1;
   }
   // İçeriğe göre kendini gizleyen bölümler yeniden karar versin.
-  if(sekme === "bugun"){   kazaCiz(); ogunCiz(); }
+  if(sekme === "bugun")    kazaCiz();
   if(sekme === "plan")     etkinlikCiz();
   if(sekme === "seri")     istatistikCiz();
-  if(sekme === "beslenme") beslenmeCiz();
+  if(sekme === "beslenme"){ beslenmeCiz(); ogunCiz(); }
 
   const nav = document.getElementById("alt-nav");
   if(nav && nav.querySelectorAll){
@@ -3807,11 +4092,9 @@ function gorunum(sekme){
 })();
 
 /* --- Açılış --------------------------------------------------- */
-function baslat(){
-  UYG.veri  = yukle();
-  UYG.bugun = uygulamaGunu();
-  vurguyuAyarla("yatsi");
-
+/** Tüm bölümleri yeniden çizer — açılışta ve bulut senkronu yereli
+    değiştirdiğinde (§16) kullanılır. */
+function tumunuCiz(){
   gunlukCiz();
   kazaCiz();
   suCiz();
@@ -3825,6 +4108,14 @@ function baslat(){
   istatistikCiz();
   beslenmeCiz();
   ogunCiz();
+}
+
+function baslat(){
+  UYG.veri  = yukle();
+  UYG.bugun = uygulamaGunu();
+  vurguyuAyarla("yatsi");
+
+  tumunuCiz();
   gorunum((UYG.veri.ayar && UYG.veri.ayar.sekme) || "bugun");
 
   // Plan üretimi vakitleri de gönderir (§6), o yüzden namazKur'dan sonra.
@@ -3834,6 +4125,8 @@ function baslat(){
   konumSor(false).then(k => {                   // izin gelirse konuma göre tazele
     if(k && k.kaynak === "cihaz") namazKur(true).then(borcTara);
   });
+
+  senkronYukle();     // arka planda; buluttaki daha yeniyse yeniden çizer (§16)
 }
 baslat();
 

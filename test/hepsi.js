@@ -578,7 +578,7 @@ await dene("kurs saatleri: salı/perşembe 19:00, cuma-cumartesi-pazar yok", asy
   esit(u.ic.kursSaati("2026-09-13"), null, "pazar");
 });
 
-bolum("§16 — Java eğitimi");
+bolum("§17 — Java eğitimi");
 
 await dene("javaDurumu: başlamadan önce ve 20 hafta bitince null", async () => {
   const u = await ac({ simdi:"2026-09-06T09:00:00" });
@@ -616,7 +616,7 @@ await dene("api/plan gövdesine java alanı gider", async () => {
   esit(b.java.faz, "Java temeli");
 });
 
-bolum("§17 — haftalık Notion onayı");
+bolum("§18 — haftalık Notion onayı");
 
 await dene("javaOnayGosterilsin: çalışma gününde hiç gösterilmez", async () => {
   const u = await ac({ simdi:"2026-09-22T09:00:00" });   // salı, çalışma günü
@@ -1265,8 +1265,10 @@ await dene("iPhone'da kısayol bağlantısı basılır ve saati taşır", async 
 });
 
 await dene("ana ekrandan açılınca x-success verilmez", async () => {
-  // Safari'de x-success sayfaya geri getiriyor; ana ekranda ise iOS aynı https
-  // adresini Safari'de açıp kullanıcıyı uygulamanın tarayıcı kopyasına düşürüyor.
+  // Safari'de x-success sayfaya geri getiriyor. Ana ekrandan (PWA) açıksa
+  // iOS'ta bir https linki hiçbir zaman standalone kabuğu açamıyor — Safari'ye
+  // düşmek yerine kısayolda kalınıp gerçek PWA'ya elle (uygulama geçiş
+  // ekranından) dönülüyor.
   const tarayici = await ac({ simdi:"2026-09-06T22:00:00", cihaz:"ios" });
   esit(tarayici.ic.anaEkrandaMi(), false);
   icerir(tarayici.html("b-alarm"), "x-success=");
@@ -1859,6 +1861,17 @@ await dene("beslenme 5. sekmedir; gorunum('beslenme') onu açar", async () => {
   esit(u.ctx.document.getElementById("b-namaz").hidden, true);
 });
 
+await dene("§8 yarının alarmları artık Plan sekmesinde, Ayarlar'da değil", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.ic.gorunum("plan");
+  esit(u.ctx.document.getElementById("b-alarm").hidden, false, "Plan'da görünmeli");
+  u.ic.gorunum("ayarlar");
+  esit(u.ctx.document.getElementById("b-alarm").hidden, true, "Ayarlar'da gizlenmeli");
+  esit(u.ctx.document.getElementById("b-ayar").hidden, false, "Profil Ayarlar'da kalmalı");
+  esit(u.ctx.document.getElementById("b-ayarlar").hidden, false, "Ayarlar bölümü Ayarlar'da kalmalı");
+});
+
 await dene("programUret: kota düşer, istek mod=program ve hedefi taşır", async () => {
   const prog = { gunlukKalori:3020, makro:{protein:132,karb:430,yag:85},
     ogunler:[{ ad:"Kahvaltı", yemekler:[
@@ -1913,16 +1926,105 @@ await dene("tarifVideosu: api/tarif'ten gelen linki yemeğe önbellekler", async
        "https://www.youtube.com/watch?v=abcdefghijk");
 });
 
+bolum("§15 — market (tarif malzemeleri onay kutusu + alışveriş listesi)");
+
+const MPROG = { gunlukKalori:3000, makro:{protein:130,karb:400,yag:80},
+  ogunler:[{ ad:"Kahvaltı", yemekler:[
+    { ad:"Menemen", miktar:"1 tabak", kalori:320, protein:16, karb:10, yag:24,
+      malzemeler:["yumurta","domates","yeşil biber","zeytinyağı"], tarif:"Kavur." } ] }] };
+
+function marketliDepo(ek){
+  return JSON.stringify({ surum:1, ayar:{},
+    beslenme: Object.assign({ profil:BP, program:MPROG }, ek || {}) });
+}
+
+await dene("tarif açılınca malzemeler onay kutusu olur; mutfaktaki işaretli gelir", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": marketliDepo({ market:["Yumurta"] }) } });
+  await u.bekle();
+  u.tikla({ dataset:{ tarif:"0-0" } });
+  const h = u.html("b-beslenme");
+  icerir(h, 'type="checkbox" data-malz="domates"');
+  icerir(h, 'data-malz="yumurta" checked');    // mutfakta → işaretli
+  icermez(h, "listeye ekle");                   // elle giriş / buton yok
+});
+
+await dene("malzeme kutusu işaretlenince mutfağa, kaldırılınca listeye döner", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": marketliDepo() } });
+  await u.bekle();
+  u.tikla({ dataset:{ tarif:"0-0" } });
+  u.degisim({ dataset:{ malz:"domates" }, checked:true });
+  esit(u.ic.mutfaktaVar("domates"), true);
+  esit(u.ic.alinacaklar().indexOf("domates"), -1, "işaretli malzeme alışverişte olmamalı");
+  esit(JSON.parse(u.durum.depo.get("ledger/v1")).beslenme.market.join(","), "domates");
+  u.degisim({ dataset:{ malz:"Domates" }, checked:false });   // harf duyarsız eşleşme
+  esit(u.ic.mutfaktaVar("domates"), false);
+  esit(u.ic.alinacaklar().indexOf("domates") !== -1, true);
+});
+
+await dene("alışveriş listesi = programdaki işaretsiz malzemeler (tekilleştirilmiş)", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": marketliDepo({ market:["zeytinyağı"] }) } });
+  await u.bekle();
+  esit(u.ic.alinacaklar().join(","), "yumurta,domates,yeşil biber");
+  const h = u.html("b-beslenme");
+  icerir(h, "Market listesi");
+  icerir(h, 'data-mkt="yumurta"');
+  icerir(h, "Mutfağımda");
+  icerir(h, 'data-mkt="zeytinyağı" checked');
+});
+
+await dene("Market listesinde işaretlemek ürünü mutfağa taşır", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": marketliDepo() } });
+  await u.bekle();
+  u.degisim({ dataset:{ mkt:"yumurta" }, checked:true });
+  esit(u.ic.mutfaktaVar("yumurta"), true);
+  esit(u.ic.alinacaklar().join(","), "domates,yeşil biber,zeytinyağı");
+});
+
+await dene("Mutfağımda işareti kaldırmak ürünü alışveriş listesine geri koyar", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": marketliDepo({ market:["yumurta","domates","yeşil biber","zeytinyağı"] }) } });
+  await u.bekle();
+  esit(u.ic.alinacaklar().length, 0);
+  u.degisim({ dataset:{ mkt:"domates" }, checked:false });
+  esit(u.ic.UYG.veri.beslenme.market.indexOf("domates"), -1);
+  esit(u.ic.alinacaklar().join(","), "domates");
+});
+
+await dene("program yoksa ve mutfak boşsa market bölümü çizilmez", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, ayar:{}, beslenme:{ profil:BP } }) } });
+  await u.bekle();
+  icermez(u.html("b-beslenme"), "Market listesi");
+});
+
+await dene("eski program (malzemesiz): yeniden üret uyarısı çıkar", async () => {
+  const ESKI = { gunlukKalori:3000, makro:{protein:130,karb:400,yag:80},
+    ogunler:[{ ad:"Kahvaltı", yemekler:[
+      { ad:"Menemen", miktar:"1 tabak", kalori:320, tarif:"Kavur." } ] }] };   // malzemeler yok
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    depo:{ "ledger/v1": JSON.stringify({ surum:1, ayar:{}, beslenme:{ profil:BP, program:ESKI } }) } });
+  await u.bekle();
+  esit(u.ic.programMalzemeliMi(), false);
+  u.tikla({ dataset:{ tarif:"0-0" } });
+  const h = u.html("b-beslenme");
+  icerir(h, "malzeme listesi içermiyor");        // market bölümü uyarısı
+  icerir(h, "Bu tarif eski");                     // tarif kartı uyarısı
+});
+
 bolum("§15 — öğün günlüğü ve kalori halkası");
 
-await dene("b-ogun: profil ve kayıt yoksa gizli, profil varsa görünür", async () => {
+await dene("b-ogun: Beslenme sekmesinde; Bugün'de (doğru sekme değilken) gizli", async () => {
   const bos = kur({ simdi:"2026-09-10T09:00:00" });
   await bos.bekle();
   esit(bos.ctx.document.getElementById("b-ogun").hidden, true);
 
   const u = kur({ simdi:"2026-09-10T09:00:00", depo:{ "ledger/v1": JSON.stringify(PROFILLI) } });
   await u.bekle();
-  esit(u.ctx.document.getElementById("b-ogun").hidden, false);
+  esit(u.ctx.document.getElementById("b-ogun").hidden, true, "Bugün sekmesindeyken gizli olmalı");
+  u.ic.gorunum("beslenme");
+  esit(u.ctx.document.getElementById("b-ogun").hidden, false, "Beslenme sekmesinde, profil varken görünmeli");
   icerir(u.html("b-ogun"), "0 / 3029 kcal");
 });
 
@@ -1968,6 +2070,126 @@ await dene("kalori halkası profil yoksa çizilmez", async () => {
   const u = kur({ simdi:"2026-09-10T09:00:00" });
   await u.bekle();
   icermez(u.html("b-gunluk"), "Kalori");
+});
+
+bolum("§16 — bulut senkronu (Supabase, giriş ekranı yok)");
+
+const S_ANAHTAR = "z".repeat(48);
+
+await dene("kaydet(): senkron anahtarı yoksa buluta zamanlayıcı kurulmaz", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  const once = u.durum.zamanlayicilar.length;
+  u.ic.kaydet();
+  esit(u.durum.zamanlayicilar.length, once);
+});
+
+await dene("kaydet(): senkron anahtarı varsa debounce zamanlayıcısı kurulur", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  const once = u.durum.zamanlayicilar.length;
+  u.ic.kaydet();
+  dogru(u.durum.zamanlayicilar.length > once, "zamanlayıcı kurulmalı");
+});
+
+await dene("senkronGonder: UYG.veri'yi x-ledger-anahtar başlığıyla buluta POST eder", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    api:{ veri: { tamam:true, guncellendi:"2026-09-10T09:00:05.000Z" } } });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  u.ic.UYG.veri.profil = "yeni profil";
+  await u.ic.senkronGonder();
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "veri").pop();
+  dogru(c, "veri çağrısı yapılmalı");
+  esit(c.headers["x-ledger-anahtar"], S_ANAHTAR);
+  esit(c.govde.icerik.profil, "yeni profil");
+  esit(u.ic.senkronZamaniOku(), "2026-09-10T09:00:05.000Z");
+});
+
+await dene("senkronGonder: sunucu 401 dönerse sessizce geçer, çökmez", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00", api:{ veri: { durum:401 } } });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  await u.ic.senkronGonder();
+  dogru(true, "hata fırlatmamalı");
+});
+
+await dene("senkronAc: anahtar yoksa üretir ve ilk push'u yapar", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    api:{ veri: { tamam:true, guncellendi:"2026-09-10T09:05:00.000Z" } } });
+  await u.bekle();
+  esit(u.ic.senkronAnahtari(), "");
+  await u.ic.senkronAc();
+  dogru(u.ic.senkronAnahtari().length >= 16, "rastgele anahtar üretilmeli");
+  const c = u.durum.apiCagrilari.filter(x => x.ad === "veri").pop();
+  dogru(c, "ilk push yapılmalı");
+  esit(c.headers["x-ledger-anahtar"], u.ic.senkronAnahtari());
+});
+
+await dene("senkronYukle: bulut daha yeniyse yereli değiştirir, yeniden çizer", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    api:{ veri: { icerik:{ profil:"buluttan gelen metin" },
+                  guncellendi:"2026-09-10T09:00:05.000Z" } } });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  esit(u.ic.senkronZamaniOku(), "");
+  await u.ic.senkronYukle();
+  esit(u.ic.UYG.veri.profil, "buluttan gelen metin");
+  esit(u.ic.senkronZamaniOku(), "2026-09-10T09:00:05.000Z");
+});
+
+await dene("senkronYukle: yerel eşit/daha yeniyse dokunmaz", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00",
+    api:{ veri: { icerik:{ profil:"eski bulut" }, guncellendi:"2026-09-10T09:00:00.000Z" } } });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  u.ic.senkronZamaniYaz("2026-09-10T09:05:00.000Z");     // yerel daha yeni
+  u.ic.UYG.veri.profil = "yerel metin";
+  await u.ic.senkronYukle();
+  esit(u.ic.UYG.veri.profil, "yerel metin", "buluttaki eski veri yereli ezmemeli");
+});
+
+await dene("?anahtar=... URL'si gelirse localStorage'a kaydedilir", async () => {
+  const deger = "k".repeat(40);
+  const u = kur({ simdi:"2026-09-10T09:00:00", url:"https://ledger.test/?anahtar=" + deger });
+  await u.bekle();
+  esit(u.ic.senkronAnahtari(), deger);
+});
+
+await dene("kurtarmaLinki: origin + pathname + anahtar", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla("abc123");
+  esit(u.ic.kurtarmaLinki(), "https://ledger.test/?anahtar=abc123");
+});
+
+await dene("Ayarlar: senkron kapalıyken 'buluta senkronu aç' görünür, kurtarma yok", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  const h = u.html("b-ayarlar");
+  icerir(h, 'id="ay-senkron-ac"');
+  icermez(h, "kurtarma linkini kopyala");
+});
+
+await dene("Ayarlar: senkron açıkken kurtarma linki ve kapatma düğmesi görünür", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  u.ic.ayarlarCiz();
+  const h = u.html("b-ayarlar");
+  icerir(h, "bulutla senkron");
+  icerir(h, 'id="ay-kurtarma"');
+  icerir(h, 'id="ay-senkron-kapat"');
+});
+
+await dene("senkronKapat: anahtarı temizler, buton tekrar 'aç' olur", async () => {
+  const u = kur({ simdi:"2026-09-10T09:00:00" });
+  await u.bekle();
+  u.ic.senkronAnahtariAyarla(S_ANAHTAR);
+  u.ic.senkronKapat();
+  esit(u.ic.senkronAnahtari(), "");
+  icerir(u.html("b-ayarlar"), 'id="ay-senkron-ac"');
 });
 
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");
