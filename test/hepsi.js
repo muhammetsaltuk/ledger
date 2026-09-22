@@ -593,8 +593,15 @@ await dene("javaDurumu: gün türleri ve hafta sayımı", async () => {
   esit(ilk.hafta, 1, "başlangıç günü");
   esit(ilk.tur, "calisma", "salı, çalışma günü");
   esit(ilk.faz, "Java temeli");
+  esit(ilk.gun, 1, "salı, Notion tablosunda gün 1");
+  esit(u.ic.javaDurumu("2026-09-23").gun, 2, "çarşamba, gün 2");
+  esit(u.ic.javaDurumu("2026-09-24").gun, 3, "perşembe, gün 3");
+  esit(u.ic.javaDurumu("2026-09-25").gun, 4, "cuma, gün 4");
+  esit(u.ic.javaDurumu("2026-09-28").gun, 5, "pazartesi, gün 5 (haftanın son çalışma günü)");
   esit(u.ic.javaDurumu("2026-09-26").tur, "tekrar", "cumartesi");
+  esit(u.ic.javaDurumu("2026-09-26").gun, 6, "cumartesi, Notion'da gün 6 (tekrar+kontrol)");
   esit(u.ic.javaDurumu("2026-09-27").tur, "tatil", "pazar");
+  esit(u.ic.javaDurumu("2026-09-27").gun, null, "pazar, gün yok");
   esit(u.ic.javaDurumu("2026-09-28").hafta, 1, "hafta hâlâ 1 (7. gün)");
   esit(u.ic.javaDurumu("2026-09-29").hafta, 2, "8. gün, hafta 2 başladı");
 });
@@ -666,6 +673,85 @@ await dene("'sonra' bu oturum için kartı gizler, işaretlenmiş saymaz", async
   esit(u.ic.javaOnayGosterilsin(), null, "bu oturumda bir daha gösterilmemeli");
   esit(u.veri().javaOnay[1], undefined, "'sonra' onaylamak değildir");
   icermez(u.html("b-plan"), "evet, biliyorum");
+});
+
+bolum("§19 — Yol Haritası görünümü");
+
+const SAHTE_PLAN_JAVA = Object.assign({}, SAHTE_PLAN, {
+  javaGunu: { hafta: 5, faz: "Web ve veritabanı temelleri", konu: "HTTP metotları, durum kodları" }
+});
+const SAHTE_ROADMAP_5 = {
+  hafta: 5, faz: "Web ve veritabanı temelleri",
+  baslik: "Hafta 5 — HTTP ve REST",
+  giris: "Hafta sonunda REST tasarımı yapabilmelisin.",
+  algoritma: "Algoritma (her gün 1 saat): 7 soru.",
+  gunler: [
+    { gun:"1", konu:"HTTP metotları, durum kodları",
+      kaynak:"MDN HTTP (https://developer.mozilla.org/HTTP)", uygulama:"Postman ile dene" },
+    { gun:"6", konu:"Tekrar + haftalık kontrol", kaynak:"—", uygulama:"Kontrolü yap" }
+  ],
+  kontrol: [
+    { metin:"REST nedir anlatabiliyorum.", tamam:false },
+    { metin:"HTTP durum kodlarını sayabiliyorum.", tamam:true }
+  ]
+};
+
+await dene("plan sayfasında javaGunu varsa üstü kapalı özet ve 'tam müfredatı gör' çıkar", async () => {
+  const u = await ac({ simdi:"2026-09-22T09:00:00", api:{ plan:SAHTE_PLAN_JAVA } });
+  const h = u.html("b-plan");
+  icerir(h, "Java — Hafta 5");
+  icerir(h, "HTTP metotları, durum kodları");
+  icerir(h, "tam müfredatı gör");
+});
+
+await dene("javaGunu yoksa özet/düğme hiç çıkmaz", async () => {
+  const u = await ac({ simdi:"2026-09-22T09:00:00", api:{ plan:SAHTE_PLAN } });
+  icermez(u.html("b-plan"), "tam müfredatı gör");
+});
+
+await dene("roadmapAc: api/roadmap'e doğru hafta gider, içerik çizilir", async () => {
+  const u = await ac({ simdi:"2026-09-22T09:00:00", api:{ roadmap:SAHTE_ROADMAP_5 } });
+  await u.ic.roadmapAc(5);
+  const cagri = u.durum.apiCagrilari.find(c => c.ad === "roadmap");
+  dogru(cagri, "api/roadmap çağrılmalı");
+  esit(cagri.govde.hafta, 5);
+
+  const h = u.html("b-roadmap");
+  icerir(h, "Hafta 5/20 — Web ve veritabanı temelleri");
+  icerir(h, "HTTP ve REST");
+  icerir(h, "REST tasarımı yapabilmelisin");
+  icerir(h, "HTTP metotları, durum kodları");
+  icerir(h, "Postman ile dene");
+  icerir(h, 'href="https://developer.mozilla.org/HTTP"');
+  icerir(h, "Gün 6 — tekrar");
+  icerir(h, "REST nedir anlatabiliyorum.");
+  icerir(h, "☑");                                     // tamamlanmış kontrol maddesi
+  icerir(h, "☐");                                     // tamamlanmamış
+  esit(u.ic.UYG.veri.ayar.sekme, "roadmap", "aktif sekme roadmap olmalı");
+});
+
+await dene("roadmap hata: mesaj gösterilir, uygulama çökmez", async () => {
+  const u = await ac({ simdi:"2026-09-22T09:00:00",
+    api:{ roadmap:{ durum:503, hata:"anahtar-yok", mesaj:"NOTION_API_KEY tanımlı değil; roadmap görünümü kapalı." } } });
+  await u.ic.roadmapAc(5);
+  icerir(u.html("b-roadmap"), "NOTION_API_KEY tanımlı değil");
+});
+
+await dene("roadmap hafta gezinmesi: sınırlarda önceki/sonraki kapanır", async () => {
+  const u = await ac({ simdi:"2026-09-22T09:00:00", api:{ roadmap:SAHTE_ROADMAP_5 } });
+  await u.ic.roadmapAc(1);
+  icerir(u.html("b-roadmap"), 'data-roadmap-hafta="0" disabled');
+  await u.ic.roadmapYukle(20);
+  icerir(u.html("b-roadmap"), 'data-roadmap-hafta="21" disabled');
+});
+
+await dene("roadmap 'geri' düğmesi: açıldığı sekmeye döner (Plan değil, Ayarlar)", async () => {
+  const u = await ac({ simdi:"2026-09-22T09:00:00", api:{ roadmap:SAHTE_ROADMAP_5 } });
+  u.ic.gorunum("ayarlar");
+  await u.ic.roadmapAc(5);
+  esit(u.ic.UYG.veri.ayar.sekme, "roadmap");
+  u.tikla({ dataset:{ roadmapGeri:"1" } });
+  esit(u.ic.UYG.veri.ayar.sekme, "ayarlar", "geri düğmesi geldiği sekmeye dönmeli");
 });
 
 await dene("plan üretimi günde en fazla üç kez", async () => {

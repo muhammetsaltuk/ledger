@@ -155,6 +155,116 @@ await dene("§17 java yoksa istemde 'aktif değil' notu, java varsa hafta/faz/g�
   icerir(metin, "ogrenme");       // yeni tür, çerçevede geçiyor
 });
 
+/** api/plan hem Gemini'ye (generativelanguage) hem Notion'a (api.notion.com)
+    istek atar; iki ayrı sahte servisi tek fetch'te birbirinden ayırır. */
+function planIleNotionTaklit(sayfalar){
+  const genKayit = { istekler: [] };
+  global.fetch = async (url, secenek) => {
+    const u = String(url);
+    if(u.indexOf("generativelanguage") !== -1){
+      const govde = JSON.parse(secenek.body);
+      genKayit.istekler.push({ url, govde });
+      return { ok:true, status:200, text: async () => JSON.stringify({
+        candidates: [{ content: { parts: [{ text: PLAN_CEVABI }] } }]
+      }) };
+    }
+    const m = u.match(/\/blocks\/([\w-]+)\/children/);
+    if(m) return { ok:true, status:200, json: async () => ({
+      results: sayfalar[m[1]] || [], has_more:false, next_cursor:null }) };
+    return { ok:false, status:404, text: async () => "bulunamadı" };
+  };
+  return genKayit;
+}
+
+await dene("§17 bugünün Java konusu Notion'dan okunup hem prompta hem cevaba giriyor", async () => {
+  process.env.NOTION_API_KEY = "test-notion-anahtari";
+  const genKayit = planIleNotionTaklit({
+    "3e2921af4e678190969bf7c335da3e0c": [
+      baslik("Hafta 5 — HTTP ve REST"),
+      paragraf("Hafta sonunda REST tasarımı yapabilmelisin."),
+      tablo("tablo-5"),
+      paragraf("Algoritma (her gün 1 saat): 7 soru."),
+      { type:"divider", divider:{} }
+    ],
+    "tablo-5": [
+      satir([hucre("Gün"), hucre("Konu"), hucre("Kaynak"), hucre("Uygulama")]),
+      satir([hucre("1"), hucre("HTTP metotları, durum kodları"),
+             hucre("MDN HTTP", "https://developer.mozilla.org/HTTP"),
+             hucre("Postman ile GET/POST dene")]),
+      satir([hucre("2"), hucre("REST tasarımı"), hucre("REST API Tutorial"), hucre("Basit bir API tasarla")])
+    ]
+  });
+
+  const govde = Object.assign({}, ORNEK_GOVDE, {
+    java: { hafta:5, tur:"calisma", faz:"Web ve veritabanı temelleri", gun:1 }
+  });
+  const c = cevap();
+  await plan(istek(govde), c);
+  esit(c.kod, 200);
+
+  const metin = genKayit.istekler[0].govde.contents[0].parts[0].text;
+  icerir(metin, "HTTP metotları, durum kodları");
+  icerir(metin, "developer.mozilla.org/HTTP");
+  icerir(metin, "Postman ile GET/POST dene");
+  icerir(metin, "Algoritma (her gün 1 saat): 7 soru.");
+
+  dogru(c.veri.javaGunu, "javaGunu cevaba girmeli");
+  esit(c.veri.javaGunu.hafta, 5);
+  esit(c.veri.javaGunu.konu, "HTTP metotları, durum kodları");
+
+  delete process.env.NOTION_API_KEY;
+});
+
+await dene("§17 Notion okunamazsa plan yine üretilir, javaGunu null olur", async () => {
+  process.env.NOTION_API_KEY = "test-notion-anahtari";
+  const genKayit = { istekler: [] };
+  global.fetch = async (url, secenek) => {
+    if(String(url).indexOf("generativelanguage") !== -1){
+      genKayit.istekler.push(url);
+      return { ok:true, status:200, text: async () => JSON.stringify({
+        candidates: [{ content: { parts: [{ text: PLAN_CEVABI }] } }]
+      }) };
+    }
+    return { ok:false, status:500, text: async () => "notion çöktü" };
+  };
+  const govde = Object.assign({}, ORNEK_GOVDE, {
+    java: { hafta:5, tur:"calisma", faz:"Web ve veritabanı temelleri", gun:1 }
+  });
+  const c = cevap();
+  await plan(istek(govde), c);
+  esit(c.kod, 200, "Notion çökse de plan üretimi başarısız olmamalı");
+  esit(c.veri.javaGunu, null);
+  dogru(genKayit.istekler.length > 0, "Gemini yine de çağrılmalı");
+  delete process.env.NOTION_API_KEY;
+});
+
+await dene("§17 tatil gününde Notion'a hiç gidilmez (anahtar var olsa da)", async () => {
+  process.env.NOTION_API_KEY = "test-notion-anahtari";
+  const genKayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
+  const govde = Object.assign({}, ORNEK_GOVDE, {
+    java: { hafta:5, tur:"tatil", faz:"Web ve veritabanı temelleri", gun:null }
+  });
+  const c = cevap();
+  await plan(istek(govde), c);
+  esit(c.kod, 200);
+  esit(c.veri.javaGunu, null);
+  esit(genKayit.istekler.length, 1, "yalnız Gemini'ye gidilmeli, Notion'a değil");
+  delete process.env.NOTION_API_KEY;
+});
+
+await dene("§17 NOTION_API_KEY yokken çalışma gününde de Notion'a hiç gidilmez", async () => {
+  delete process.env.NOTION_API_KEY;
+  const genKayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
+  const govde = Object.assign({}, ORNEK_GOVDE, {
+    java: { hafta:5, tur:"calisma", faz:"Web ve veritabanı temelleri", gun:1 }
+  });
+  const c = cevap();
+  await plan(istek(govde), c);
+  esit(c.kod, 200);
+  esit(c.veri.javaGunu, null);
+  esit(genKayit.istekler.length, 1, "yalnız Gemini'ye gidilmeli, Notion'a değil");
+});
+
 await dene("§6 dün uyumu: 'Dün' bölümü + değerlendirme + tek cümle isteme girer", async () => {
   const kayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
   const govde = Object.assign({}, ORNEK_GOVDE, {
@@ -921,7 +1031,40 @@ function toDo(id, checked){
   return { id, type:"to_do", to_do:{ checked: !!checked, rich_text:[{ plain_text:"madde " + id }] } };
 }
 
-/* Hafta 1: 5 madde + ayraç. Hafta 2: 5 madde, sayfa burada bitiyor (ayraçsız) —
+/* --- §17/§19 için: paragraf/tablo bloğu taklitleri --------------------- */
+function paragraf(metin){
+  return { type:"paragraph", paragraph:{ rich_text:[{ plain_text: metin }] } };
+}
+function tablo(id){ return { id, type:"table", table:{ table_width:4 } }; }
+function hucre(metin, url){
+  return [{ plain_text: metin, text: url ? { link:{ url } } : {} }];
+}
+function satir(hucreler){ return { type:"table_row", table_row:{ cells: hucreler } }; }
+
+/** Birden çok blok kümesini (sayfa kökü + tablo id'leri) id'ye göre taklit
+    eder. `sayfalar`: { [blokId]: block[] }. §18'in tek-sayfalık `notionTaklit`'i
+    yerine, birden çok /children isteği (sayfa + tablo) gerektiren §17/§19
+    testlerinde kullanılır. PATCH isteklerini de `kayit.patchler`'e düşer. */
+function sayfaTaklit(sayfalar){
+  const kayit = { istekler: [], patchler: [] };
+  global.fetch = async (url, opt) => {
+    const yontem = (opt && opt.method) || "GET";
+    kayit.istekler.push({ url, yontem });
+    const m = String(url).match(/\/blocks\/([\w-]+)\/children/);
+    if(m && yontem === "GET"){
+      const sonuc = sayfalar[m[1]] || [];
+      return { ok:true, status:200, json: async () => ({ results:sonuc, has_more:false, next_cursor:null }) };
+    }
+    if(yontem === "PATCH"){
+      kayit.patchler.push({ url, govde: JSON.parse(opt.body) });
+      return { ok:true, status:200, json: async () => ({}) };
+    }
+    return { ok:false, status:404, text: async () => "bulunamadı" };
+  };
+  return kayit;
+}
+
+/* Hafta 1: 5 madde ve ayraç. Hafta 2: 5 madde, sayfa burada bitiyor (ayraçsız) —
    gerçek Faz sayfalarında son haftanın kontrolü de tam böyle. */
 const IKI_HAFTA = [
   baslik("Hafta 1 — Terminal, Git ve Java'ya dönüş"),
@@ -1035,6 +1178,93 @@ await dene("çocuklar sayfalıysa (has_more) hepsi toplanır", async () => {
   esit(c.veri.toplam, 2, "iki sayfadaki iki to_do da bulunmalı");
   esit(patchler.length, 2);
   dogru(cagri >= 2, "ikinci sayfa da çekilmeli");
+});
+
+bolum("api/roadmap — §19 haftalık müfredat (salt okuma)");
+
+const roadmap = require("../api/roadmap");
+const HAFTA1_SAYFASI = "3e2921af4e6781ce903adf5ccd27e5b1";
+const HAFTA1_SAYFALARI = {
+  [HAFTA1_SAYFASI]: [
+    baslik("Hafta 1 — Terminal, Git ve Java'ya dönüş"),
+    paragraf("Hafta sonunda terminali kullanabilmelisin."),
+    tablo("t1"),
+    paragraf("Algoritma (her gün 1 saat): 7 soru."),
+    paragraf("Haftalık kontrol (bakmadan):"),
+    toDo("kb1", false), toDo("kb2", true),
+    { type:"divider", divider:{} }
+  ],
+  "t1": [
+    satir([hucre("Gün"), hucre("Konu"), hucre("Kaynak"), hucre("Uygulama")]),
+    satir([hucre("1"), hucre("Terminal komutları"),
+           hucre("Linux Journey", "https://linuxjourney.com"), hucre("Klasör yapısı kur")]),
+    satir([hucre("6"), hucre("Tekrar + haftalık kontrol"), hucre("—"), hucre("Kontrolü yap")])
+  ]
+};
+
+await dene("yalnız GET veya POST", async () => {
+  const c = cevap();
+  await roadmap({ method:"DELETE" }, c);
+  esit(c.kod, 405);
+});
+
+await dene("anahtar yoksa 503", async () => {
+  delete process.env.NOTION_API_KEY;
+  const c = cevap();
+  await roadmap(istek({ hafta:1 }), c);
+  esit(c.kod, 503);
+  esit(c.veri.hata, "anahtar-yok");
+  process.env.NOTION_API_KEY = "test-notion-anahtari";
+});
+
+await dene("geçersiz hafta 400 döner (0, 21, sayı değil)", async () => {
+  for(const h of [0, 21, "x", null]){
+    const c = cevap();
+    await roadmap(istek({ hafta:h }), c);
+    esit(c.kod, 400, "hafta=" + h);
+  }
+});
+
+await dene("POST: hafta 1'in tam müfredatı döner", async () => {
+  sayfaTaklit(HAFTA1_SAYFALARI);
+  const c = cevap();
+  await roadmap(istek({ hafta:1 }), c);
+  esit(c.kod, 200);
+  esit(c.veri.hafta, 1);
+  esit(c.veri.faz, "Java temeli");
+  icerir(c.veri.baslik, "Terminal, Git");
+  icerir(c.veri.giris, "terminali kullanabilmelisin");
+  icerir(c.veri.algoritma, "7 soru");
+  esit(c.veri.gunler.length, 2, "yalnız başlık satırı hariç, iki gün eklendi");
+  esit(c.veri.gunler[0].gun, "1");
+  esit(c.veri.gunler[0].konu, "Terminal komutları");
+  icerir(c.veri.gunler[0].kaynak, "linuxjourney.com");
+  esit(c.veri.gunler[1].gun, "6");
+  esit(c.veri.kontrol.length, 2);
+  esit(c.veri.kontrol[0].tamam, false);
+  esit(c.veri.kontrol[1].tamam, true);
+});
+
+await dene("GET ?hafta= ile de çalışır", async () => {
+  sayfaTaklit(HAFTA1_SAYFALARI);
+  const c = cevap();
+  await roadmap(istekGet("/api/roadmap?hafta=1"), c);
+  esit(c.kod, 200);
+  esit(c.veri.hafta, 1);
+});
+
+await dene("Notion isteği başarısız olursa 502", async () => {
+  global.fetch = async () => ({ ok:false, status:500, text: async () => "notion çöktü" });
+  const c = cevap();
+  await roadmap(istek({ hafta:1 }), c);
+  esit(c.kod, 502);
+  esit(c.veri.hata, "notion");
+});
+
+await dene("gövde okunamazsa 400", async () => {
+  const c = cevap();
+  await roadmap(istek("bu json değil"), c);
+  esit(c.kod, 400);
 });
 
 bolum("api/veri — §16 Supabase senkronu (bootstrap kilidi, giriş ekranı yok)");

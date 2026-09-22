@@ -129,7 +129,9 @@ api/beslenme.js Gemini — §15 program / alternatif yemek / fotoğraftan kalori
 api/tarif.js    §15 — bir yemek için çalışan YouTube tarif linki
 api/push.js     ntfy'ye bildirim gönderir
 api/veri.js     §16 — Supabase senkronu (Gemini'ye bağlı değil)
+api/_notion.js  §17/§18/§19 — plan/notion/roadmap'in paylaştığı Notion yardımcıları
 api/notion.js   §18 — haftalık kontrolü Notion'da işaretler (AI'siz)
+api/roadmap.js  §19 — bir haftanın tam müfredatını Notion'dan okur (AI'siz)
 ```
 
 ## Canlı doğrulama
@@ -393,9 +395,28 @@ satır durum) — sohbetten yapılan düzenlemeler bloğun o gün sabit olduğun
 görebilsin; `api/review.js` ve `api/beslenme.js` dokunulmadı, ikisi de günün
 plan içeriğini değil yalnız profil + son 14 günün kaydını okuyor.
 
+**Günün asıl konusu (`gun` + Notion zenginleştirmesi).** İlk sürümde model
+yalnız "bugün ana konu çalış" gibi genel bir çerçeve görüyordu, Notion'daki o
+günün gerçek konusunu (Git branch'leri, Stream API, ne olursa) hiç bilmiyordu
+— plan maddeleri de "Ana konu çalışması" gibi genel kalıyordu. Bunu kapatmak
+için `javaDurumu` dördüncü bir alan daha döner: `gun` — haftanın gününden
+(salı sabit başlangıç olduğu için her hafta hep aynı sırada aktığından)
+Notion tablosundaki 1-6 satır no'suna sabit bir eşleme (`JAVA_GUN_NO`).
+`api/plan` bu `gun`'la günün Konu/Kaynak/Uygulama satırını **canlı**
+`api/_notion.js`'ten (`gununIcerigi`) okur, hem istemin "Java eğitimi"
+bölümüne ekler (model artık "Ana konu: Git branch, merge, conflict" gibi
+somut bir başlık yazabiliyor) hem de cevaba `javaGunu` olarak geri koyar.
+En iyi çaba (best effort): tatil gününde, roadmap aktif değilken ya da
+`NOTION_API_KEY` yokken hiç denenmez; Notion isteği başarısız olursa plan
+üretimi yine de devam eder, yalnız `javaGunu` `null` kalır — Gemini'nin
+kendisi gibi ikinci bir dış servisin çökmesi asıl işi durdurmasın diye
+(§12'yle aynı felsefe).
+
 Test: `javaDurumu` tarih aritmetiği (başlamadan önce/sonra, hafta sınırları,
-her üç gün türü, faz sınırları) ve `api/plan`'e giden gövdede `java` alanı
-— `test/hepsi.js`, "§17 — Java eğitimi" bölümü.
+her üç gün türü + `gun` eşlemesi, faz sınırları), `api/plan`'e giden gövdede
+`java` alanı, Notion'dan okunan günün hem istemde hem cevapta (`javaGunu`)
+göründüğü, Notion başarısız olsa da planın yine üretildiği — `test/hepsi.js`
+"§17 — Java eğitimi" ve `test/api.js` "api/plan — istem ve şema" bölümleri.
 
 ## §18 — Java roadmap'i Notion'a bağlama
 
@@ -417,11 +438,12 @@ onaylı**:
 - Ledger hiçbir zaman kendiliğinden işaretlemez; `api/notion` yalnız bu
   düğmeden çağrılır.
 
-**`api/notion.js`** — model yok, düz Notion REST isteği (`_ortak.js`'e değil,
-kendi küçük yardımcılarına sahip; AI fonksiyonlarından bağımsız bir uç).
-`{ hafta }` alır, hangi Faz sayfasında olduğunu sabit bir tablodan (`FAZ_SAYFALARI`)
-bulur, sayfanın bloklarını sayfalayarak çeker, `## Hafta N` başlığıyla bir
-sonraki başlık/ayraç arasındaki `to_do` bloklarını toplayıp işaretler (zaten
+**`api/notion.js`** — model yok, düz Notion REST isteği (AI fonksiyonlarından
+bağımsız bir uç, `_ortak.js`'e değil `api/_notion.js`'e bağlı — bkz. §19,
+`api/roadmap.js` da aynı dosyayı paylaşıyor). `{ hafta }` alır, hangi Faz
+sayfasında olduğunu sabit bir tablodan (`FAZ_SAYFALARI`) bulur, sayfanın
+bloklarını sayfalayarak çeker, `## Hafta N` başlığıyla bir sonraki
+başlık/ayraç arasındaki `to_do` bloklarını toplayıp işaretler (zaten
 işaretliyse tekrar yazmaz). `NOTION_API_KEY` yoksa 503 döner — uygulamanın geri
 kalanı §12'deki gibi çalışmaya devam eder.
 
@@ -447,6 +469,69 @@ ayraçla kapanma, ayraçsız son hafta, zaten işaretli maddeyi atlama,
 sayfalanmış çocuklar), hata yolları (anahtar yok, geçersiz hafta, checklist
 bulunamadı, Notion isteği başarısız). `test/hepsi.js` — kartın ne zaman
 gösterildiği/gizlendiği, onay ve hata durumunda `javaOnay`'ın durumu.
+
+## §19 — Yol Haritası görünümü
+
+§17/§18 Java'nın *ne kadar süre* çalışılacağını ve *haftalık kontrolün*
+Notion'da işaretlenmesini hallediyordu; roadmap'in gerçek içeriği (bugün
+hangi konu, hangi kaynak, hangi uygulama ödevi) hâlâ yalnız Notion'da
+kalıyordu — ledger "2,5 saat bir şey çalış" diyordu ama "ne" sorusu
+cevapsızdı. §19 bunu iki katmanda kapatıyor:
+
+- **Üstü kapalı (Plan sayfası).** `api/plan`'in döndürdüğü `javaGunu`
+  (`{ hafta, faz, konu }`) günün kaydına yazılır; Plan sekmesinde "Bugün"ün
+  hemen altında tek satır bir hatırlatma çıkar ("Java — Hafta 5: HTTP
+  metotları, durum kodları…", 90 karakterde kısaltılmış) + bir **"tam
+  müfredatı gör"** düğmesi.
+- **Açık (ayrı sayfa — Yol Haritası).** Düğme `roadmapAc(hafta)`'yı çağırır:
+  `gorunum()`'ün aynı tek-sayfa mekanizmasıyla yeni bir bölüm açılır
+  (`b-roadmap`) ama **alt tab bar'da düğmesi yok** — yalnız buradan ya da
+  kendi hafta gezinmesinden ulaşılır, "← geri" geldiği sekmeye döner
+  (`roadmapGeriGorunumu`, oturum içi). İçerik `api/roadmap`'ten **canlı**
+  gelir, önbelleklenmez: sayfa/hafta her açıldığında yeni bir Notion isteği
+  atılır (kullanıcı roadmap'i Notion'da güncellerse ledger'da da hemen
+  görünsün diye — bu, §18'in tersi yönü: Notion → ledger, salt okuma).
+
+**`api/_notion.js`** — §18'in yazdığı tek dosyalık yardımcı, artık üç uç
+noktanın (`plan`, `notion`, `roadmap`) paylaştığı ortak katman: sayfa
+bloklarını çekme, sayfalama, düz metin çıkarma hep aynı yerde.
+Yeni eklenen `haftaIcerigi(hafta)` bir haftanın **tablosunu** (Notion'da
+`table` bloğu → `table_row` çocukları, her satır `[Gün, Konu, Kaynak,
+Uygulama]` dört hücre) okuyor: `## Hafta N` başlığından sonraki ilk
+`table` bloğunu bulup çocuklarını çekiyor, satır 0 (başlık: "Gün/Konu/…")
+atlanıyor. Hücre metni `hucreMetni` ile düzleştiriliyor; bir hücrede birden
+çok link olabildiği için (`"Video: X (url1) · Okuma: Y (url2)"`) her
+metin parçası **kendi** linkini taşıyor, tek bir link'e indirgenmiyor.
+Aynı fonksiyon `algoritma` satırını (haftanın "Algoritma (her gün 1
+saat):…" paragrafı) ve `kontrol` maddelerini (§18'in checkbox'ları, ama
+bu kez `duzMetin` ile okunabilir metne çevrilmiş, `tamam` alanıyla
+işaretli/değil durumuyla) da aynı taramadan çıkarıyor — üç ihtiyaç
+(§17'nin günlük zenginleştirmesi, §18'in checkbox işaretlemesi, §19'un
+tam sayfa görünümü) sayfayı üç kez ayrı ayrı taramak yerine tek bir
+`haftaBlogu` sınır bulma mantığını paylaşıyor.
+
+**`api/roadmap.js`** — salt okunur, model yok, yazmaz. `{ hafta }` alır
+(GET `?hafta=` ya da POST gövdesi, `api/tarif` gibi ikisini de destekler;
+istemci tutarlılık için POST kullanıyor), `haftaIcerigi`yi çağırıp aynen
+döner. `NOTION_API_KEY` yoksa 503 — kart/düğme görünür ama açılmaz, aynı
+§18'in "sen kur, hazır olunca çalışır" kuralı.
+
+**İstemcide `linkli()`** Notion'dan gelen `"metin (url)"` katıştırmasını
+tıklanabilir `<a>`'ya çeviriyor (`api/_notion.js`'in `hucreMetni`'siyle
+aynı biçimi bekliyor) — önce `kacir` ile HTML kaçırılıyor, sonra `(url)`
+kalıbı linke sarılıyor.
+
+Test: `api/_notion.js`'in tablo ayrıştırması `api/roadmap`'in testleri
+üzerinden dolaylı doğrulanıyor (sahte `table`/`table_row`/`paragraph`
+blokları — `test/api.js` "api/roadmap — §19"); `api/plan`'in Notion
+zenginleştirmesi kendi testinde (§17). İstemci tarafı `test/hepsi.js`
+"§19 — Yol Haritası görünümü": üstü kapalı özetin çıkıp çıkmadığı, hafta
+gezinmesinin sınırlarda kapanması, "geri"nin açıldığı sekmeye dönmesi,
+Notion hatasının uygulamayı çökertmeden mesaj olarak göründüğü.
+`roadmapAc`'ın `gorunum()`'ün kendi "sekme=roadmap ise tazele" dürtüsüyle
+çakışıp iki eşzamanlı isteğe yol açmaması için o dürtü `gorunum()`'den
+çıkarılıp yalnız `baslat()`'ın "kaydedilmiş sekme roadmap'se" özel yoluna
+taşındı — `roadmapAc` zaten kendi hafta'sıyla çağırıyor.
 
 ## Yayına alma
 
@@ -582,6 +667,11 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §18 "evet, biliyorum" Notion'ı işaretler; "sonra" onaylamaz, yalnız oturumda gizler | ✓ test |
 | §18 `api/notion`: doğru haftanın checkbox'ları bulunur, zaten işaretli atlanır, sayfalama çalışır | ✓ test |
 | §18 `NOTION_API_KEY` yokken uygulama çalışır, yalnız onay düğmesi 503 verir | ✓ test |
+| §17 günün Notion konusu okunup hem plan istemine hem `javaGunu` cevabına girer | ✓ test |
+| §17 Notion okunamazsa (çökme/anahtarsız/tatil) plan yine üretilir, `javaGunu` null | ✓ test |
+| §19 Plan sayfasında `javaGunu` varsa üstü kapalı özet + "tam müfredatı gör" çıkar | ✓ test |
+| §19 `api/roadmap`: hafta/gün/kaynak/uygulama/algoritma/kontrol doğru ayrıştırılır | ✓ test |
+| §19 hafta gezinmesi sınırlarda (1 ve 20) kapanır; "geri" açıldığı sekmeye döner | ✓ test |
 | §6 "plan üret" değerlendirme yoksa önce "dün nasıl geçti?" sorar | ✓ test |
 | "Koşuyu akşama al" hem planı hem profili değiştirir | ✓ test |
 | §6/§10 "Planı konuş" paneli plan sekmesinde açık başlar | ✓ test |
