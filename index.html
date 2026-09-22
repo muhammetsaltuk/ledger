@@ -2919,12 +2919,19 @@ function planCiz(){
     ? '<p class="sonuk" style="margin:0 0 14px">' + kacir(g.gununNotu) + '</p>' : "";
 
   // §17/§19 — plan sayfasında üstü kapalı bir hatırlatma; tam detay Roadmap
-  // görünümünde (kaynak linkleri, uygulama ödevi, haftalık kontrol).
+  // görünümünde (kaynak linkleri, uygulama ödevi, haftalık kontrol). javaGunu
+  // yalnız Gemini planı ürettiğinde dolduruyor — Roadmap'in kendisi Gemini'ye
+  // hiç ihtiyaç duymadığından (yalnız Notion), plan hiç üretilememiş olsa
+  // (kota/anahtar/vs.) bile roadmap'e erişim ayrı bir bağlantıyla açık kalsın.
+  const javaBuHafta = javaDurumu(bugun);
   const javaOzet = g.javaGunu
     ? '<p class="sonuk" style="margin:0 0 6px">Java — Hafta ' + g.javaGunu.hafta + ': ' +
         kacir(kisalt(g.javaGunu.konu, 90)) + '</p>' +
       '<button class="dg dg-sonuk" data-java-roadmap="' + g.javaGunu.hafta +
         '" style="margin:0 0 14px">tam müfredatı gör</button>'
+    : javaBuHafta
+    ? '<button class="dg dg-sonuk" data-java-roadmap="' + javaBuHafta.hafta +
+        '" style="margin:0 0 14px">Yol Haritası — Hafta ' + javaBuHafta.hafta + '</button>'
     : "";
 
   const kaynak = g.planKaynak === "kopya" ? "dünün planından"
