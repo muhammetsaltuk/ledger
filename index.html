@@ -712,6 +712,13 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 .og-onay{ margin:10px 0; padding:12px; border-radius:14px;
   background:rgba(224,154,79,.08); border:1px solid rgba(224,154,79,.28); }
 
+/* §19 Roadmap görünümü */
+.rm-gun{ padding:12px 0; border-top:1px solid rgba(255,255,255,.06); }
+.rm-gun:first-of-type{ border-top:0; }
+.rm-gun-bas{ font-family:var(--bas); font-weight:600; margin-bottom:4px; }
+.rm-gun a{ color:var(--vakit); }
+.rm-kontrol li{ padding:4px 0; }
+
 .gizli{
   position:absolute; width:1px; height:1px;
   padding:0; margin:-1px; overflow:hidden;
@@ -767,6 +774,10 @@ input:focus,textarea:focus{ outline:none; border-color:var(--vakit); }
 
   <!-- Ayarlar -->
   <section id="b-ayarlar" class="bolum" aria-label="Ayarlar"></section>
+
+  <!-- §19 Yol Haritası: Plan'dan "tam müfredatı gör" ile açılan ayrı sayfa,
+       alt tab bar'da yok — geri düğmesiyle geldiği sekmeye döner. -->
+  <section id="b-roadmap" class="bolum" aria-label="Yol Haritası" hidden></section>
 
 </main>
 
@@ -1499,6 +1510,10 @@ function ss(d){ return iki(d.getHours()) + ":" + iki(d.getMinutes()); }
 function kacir(s){
   return String(s).replace(/[&<>"']/g, c =>
     ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+function kisalt(s, n){
+  s = String(s || "");
+  return s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s;
 }
 
 /* Tıklamalar — liste her çizimde yenilendiği için olay delegasyonu. */
@@ -2903,6 +2918,15 @@ function planCiz(){
   const gununNotu = g.gununNotu
     ? '<p class="sonuk" style="margin:0 0 14px">' + kacir(g.gununNotu) + '</p>' : "";
 
+  // §17/§19 — plan sayfasında üstü kapalı bir hatırlatma; tam detay Roadmap
+  // görünümünde (kaynak linkleri, uygulama ödevi, haftalık kontrol).
+  const javaOzet = g.javaGunu
+    ? '<p class="sonuk" style="margin:0 0 6px">Java — Hafta ' + g.javaGunu.hafta + ': ' +
+        kacir(kisalt(g.javaGunu.konu, 90)) + '</p>' +
+      '<button class="dg dg-sonuk" data-java-roadmap="' + g.javaGunu.hafta +
+        '" style="margin:0 0 14px">tam müfredatı gör</button>'
+    : "";
+
   const kaynak = g.planKaynak === "kopya" ? "dünün planından"
                : g.planKaynak === "model" ? "" : "";
   const hak = planHakki(bugun);
@@ -2913,6 +2937,7 @@ function planCiz(){
       (kaynak ? '<span class="yan">' + kaynak + '</span>' : "") +
     '</h2>' +
     gununNotu +
+    javaOzet +
     (UYG.planUretiliyor
       ? '<p class="plan-bos">Plan üretiliyor…</p>'
       : maddeler.length
@@ -2986,6 +3011,7 @@ $plan.addEventListener("click", e => {
   else if(d.id === "p-etkinlik") etkinlikGirisAc();
   else if(d.id === "p-java-evet"){ const j = javaOnayGosterilsin(); if(j) javaOnayGonder(j.hafta); }
   else if(d.id === "p-java-sonra") javaOnaySonrayaBirak();
+  else if(d.dataset.javaRoadmap) roadmapAc(Number(d.dataset.javaRoadmap));
 });
 
 $plan.addEventListener("change", e => {
@@ -3049,15 +3075,21 @@ const JAVA_FAZLAR = [
   { ad:"İleri konular ve iş hazırlığı", ilk:17, son:20 }
 ];
 
+/* JAVA_BASLANGIC salı olduğu için her hafta penceresi hep aynı sırayla akar
+   (Sal-Çrş-Prş-Cum-Cmt-Paz-Pzt); haftanın gününden Notion tablosundaki
+   "Gün" no'suna (1-6) sabit bir eşleme yeterli. Cmt=6 (tekrar), Paz=null
+   (tatil, Java'ya hiç dokunma). */
+const JAVA_GUN_NO = { 2:1, 3:2, 4:3, 5:4, 1:5, 6:6 };
+
 function javaDurumu(tarih){
   const gunSayisi = Math.round((gunNesnesi(tarih) - gunNesnesi(JAVA_BASLANGIC)) / 86400000);
   if(gunSayisi < 0) return null;                          // henüz başlamadı
   const hafta = Math.floor(gunSayisi / 7) + 1;
   if(hafta > JAVA_SURE_HAFTA) return null;                 // program bitti
-  const gun = gunNesnesi(tarih).getDay();                  // 0 pazar … 6 cumartesi
-  const tur = gun === 0 ? "tatil" : gun === 6 ? "tekrar" : "calisma";
+  const haftaninGunu = gunNesnesi(tarih).getDay();          // 0 pazar … 6 cumartesi
+  const tur = haftaninGunu === 0 ? "tatil" : haftaninGunu === 6 ? "tekrar" : "calisma";
   const faz = JAVA_FAZLAR.find(f => hafta >= f.ilk && hafta <= f.son);
-  return { hafta: hafta, tur: tur, faz: faz ? faz.ad : "" };
+  return { hafta: hafta, tur: tur, faz: faz ? faz.ad : "", gun: JAVA_GUN_NO[haftaninGunu] || null };
 }
 
 /* §9 — kısa vadeli katman: son 14 günün ham kaydı, notlarıyla birlikte. */
@@ -3251,6 +3283,7 @@ async function planUret(elle, dun){
       yapildi: false, not: ""
     }));
     g.gununNotu = plan.gununNotu || "";
+    g.javaGunu = plan.javaGunu || null;    // §17 — plan sayfasındaki üstü kapalı özet
     g.planKaynak = "model";
     UYG.veri.ayar.yapayZeka = true;
     kaydet();
@@ -4042,6 +4075,121 @@ $ogun.addEventListener("keydown", e => {
 });
 
 /* ===============================================================
+   §19 — Yol Haritası görünümü: bir haftanın tam müfredatını Notion'dan
+   canlı okur (api/roadmap). Alt tab bar'da yok; Plan'daki "tam müfredatı
+   gör"den ya da roadmap içindeki hafta gezinmesinden açılır. Önbelleklenmez
+   — her açılış/hafta değişimi yeni bir istek atar (§17/§19 README).
+   =============================================================== */
+let roadmapHafta = null;
+let roadmapVeri = null;
+let roadmapYukleniyor = false;
+let roadmapHata = "";
+let roadmapGeriGorunumu = "plan";        // "geri" düğmesinin döneceği sekme
+
+function javaBugunHaftasi(){
+  const j = javaDurumu(uygulamaGunu());
+  return j ? j.hafta : 1;
+}
+
+/** Notion'daki "text (url)" biçimindeki katıştırılmış linkleri tıklanabilir
+    yapar (api/_notion.js'in hucreMetni'siyle aynı biçim). */
+function linkli(metin){
+  return kacir(metin).replace(/\((https?:\/\/[^\s)]+)\)/g,
+    (tam, url) => '(<a href="' + url + '" target="_blank" rel="noopener">link</a>)');
+}
+
+async function roadmapYukle(hafta){
+  roadmapHafta = Math.min(20, Math.max(1, hafta || 1));
+  roadmapYukleniyor = true;
+  roadmapHata = "";
+  roadmapVeri = null;
+  roadmapCiz();
+  try{
+    const cevap = await fetch("api/roadmap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hafta: roadmapHafta })
+    });
+    if(!cevap.ok){
+      const h = await cevap.json().catch(() => ({}));
+      throw new Error(h.mesaj || "Roadmap okunamadı.");
+    }
+    roadmapVeri = await cevap.json();
+  }catch(e){
+    roadmapHata = e.message || "Roadmap okunamadı.";
+  }
+  roadmapYukleniyor = false;
+  roadmapCiz();
+}
+
+/** Plan'daki "tam müfredatı gör" düğmesi buradan çağrılır. */
+async function roadmapAc(hafta){
+  if(aktifGorunum !== "roadmap") roadmapGeriGorunumu = aktifGorunum;
+  gorunum("roadmap");
+  await roadmapYukle(hafta);
+}
+
+function roadmapCiz(){
+  const $r = document.getElementById("b-roadmap");
+  if(!$r) return;
+
+  const ustBar =
+    '<div class="plan-alt" style="margin-bottom:14px">' +
+      '<button class="dg dg-sonuk" data-roadmap-geri="1">← geri</button>' +
+      '<button class="dg dg-sonuk" data-roadmap-hafta="' + (roadmapHafta - 1) + '"' +
+        (roadmapHafta <= 1 ? " disabled" : "") + '>‹ önceki hafta</button>' +
+      '<button class="dg dg-sonuk" data-roadmap-hafta="' + (roadmapHafta + 1) + '"' +
+        (roadmapHafta >= 20 ? " disabled" : "") + '>sonraki hafta ›</button>' +
+    '</div>';
+  const baslikSatiri = '<h2 class="bolum-bas">Yol Haritası' +
+    (roadmapVeri ? '<span class="yan">Hafta ' + roadmapVeri.hafta + '/20 — ' + kacir(roadmapVeri.faz) + '</span>' : '') +
+    '</h2>';
+
+  if(roadmapYukleniyor){
+    $r.innerHTML = baslikSatiri + ustBar + '<p class="plan-bos">Yükleniyor…</p>';
+    return;
+  }
+  if(roadmapHata){
+    $r.innerHTML = baslikSatiri + ustBar + '<p class="plan-bos">' + kacir(roadmapHata) + '</p>';
+    return;
+  }
+  const v = roadmapVeri;
+  if(!v){ $r.innerHTML = ""; return; }
+
+  const gunSatirlari = v.gunler.map(g =>
+    '<li class="rm-gun">' +
+      '<div class="rm-gun-bas">' + (g.gun === "6" ? "Gün 6 — tekrar + haftalık kontrol" : "Gün " + kacir(g.gun)) + '</div>' +
+      '<div style="margin-bottom:4px">' + kacir(g.konu) + '</div>' +
+      (g.kaynak && g.kaynak !== "—"
+        ? '<div class="sonuk" style="margin-bottom:4px">Kaynak: ' + linkli(g.kaynak) + '</div>' : '') +
+      (g.uygulama && g.uygulama !== "—"
+        ? '<div class="sonuk">Uygulama: ' + kacir(g.uygulama) + '</div>' : '') +
+    '</li>'
+  ).join("");
+
+  const kontrolSatirlari = (v.kontrol || []).map(k =>
+    '<li>' + (k.tamam ? "☑" : "☐") + " " + kacir(k.metin) + '</li>'
+  ).join("");
+
+  $r.innerHTML =
+    baslikSatiri + ustBar +
+    '<p style="font-family:var(--bas); font-weight:600; margin:0 0 6px">' + kacir(v.baslik) + '</p>' +
+    (v.giris ? '<p class="sonuk" style="margin:0 0 14px">' + kacir(v.giris) + '</p>' : '') +
+    (v.algoritma ? '<p class="sonuk" style="margin:0 0 14px">' + kacir(v.algoritma) + '</p>' : '') +
+    '<ul class="ray">' + gunSatirlari + '</ul>' +
+    (kontrolSatirlari
+      ? '<h3 style="margin:18px 0 8px">Haftalık kontrol (bakmadan)</h3><ul class="ray rm-kontrol">' + kontrolSatirlari + '</ul>'
+      : '');
+}
+
+document.getElementById("b-roadmap").addEventListener("click", e => {
+  const d = e.target.closest("button");
+  if(!d) return;
+  if(d.dataset.roadmapGeri) gorunum(roadmapGeriGorunumu);
+  else if(d.dataset.roadmapHafta) roadmapYukle(Number(d.dataset.roadmapHafta));
+});
+
+/* ===============================================================
    Görünüm (alt tab bar): tek sayfa, bölümler sekmeye göre gösterilir.
    =============================================================== */
 const GORUNUM = {
@@ -4053,7 +4201,10 @@ const GORUNUM = {
   // Öğün günlüğü beslenmeyle ilgili; kalori halkası (b-gunluk) yine Bugün'de
   // özet olarak kalıyor, yalnız günlüğün kendisi Beslenme'ye taşındı.
   beslenme: ["b-ogun", "b-beslenme"],
-  ayarlar:  ["b-ayar", "b-ayarlar"]
+  ayarlar:  ["b-ayar", "b-ayarlar"],
+  // §19 — alt-nav'da düğmesi yok; yalnız "tam müfredatı gör" ile açılır,
+  // "geri" geldiği sekmeye döner.
+  roadmap:  ["b-roadmap"]
 };
 const TUM_BOLUMLER = Object.keys(GORUNUM).reduce((a, k) => a.concat(GORUNUM[k]), []);
 let aktifGorunum = "bugun";
@@ -4108,6 +4259,7 @@ function tumunuCiz(){
   istatistikCiz();
   beslenmeCiz();
   ogunCiz();
+  roadmapCiz();
 }
 
 function baslat(){
@@ -4116,7 +4268,12 @@ function baslat(){
   vurguyuAyarla("yatsi");
 
   tumunuCiz();
-  gorunum((UYG.veri.ayar && UYG.veri.ayar.sekme) || "bugun");
+  const acilisSekmesi = (UYG.veri.ayar && UYG.veri.ayar.sekme) || "bugun";
+  gorunum(acilisSekmesi);
+  // §19 — kaydedilmiş sekme "roadmap" olarak açılışta geri geldiyse (nadir,
+  // roadmapAc dışından): veriyi burada tazele, roadmapAc'ın kendisiyle
+  // çakışıp iki eşzamanlı isteğe yol açmasın diye yalnız burada.
+  if(acilisSekmesi === "roadmap") roadmapYukle(javaBugunHaftasi());
 
   // Plan üretimi vakitleri de gönderir (§6), o yüzden namazKur'dan sonra.
   namazKur().then(borcTara).then(planHazirla).then(() => {

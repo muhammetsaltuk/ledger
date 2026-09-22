@@ -1,6 +1,7 @@
 /* §6 — günlük planı üretir. Yapılandırılmış çıktı zorunlu (§12). */
 
 const { TURLER, girdiAl, gemini, jsonCoz, hataVer } = require("./_ortak");
+const { anahtar: notionAnahtar, gununIcerigi } = require("./_notion");
 
 const SEMA = {
   type: "object",
@@ -38,6 +39,9 @@ const CERCEVE = `Çerçeve (dışına çıkma):
   bir bloğuna yerleştir. Tam tatil gününde Java'ya hiç dokunma.
 - Java bloklarını kurs saatiyle çakıştırma; kurs günü çalışmayı kurstan önceki
   zamana sığdır.
+- Bugünün Java konusu/kaynağı/uygulaması verildiyse o bloğun başlığını genel
+  geçme, konuya göre yaz (örn. "Ana konu: Git branch, merge, conflict"); kaynak
+  linkini gerekçeye koyabilirsin. Verilmediyse genel bir başlık yeterli.
 - Uyku hedefi 8 saat. Kurs günlerinde uyku iki parçalı planlanır: sabah namazı,
   sonra tekrar uyku, sonra sabah kalkışı.
 - Kahvaltı, spordan sonraki 45 dakika içinde.
@@ -50,7 +54,7 @@ function bolum(baslik, icerik){
   return icerik ? "\n\n## " + baslik + "\n" + icerik : "";
 }
 
-function istemKur(g){
+function istemKur(g, gununIcerik){
   const kurs = g.kurs
     ? g.kurs.bas + " - " + g.kurs.bit + " arası İngilizce kursu"
     : "Bugün kurs yok.";
@@ -60,7 +64,13 @@ function istemKur(g){
     : "Hafta " + g.java.hafta + "/20 — " + g.java.faz + ". " +
       (g.java.tur === "calisma" ? "Bugün çalışma günü: toplam 4,5 saat Java eğitimi."
       : g.java.tur === "tekrar"  ? "Bugün tekrar + proje günü: sabit süre yok."
-      :                            "Bugün tam tatil: Java'ya hiç dokunma.");
+      :                            "Bugün tam tatil: Java'ya hiç dokunma.") +
+      (gununIcerik
+        ? "\nBugünkü konu: " + gununIcerik.konu +
+          "\nKaynak: " + gununIcerik.kaynak +
+          "\nUygulama: " + gununIcerik.uygulama +
+          (gununIcerik.algoritma ? "\n" + gununIcerik.algoritma : "")
+        : "");
 
   const vakitler = g.vakitler
     ? Object.keys(g.vakitler).map(k => k + ": " + g.vakitler[k]).join(" · ")
@@ -130,12 +140,28 @@ function istemKur(g){
     "- `gununNotu` en fazla iki cümle: bugünkü planın dünden ne farkla kurulduğu.";
 }
 
+/* §17 — bugünün Java konusunu Notion'dan en iyi çaba ("best effort") ile
+   okur: tatil gününde, roadmap aktif değilken ya da NOTION_API_KEY yokken
+   hiç denemez; Notion isteği başarısız olursa plan üretimi yine de devam
+   eder (yalnız günlük konu detayı olmadan) — §12'nin "geçici bir dış
+   servis sorunu asıl işi durdurmasın" felsefesiyle aynı. */
+async function gununJavaIcerigi(g){
+  if(!g.java || g.java.tur === "tatil" || !g.java.gun || !notionAnahtar()) return null;
+  try{
+    return await gununIcerigi(g.java.hafta, g.java.gun);
+  }catch(e){
+    console.warn("java müfredatı okunamadı:", e && (e.ayrinti || e.message || e));
+    return null;
+  }
+}
+
 module.exports = async (req, res) => {
   const g = girdiAl(req, res);
   if(!g) return;
 
   try{
-    const metin = await gemini(istemKur(g), SEMA, { temperature: 0.8 });
+    const gununIcerik = await gununJavaIcerigi(g);
+    const metin = await gemini(istemKur(g, gununIcerik), SEMA, { temperature: 0.8 });
     const plan  = jsonCoz(metin);
 
     // Model şemayı tutturmuş olsa da gelen veriyi kendimiz sağlama alalım.
@@ -155,6 +181,12 @@ module.exports = async (req, res) => {
       // Saatsiz maddeler sona: boş dize aksi halde 08:00'in önüne geçer.
       .sort((a, b) => (a.saat || "99:99").localeCompare(b.saat || "99:99"));
     plan.gununNotu = plan.gununNotu ? String(plan.gununNotu).slice(0, 300) : "";
+
+    // §17 — plan sayfasındaki "üstü kapalı" özet için; ayrıntı Roadmap
+    // görünümünde (§19, api/roadmap).
+    plan.javaGunu = gununIcerik
+      ? { hafta: g.java.hafta, faz: g.java.faz, konu: gununIcerik.konu }
+      : null;
 
     res.status(200).json(plan);
   }catch(e){
