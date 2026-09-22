@@ -792,6 +792,7 @@ const VARSAYILAN = {
   islenmisVakitler: [],                                     // §5 — "tarih|vakit"
   sonKontrol: null,
   profil: "",                                               // §9
+  javaOnay: {},                                             // §17 — hafta -> onay zamanı
   etkinlikler: [],                                          // §7
   sohbet: [],                                               // §10
   ayar: {},
@@ -2724,6 +2725,7 @@ function planCiz(){
   const kaynak = g.planKaynak === "kopya" ? "dünün planından"
                : g.planKaynak === "model" ? "" : "";
   const hak = planHakki(bugun);
+  const javaOnay = javaOnayGosterilsin();
 
   $plan.innerHTML =
     '<h2 class="bolum-bas">Bugün' +
@@ -2750,6 +2752,19 @@ function planCiz(){
             '<button class="dg dg-bir" id="p-dun-uret">üret</button>' +
           '</div>' +
           '<button class="dg dg-sonuk" id="p-dun-gec" style="margin-top:8px">bu adımı geç</button>' +
+        '</div>'
+      : '') +
+    (javaOnay
+      ? '<div class="dun-soru">' +
+          '<p class="sonuk" style="margin:0 0 8px">Hafta ' + javaOnay.hafta + ' — ' + kacir(javaOnay.faz) +
+            ' bitti. Notion\'daki haftalık kontrolü bakmadan yapabiliyor musun?</p>' +
+          '<div class="plan-ekle">' +
+            '<button class="dg dg-bir" id="p-java-evet"' + (javaOnayBekliyor ? " disabled" : "") + '>' +
+              (javaOnayBekliyor ? "işaretleniyor…" : "evet, biliyorum") +
+            '</button>' +
+            '<button class="dg dg-sonuk" id="p-java-sonra"' + (javaOnayBekliyor ? " disabled" : "") + '>sonra</button>' +
+          '</div>' +
+          (javaOnayMesaj ? '<span class="sonuk">' + kacir(javaOnayMesaj) + '</span>' : "") +
         '</div>'
       : '') +
     '<div class="plan-alt">' +
@@ -2788,6 +2803,8 @@ $plan.addEventListener("click", e => {
   }
   else if(d.id === "p-dun-gec") planUret(true, "");
   else if(d.id === "p-etkinlik") etkinlikGirisAc();
+  else if(d.id === "p-java-evet"){ const j = javaOnayGosterilsin(); if(j) javaOnayGonder(j.hafta); }
+  else if(d.id === "p-java-sonra") javaOnaySonrayaBirak();
 });
 
 $plan.addEventListener("change", e => {
@@ -2916,6 +2933,56 @@ function planHakkiDus(tarih){
 }
 
 let planMesaj = "";
+
+/* §17 — haftalık Notion onayı. Roadmap'in checkbox'ları "bakmadan" kendi
+   kendine test sorularıdır; ledger'daki bir günü "yapıldı" işaretlemek
+   "biliyorum" anlamına gelmez. Bu yüzden api/notion yalnız kullanıcı elle
+   onaylayınca çağrılır — otomatik tetiklenmez. */
+let javaOnayBekliyor = false;
+let javaOnayMesaj = "";
+let javaOnayGecildi = null;                  // bu oturumda "sonra" denen hafta
+
+/* Bugün Java'nın tekrar ya da tatil günüyse, o hafta henüz onaylanmadıysa ve
+   bu oturumda geçilmediyse onay kartı gösterilir. */
+function javaOnayGosterilsin(){
+  const j = javaDurumu(uygulamaGunu());
+  if(!j || j.tur === "calisma") return null;
+  if(UYG.veri.javaOnay[j.hafta]) return null;
+  if(javaOnayGecildi === j.hafta) return null;
+  return j;
+}
+
+async function javaOnayGonder(hafta){
+  javaOnayBekliyor = true;
+  javaOnayMesaj = "";
+  planCiz();
+  try{
+    const cevap = await fetch("api/notion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hafta: hafta })
+    });
+    if(!cevap.ok){
+      const h = await cevap.json().catch(() => ({}));
+      throw new Error(h.mesaj || "Notion güncellenemedi.");
+    }
+    UYG.veri.javaOnay[hafta] = Date.now();
+    kaydet();
+  }catch(e){
+    javaOnayMesaj = e.message || "Notion güncellenemedi.";
+  }
+  javaOnayBekliyor = false;
+  planCiz();
+}
+
+/** "sonra" düğmesi: bu oturumda kartı gizler, hafta onaylanmış sayılmaz —
+    uygulama yeniden açılınca (ya da hafta bitmeden) tekrar sorulur. */
+function javaOnaySonrayaBirak(){
+  const j = javaOnayGosterilsin();
+  if(!j) return;
+  javaOnayGecildi = j.hafta;
+  planCiz();
+}
 
 /* Dün bir plan vardı ama ne değerlendirme ne de tek cümlelik not girildiyse,
    "plan üret"e basınca önce "dün nasıl geçti?" diye sorulur (§6). */

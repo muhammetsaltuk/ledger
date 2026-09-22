@@ -18,6 +18,9 @@ function dogru(k, not){ if(!k) throw new Error(not || "doğru bekleniyordu"); }
 function icerir(m, p){
   if(String(m).indexOf(p) === -1) throw new Error("bulunamadı: " + JSON.stringify(p));
 }
+function icermez(m, p){
+  if(String(m).indexOf(p) !== -1) throw new Error("olmamalıydı: " + JSON.stringify(p));
+}
 
 /* --- Sahte istek / cevap --------------------------------------- */
 function istek(govde, yontem){
@@ -854,6 +857,152 @@ await dene("yemek adı boşsa 400", async () => {
   const c = cevap();
   await tarif(istek({ yemek:"  " }), c);
   esit(c.kod, 400);
+});
+
+bolum("api/notion — §17 haftalık kontrol");
+
+const notion = require("../api/notion");
+
+/** Notion API'yi taklit et. `cocuklar`: hedef sayfanın /children'ından dönen
+    results dizisi (testte tek sayfa yeterli, sayfalama ayrıca denenir).
+    PATCH istekleri `kayit.patchler`'e, hepsi `kayit.istekler`'e düşer. */
+function notionTaklit(cocuklar, hataKodu){
+  const kayit = { istekler: [], patchler: [] };
+  global.fetch = async (url, opt) => {
+    const yontem = (opt && opt.method) || "GET";
+    kayit.istekler.push({ url, yontem });
+    if(hataKodu) return { ok:false, status:hataKodu, text: async () => "notion hata" };
+    if(yontem === "GET")
+      return { ok:true, status:200, json: async () => ({ results:cocuklar, has_more:false, next_cursor:null }) };
+    const govde = JSON.parse(opt.body);
+    kayit.patchler.push({ url, govde });
+    return { ok:true, status:200, json: async () => ({}) };
+  };
+  return kayit;
+}
+
+function baslik(metin){
+  return { type:"heading_2", heading_2:{ rich_text:[{ plain_text: metin }] } };
+}
+function ayrac(){ return { type:"divider", divider:{} }; }
+function toDo(id, checked){
+  return { id, type:"to_do", to_do:{ checked: !!checked, rich_text:[{ plain_text:"madde " + id }] } };
+}
+
+/* Hafta 1: 5 madde + ayraç. Hafta 2: 5 madde, sayfa burada bitiyor (ayraçsız) —
+   gerçek Faz sayfalarında son haftanın kontrolü de tam böyle. */
+const IKI_HAFTA = [
+  baslik("Hafta 1 — Terminal, Git ve Java'ya dönüş"),
+  { type:"paragraph", paragraph:{ rich_text:[{ plain_text:"Haftalık kontrol:" }] } },
+  toDo("h1-a"), toDo("h1-b"), toDo("h1-c"), toDo("h1-d"), toDo("h1-e"),
+  ayrac(),
+  baslik("Hafta 2 — OOP"),
+  toDo("h2-a"), toDo("h2-b"), toDo("h2-c"), toDo("h2-d"), toDo("h2-e")
+];
+
+process.env.NOTION_API_KEY = "test-notion-anahtari";
+
+await dene("yalnız POST", async () => {
+  const c = cevap();
+  await notion(istek({ hafta:1 }, "GET"), c);
+  esit(c.kod, 405);
+});
+
+await dene("anahtar yoksa 503", async () => {
+  delete process.env.NOTION_API_KEY;
+  const c = cevap();
+  await notion(istek({ hafta:1 }), c);
+  esit(c.kod, 503);
+  esit(c.veri.hata, "anahtar-yok");
+  process.env.NOTION_API_KEY = "test-notion-anahtari";
+});
+
+await dene("geçersiz hafta 400 döner (0, 21, sayı değil)", async () => {
+  for(const h of [0, 21, "x", null]){
+    const c = cevap();
+    await notion(istek({ hafta:h }), c);
+    esit(c.kod, 400, "hafta=" + h);
+  }
+});
+
+await dene("hafta 1'in beş to_do'su işaretlenir, hafta 2'ye dokunulmaz", async () => {
+  const kayit = notionTaklit(IKI_HAFTA);
+  const c = cevap();
+  await notion(istek({ hafta:1 }), c);
+  esit(c.kod, 200);
+  esit(c.veri.isaretlenen, 5);
+  esit(c.veri.toplam, 5);
+  esit(kayit.patchler.length, 5, "yalnız hafta 1'in 5 maddesi PATCH edilmeli");
+  dogru(kayit.patchler.every(p => p.url.indexOf("/h1-") !== -1), "yalnız h1-* blokları");
+  dogru(kayit.patchler.every(p => p.govde.to_do.checked === true), "checked:true gönderilmeli");
+});
+
+await dene("zaten işaretli maddeler tekrar PATCH edilmez", async () => {
+  const kismenIsaretli = IKI_HAFTA.map(b =>
+    (b.id === "h1-a" || b.id === "h1-b") ? toDo(b.id, true) : b);
+  const kayit = notionTaklit(kismenIsaretli);
+  const c = cevap();
+  await notion(istek({ hafta:1 }), c);
+  esit(c.veri.isaretlenen, 3, "yalnız işaretsiz 3 madde");
+  esit(c.veri.toplam, 5);
+  esit(kayit.patchler.length, 3);
+});
+
+await dene("son haftada (sayfa sonu, ayraçsız) doğru toplanır", async () => {
+  const kayit = notionTaklit(IKI_HAFTA);
+  const c = cevap();
+  await notion(istek({ hafta:2 }), c);
+  esit(c.kod, 200);
+  esit(c.veri.isaretlenen, 5);
+  dogru(kayit.patchler.every(p => p.url.indexOf("/h2-") !== -1), "yalnız h2-* blokları");
+});
+
+await dene("eşleşen checklist yoksa 404", async () => {
+  notionTaklit([baslik("Hafta 9 — başka bir şey"), toDo("x")]);
+  const c = cevap();
+  await notion(istek({ hafta:1 }), c);
+  esit(c.kod, 404);
+  esit(c.veri.hata, "kontrol-listesi-bulunamadi");
+});
+
+await dene("Notion isteği başarısız olursa 502, anahtar mesajda geçmez", async () => {
+  notionTaklit(IKI_HAFTA, 401);
+  const c = cevap();
+  await notion(istek({ hafta:1 }), c);
+  esit(c.kod, 502);
+  esit(c.veri.hata, "notion");
+  icermez(c.veri.mesaj, "test-notion-anahtari");
+});
+
+await dene("gövde okunamazsa 400", async () => {
+  const c = cevap();
+  await notion(istek("bu json değil"), c);
+  esit(c.kod, 400);
+});
+
+await dene("çocuklar sayfalıysa (has_more) hepsi toplanır", async () => {
+  const patchler = [];
+  let cagri = 0;
+  global.fetch = async (url, opt) => {
+    const yontem = (opt && opt.method) || "GET";
+    if(yontem === "GET"){
+      cagri++;
+      return cagri === 1
+        ? { ok:true, status:200, json: async () => ({
+            results:[baslik("Hafta 1 — a"), toDo("h1-a")],
+            has_more:true, next_cursor:"devam" }) }
+        : { ok:true, status:200, json: async () => ({
+            results:[toDo("h1-b"), ayrac()], has_more:false, next_cursor:null }) };
+    }
+    patchler.push({ url, govde: JSON.parse(opt.body) });
+    return { ok:true, status:200, json: async () => ({}) };
+  };
+  const c = cevap();
+  await notion(istek({ hafta:1 }), c);
+  esit(c.kod, 200);
+  esit(c.veri.toplam, 2, "iki sayfadaki iki to_do da bulunmalı");
+  esit(patchler.length, 2);
+  dogru(cagri >= 2, "ikinci sayfa da çekilmeli");
 });
 
 console.log("\n" + (kalan ? "✗" : "✓") + "  " + gecen + " geçti, " + kalan + " kaldı\n");

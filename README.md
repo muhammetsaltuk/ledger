@@ -122,6 +122,7 @@ api/parse.js    Gemini — serbest metni etkinliğe çevirir
 api/beslenme.js Gemini — §15 program / alternatif yemek / fotoğraftan kalori
 api/tarif.js    §15 — bir yemek için çalışan YouTube tarif linki
 api/push.js     ntfy'ye bildirim gönderir
+api/notion.js   §17 — haftalık kontrolü Notion'da işaretler (AI'siz)
 ```
 
 ## Canlı doğrulama
@@ -325,6 +326,57 @@ Test: `javaDurumu` tarih aritmetiği (başlamadan önce/sonra, hafta sınırlar�
 her üç gün türü, faz sınırları) ve `api/plan`'e giden gövdede `java` alanı
 — `test/hepsi.js`, "§16 — Java eğitimi" bölümü.
 
+## §17 — Java roadmap'i Notion'a bağlama
+
+Notion'daki her Faz sayfasının haftalık kontrolü var: `- [ ] Merge conflict'i
+kendi başıma çözebiliyorum...` gibi, **"bakmadan" kendi kendine test** eden
+beş maddelik bir liste. Bunu ledger'daki gün tamamlama ile birebir bağlamak
+yanlış olurdu: bir günün 4,5 saatlik bloğunu "yapıldı" işaretlemek "bu bilgiyi
+gerçekten biliyorum" anlamına gelmez. O yüzden bağlantı **tek yönlü ve elle
+onaylı**:
+
+- Bugün Java'nın tekrar (Cumartesi) ya da tatil (Pazar) günündeyse ve o hafta
+  henüz onaylanmadıysa, Plan sekmesinde bir kart çıkar: "Hafta N — [faz] bitti.
+  Notion'daki haftalık kontrolü bakmadan yapabiliyor musun?"
+- **"evet, biliyorum"** → `api/notion`'a `{ hafta }` gider, o haftanın Notion
+  sayfasındaki 5 checkbox işaretlenir, `UYG.veri.javaOnay[hafta]` yazılır —
+  kart bir daha çıkmaz.
+- **"sonra"** yalnız bu oturumda gizler (`javaOnayGecildi`, kalıcı değil);
+  hafta onaylanmış sayılmaz, uygulama yeniden açılınca tekrar sorulur.
+- Ledger hiçbir zaman kendiliğinden işaretlemez; `api/notion` yalnız bu
+  düğmeden çağrılır.
+
+**`api/notion.js`** — model yok, düz Notion REST isteği (`_ortak.js`'e değil,
+kendi küçük yardımcılarına sahip; AI fonksiyonlarından bağımsız bir uç).
+`{ hafta }` alır, hangi Faz sayfasında olduğunu sabit bir tablodan (`FAZ_SAYFALARI`)
+bulur, sayfanın bloklarını sayfalayarak çeker, `## Hafta N` başlığıyla bir
+sonraki başlık/ayraç arasındaki `to_do` bloklarını toplayıp işaretler (zaten
+işaretliyse tekrar yazmaz). `NOTION_API_KEY` yoksa 503 döner — uygulamanın geri
+kalanı §12'deki gibi çalışmaya devam eder.
+
+### Kurulum (bir kerelik, sende kaldı)
+
+1. [notion.so/my-integrations](https://www.notion.so/my-integrations) →
+   **New integration** → bir isim ver (örn. "Ledger") → workspace'ini seç →
+   yetkiler: en az **Read content** ve **Update content** işaretli olsun.
+   Kaydettikten sonra **Internal Integration Secret**'ı kopyala.
+2. Notion'da "Java Backend + DevOps Yol Haritası" sayfasını aç → **⋯** →
+   **Connections** → az önce oluşturduğun entegrasyonu ekle. Bu üst sayfayı
+   paylaşmak alt Faz sayfalarını da kapsar; kapsamazsa 5 Faz sayfasını da tek
+   tek paylaş.
+3. Vercel projesinde **Settings → Environment Variables** → `NOTION_API_KEY`
+   adıyla kopyaladığın secret'ı ekle (Production + Preview), yeniden deploy et.
+   Yerelde denemek için `.env.local`'e aynı satırı ekleyip `npx vercel dev`.
+
+Bu üç adım tamamlanmadan kart görünür ama "evet, biliyorum" 503 ile başarısız
+olur — sen kur, hazır olunca kendiliğinden çalışmaya başlar.
+
+Test: `test/api.js` — `haftaninToDolari` sınır mantığı (hafta eşleştirme,
+ayraçla kapanma, ayraçsız son hafta, zaten işaretli maddeyi atlama,
+sayfalanmış çocuklar), hata yolları (anahtar yok, geçersiz hafta, checklist
+bulunamadı, Notion isteği başarısız). `test/hepsi.js` — kartın ne zaman
+gösterildiği/gizlendiği, onay ve hata durumunda `javaOnay`'ın durumu.
+
 ## Yayına alma
 
 **Canlı:** <https://ledger-muhammetsaltuks-projects.vercel.app>
@@ -435,6 +487,10 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §6 plan düne uyar: "Dün" bölümü + gün sonu değerlendirmesi isteme girer | ✓ test |
 | §16 `javaDurumu`: başlamadan önce/bittikten sonra null, hafta/faz/gün türü doğru | ✓ test |
 | §16 `api/plan` gövdesine `java` alanı gider, çerçevede sabit süre olarak geçer | ✓ test |
+| §17 Notion onay kartı yalnız tekrar/tatil gününde, onaylanmamış haftada çıkar | ✓ test |
+| §17 "evet, biliyorum" Notion'ı işaretler; "sonra" onaylamaz, yalnız oturumda gizler | ✓ test |
+| §17 `api/notion`: doğru haftanın checkbox'ları bulunur, zaten işaretli atlanır, sayfalama çalışır | ✓ test |
+| §17 `NOTION_API_KEY` yokken uygulama çalışır, yalnız onay düğmesi 503 verir | ✓ test |
 | §6 "plan üret" değerlendirme yoksa önce "dün nasıl geçti?" sorar | ✓ test |
 | "Koşuyu akşama al" hem planı hem profili değiştirir | ✓ test |
 | §6/§10 "Planı konuş" paneli plan sekmesinde açık başlar | ✓ test |

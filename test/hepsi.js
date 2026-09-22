@@ -616,6 +616,58 @@ await dene("api/plan gövdesine java alanı gider", async () => {
   esit(b.java.faz, "Java temeli");
 });
 
+bolum("§17 — haftalık Notion onayı");
+
+await dene("javaOnayGosterilsin: çalışma gününde hiç gösterilmez", async () => {
+  const u = await ac({ simdi:"2026-09-22T09:00:00" });   // salı, çalışma günü
+  esit(u.ic.javaOnayGosterilsin(), null);
+});
+
+await dene("javaOnayGosterilsin: tekrar/tatil gününde henüz onaylanmadıysa gösterilir", async () => {
+  const u = await ac({ simdi:"2026-09-26T09:00:00" });   // cumartesi, tekrar günü
+  const j = u.ic.javaOnayGosterilsin();
+  dogru(j, "kart gösterilmeli");
+  esit(j.hafta, 1);
+  esit(j.tur, "tekrar");
+  esit(j.faz, "Java temeli");
+  icerir(u.html("b-plan"), "Hafta 1");
+  icerir(u.html("b-plan"), "evet, biliyorum");
+});
+
+await dene("javaOnayGosterilsin: onaylanmış haftada bir daha gösterilmez", async () => {
+  const u = await ac({ simdi:"2026-09-26T09:00:00" });
+  u.ic.UYG.veri.javaOnay[1] = Date.now();
+  esit(u.ic.javaOnayGosterilsin(), null);
+});
+
+await dene("javaOnayGonder: başarılı istek javaOnay'a yazar", async () => {
+  const u = await ac({ simdi:"2026-09-26T09:00:00", api:{ notion:{ tamam:true, isaretlenen:5, toplam:5 } } });
+  await u.ic.javaOnayGonder(1);
+  dogru(u.veri().javaOnay[1], "hafta işaretlenmeli");
+  const cagri = u.durum.apiCagrilari.find(c => c.ad === "notion");
+  dogru(cagri, "api/notion çağrılmalı");
+  esit(cagri.govde.hafta, 1);
+  esit(u.ic.javaOnayGosterilsin(), null, "işaretlendikten sonra kart kaybolmalı");
+});
+
+await dene("javaOnayGonder: hata javaOnay'ı kirletmez, mesaj gösterilir", async () => {
+  const u = await ac({ simdi:"2026-09-26T09:00:00",
+    api:{ notion:{ durum:502, hata:"notion", mesaj:"Notion güncellenemedi." } } });
+  await u.ic.javaOnayGonder(1);
+  esit(u.veri().javaOnay[1], undefined, "hata varken işaretlenmemeli");
+  icerir(u.html("b-plan"), "Notion güncellenemedi.");
+  dogru(u.ic.javaOnayGosterilsin(), "hata sonrası kart hâlâ görünmeli");
+});
+
+await dene("'sonra' bu oturum için kartı gizler, işaretlenmiş saymaz", async () => {
+  const u = await ac({ simdi:"2026-09-26T09:00:00" });
+  dogru(u.ic.javaOnayGosterilsin(), "önce görünür olmalı");
+  u.ic.javaOnaySonrayaBirak();
+  esit(u.ic.javaOnayGosterilsin(), null, "bu oturumda bir daha gösterilmemeli");
+  esit(u.veri().javaOnay[1], undefined, "'sonra' onaylamak değildir");
+  icermez(u.html("b-plan"), "evet, biliyorum");
+});
+
 await dene("plan üretimi günde en fazla üç kez", async () => {
   const u = await ac({ simdi:"2026-09-06T09:00:00", api:{ plan:SAHTE_PLAN } });
   esit(u.ic.planHakki("2026-09-06"), 2, "açılıştaki üretim bir hak yakar");
