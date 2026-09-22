@@ -2061,6 +2061,7 @@ async function sohbetGonder(metin){
       tarih: tarih,
       gunAdi: gunAdi(tarih),
       kurs: kursSaati(tarih),
+      java: javaDurumu(tarih),
       vakitler: bugununVakitleri(),
       plan: (g.maddeler || []).map(m => ({
         saat:m.saat, sure:m.sure, baslik:m.baslik, tur:m.tur,
@@ -2607,7 +2608,7 @@ function suCiz(){
    =============================================================== */
 
 const TURLER = ["uyku","spor","yemek","kod","kitap","ingilizce","kurs",
-                "etkinlik","namaz","ev","bos"];
+                "etkinlik","namaz","ev","bos","ogrenme"];
 
 const $plan = document.getElementById("b-plan");
 let acikNot = null;                          // not alanı açık olan maddenin id'si
@@ -2836,6 +2837,31 @@ function gunNesnesi(tarih){
 function kursSaati(tarih){ return KURS[gunNesnesi(tarih).getDay()] || null; }
 function gunAdi(tarih){ return GUN_ADI[gunNesnesi(tarih).getDay()]; }
 
+/* §16 — Java eğitimi: 22 Eylül 2026'da başlayan 20 haftalık öz-öğrenim
+   programı (Notion'daki yol haritasıyla aynı tarih ve fazlar). Hafta içi
+   (Pazartesi-Cuma) sabit süreli bir çalışma günü, Cumartesi tekrar+proje,
+   Pazar tam tatil — kurs saatleri gibi tarihe bağlı, sabit bir katman. */
+const JAVA_BASLANGIC = "2026-09-22";
+const JAVA_SURE_HAFTA = 20;
+const JAVA_FAZLAR = [
+  { ad:"Java temeli",                   ilk:1,  son:4  },
+  { ad:"Web ve veritabanı temelleri",   ilk:5,  son:7  },
+  { ad:"Spring Boot",                   ilk:8,  son:12 },
+  { ad:"DevOps temelleri",              ilk:13, son:16 },
+  { ad:"İleri konular ve iş hazırlığı", ilk:17, son:20 }
+];
+
+function javaDurumu(tarih){
+  const gunSayisi = Math.round((gunNesnesi(tarih) - gunNesnesi(JAVA_BASLANGIC)) / 86400000);
+  if(gunSayisi < 0) return null;                          // henüz başlamadı
+  const hafta = Math.floor(gunSayisi / 7) + 1;
+  if(hafta > JAVA_SURE_HAFTA) return null;                 // program bitti
+  const gun = gunNesnesi(tarih).getDay();                  // 0 pazar … 6 cumartesi
+  const tur = gun === 0 ? "tatil" : gun === 6 ? "tekrar" : "calisma";
+  const faz = JAVA_FAZLAR.find(f => hafta >= f.ilk && hafta <= f.son);
+  return { hafta: hafta, tur: tur, faz: faz ? faz.ad : "" };
+}
+
 /* §9 — kısa vadeli katman: son 14 günün ham kaydı, notlarıyla birlikte. */
 function son14Gun(bugun){
   const liste = [];
@@ -2944,6 +2970,7 @@ async function planUret(elle, dun){
         tarih: tarih,
         gunAdi: gunAdi(tarih),
         kurs: kursSaati(tarih),
+        java: javaDurumu(tarih),
         vakitler: bugununVakitleri(),
         etkinlikler: yaklasanEtkinlikler(tarih),
         profil: UYG.veri.profil || "",

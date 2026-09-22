@@ -282,6 +282,49 @@ gösterilir — hedef hızıyla karşılaştırmak için.
 +0.3 kg/hafta" gibi kuru olgu); veri telefonda; anahtarsız da temel işlevler
 çalışır; sunucu durumsuz; kota istemcide.
 
+## §16 — Java eğitimi entegrasyonu
+
+Notion'daki 20 haftalık "Java Backend + DevOps Yol Haritası" (22 Eylül 2026
+başlangıç) `api/plan`'e kurs saatleri gibi ikinci bir **sabit katman** olarak
+eklendi: model kendi hesaplamaz, `javaDurumu(tarih)` istemcide tarihten
+hesaplar ve `kurs` alanının yanına `java` olarak gövdeye girer.
+
+**Neden istemcide hesaplanır, modele bırakılmaz:** hafta/faz/gün türü saf tarih
+aritmetiği (`kaloriHedefi` §15'te olduğu gibi) — modele bırakılsa her istekte
+yeniden "kaçıncı hafta" sorusunu yanıtlaması gerekir ve tutarsızlık riski
+doğar. `javaDurumu` üç şey döner:
+
+- `hafta` — 1-20, `JAVA_BASLANGIC`'tan gün farkının 7'ye bölümü.
+- `tur` — `calisma` (Pazartesi-Cuma), `tekrar` (Cumartesi, tekrar + proje),
+  `tatil` (Pazar, tam tatil). Roadmap'in "6. gün tekrar, 7. gün tatil" maddesi
+  normal bir çalışma haftasına (hafta içi + cumartesi + pazar) eşlendi.
+- `faz` — `JAVA_FAZLAR`'dan hafta numarasına karşılık gelen adı (Java temeli,
+  Web ve veritabanı temelleri, Spring Boot, DevOps temelleri, İleri konular).
+
+Tarih başlangıçtan önceyse ya da 20 haftayı geçtiyse `null` döner — `kursSaati`
+ile aynı "aktif değilse hiçbir şey ekleme" kuralı.
+
+**Çerçeveye (§6) eklenenler:** çalışma gününde toplam 4,5 saat — 1 saat
+algoritma, 2,5 saat haftanın ana konusu, 45 dakika proje, 15 dakika İngilizce
+teknik okuma — sabit toplam ama esnek sıralama; tekrar gününde sabit dakika
+yok; tatil gününde Java'ya hiç dokunulmaz; kurs saatiyle çakıştırılmaz.
+
+**Yeni tür: `ogrenme`.** Roadmap'in kendi AI kuralı ("öğrenme projelerinde AI'a
+kod yazdırma, ledger gibi ürün projelerinde serbest") var olan `kod` türünden
+(ledger'ın kendisi üstünde çalışmak) ayrı bir kategori gerektiriyor; algoritma,
+ana konu ve proje blokları `ogrenme`, teknik okuma bloğu mevcut `ingilizce`
+türünü kullanıyor. `TURLER` üç yerde birebir aynı tutuluyor: `api/_ortak.js`
+(şema enum'u), `index.html` (elle madde eklerken doğrulama).
+
+`api/chat.js`'e de aynı `java` alanı gidiyor (kurs satırıyla aynı yerde, tek
+satır durum) — sohbetten yapılan düzenlemeler bloğun o gün sabit olduğunu
+görebilsin; `api/review.js` ve `api/beslenme.js` dokunulmadı, ikisi de günün
+plan içeriğini değil yalnız profil + son 14 günün kaydını okuyor.
+
+Test: `javaDurumu` tarih aritmetiği (başlamadan önce/sonra, hafta sınırları,
+her üç gün türü, faz sınırları) ve `api/plan`'e giden gövdede `java` alanı
+— `test/hepsi.js`, "§16 — Java eğitimi" bölümü.
+
 ## Yayına alma
 
 **Canlı:** <https://ledger-muhammetsaltuks-projects.vercel.app>
@@ -390,6 +433,8 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | 00:30'da işaretlenen yatsı dünün kaydına yazılır | ✓ test |
 | Maddeye yazılan not ertesi günün plan isteğine girer | ✓ test |
 | §6 plan düne uyar: "Dün" bölümü + gün sonu değerlendirmesi isteme girer | ✓ test |
+| §16 `javaDurumu`: başlamadan önce/bittikten sonra null, hafta/faz/gün türü doğru | ✓ test |
+| §16 `api/plan` gövdesine `java` alanı gider, çerçevede sabit süre olarak geçer | ✓ test |
 | §6 "plan üret" değerlendirme yoksa önce "dün nasıl geçti?" sorar | ✓ test |
 | "Koşuyu akşama al" hem planı hem profili değiştirir | ✓ test |
 | §6/§10 "Planı konuş" paneli plan sekmesinde açık başlar | ✓ test |

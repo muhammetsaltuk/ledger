@@ -30,6 +30,14 @@ const SEMA = {
 /* §6 — Değişmeyenler. Model bu çerçevenin dışına çıkmaz. */
 const CERCEVE = `Çerçeve (dışına çıkma):
 - Kurs saatleri sabittir, üstüne başka bir şey koyma.
+- Java eğitimi çalışma gününde toplam 4,5 saat, dört ayrı bloktan oluşur: 1 saat
+  algoritma, 2,5 saat o haftanın ana konusu, 45 dakika proje (bu üçü tur:
+  ogrenme), 15 dakika İngilizce teknik okuma (tur: ingilizce). Bloklar art arda
+  olmak zorunda değil, güne dağıtılabilir ama toplam süre değişmez.
+- Java tekrar + proje gününde sabit dakika yok (tur yine ogrenme); günün uygun
+  bir bloğuna yerleştir. Tam tatil gününde Java'ya hiç dokunma.
+- Java bloklarını kurs saatiyle çakıştırma; kurs günü çalışmayı kurstan önceki
+  zamana sığdır.
 - Uyku hedefi 8 saat. Kurs günlerinde uyku iki parçalı planlanır: sabah namazı,
   sonra tekrar uyku, sonra sabah kalkışı.
 - Kahvaltı, spordan sonraki 45 dakika içinde.
@@ -46,6 +54,13 @@ function istemKur(g){
   const kurs = g.kurs
     ? g.kurs.bas + " - " + g.kurs.bit + " arası İngilizce kursu"
     : "Bugün kurs yok.";
+
+  const java = !g.java
+    ? "Roadmap bu tarihte aktif değil (henüz başlamadı ya da 20 hafta bitti)."
+    : "Hafta " + g.java.hafta + "/20 — " + g.java.faz + ". " +
+      (g.java.tur === "calisma" ? "Bugün çalışma günü: toplam 4,5 saat Java eğitimi."
+      : g.java.tur === "tekrar"  ? "Bugün tekrar + proje günü: sabit süre yok."
+      :                            "Bugün tam tatil: Java'ya hiç dokunma.");
 
   const vakitler = g.vakitler
     ? Object.keys(g.vakitler).map(k => k + ": " + g.vakitler[k]).join(" · ")
@@ -92,6 +107,7 @@ function istemKur(g){
 
   return "Bugün için bir günlük plan üret." +
     bolum("Bugün", g.tarih + " " + (g.gunAdi || "") + "\n" + kurs) +
+    bolum("Java eğitimi", java) +
     bolum("Namaz vakitleri", vakitler) +
     bolum("Kaza borcu", borc + (borc !== "yok"
       ? "\nBirikmiş borç varsa güne bir kaza namazı yerleştirebilirsin." : "")) +

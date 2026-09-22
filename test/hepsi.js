@@ -578,6 +578,44 @@ await dene("kurs saatleri: salı/perşembe 19:00, cuma-cumartesi-pazar yok", asy
   esit(u.ic.kursSaati("2026-09-13"), null, "pazar");
 });
 
+bolum("§16 — Java eğitimi");
+
+await dene("javaDurumu: başlamadan önce ve 20 hafta bitince null", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00" });
+  esit(u.ic.javaDurumu("2026-09-21"), null, "başlangıçtan bir gün önce");
+  esit(u.ic.javaDurumu("2027-02-08").hafta, 20, "roadmap'in son günü, hafta 20");
+  esit(u.ic.javaDurumu("2027-02-09"), null, "20 hafta bitince");
+});
+
+await dene("javaDurumu: gün türleri ve hafta sayımı", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00" });
+  const ilk = u.ic.javaDurumu("2026-09-22");
+  esit(ilk.hafta, 1, "başlangıç günü");
+  esit(ilk.tur, "calisma", "salı, çalışma günü");
+  esit(ilk.faz, "Java temeli");
+  esit(u.ic.javaDurumu("2026-09-26").tur, "tekrar", "cumartesi");
+  esit(u.ic.javaDurumu("2026-09-27").tur, "tatil", "pazar");
+  esit(u.ic.javaDurumu("2026-09-28").hafta, 1, "hafta hâlâ 1 (7. gün)");
+  esit(u.ic.javaDurumu("2026-09-29").hafta, 2, "8. gün, hafta 2 başladı");
+});
+
+await dene("javaDurumu: faz sınırı hafta 4 → 5", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00" });
+  esit(u.ic.javaDurumu("2026-10-19").faz, "Java temeli", "hafta 4, son gün");
+  esit(u.ic.javaDurumu("2026-10-20").faz, "Web ve veritabanı temelleri", "hafta 5, ilk gün");
+});
+
+await dene("api/plan gövdesine java alanı gider", async () => {
+  const u = await ac({ simdi:"2026-09-22T09:00:00", api:{ plan:SAHTE_PLAN } });
+  const cagri = u.durum.apiCagrilari.find(c => c.ad === "plan");
+  dogru(cagri, "api/plan çağrılmalı");
+  const b = cagri.govde;
+  dogru(b.java, "java alanı gitmeli");
+  esit(b.java.hafta, 1);
+  esit(b.java.tur, "calisma");
+  esit(b.java.faz, "Java temeli");
+});
+
 await dene("plan üretimi günde en fazla üç kez", async () => {
   const u = await ac({ simdi:"2026-09-06T09:00:00", api:{ plan:SAHTE_PLAN } });
   esit(u.ic.planHakki("2026-09-06"), 2, "açılıştaki üretim bir hak yakar");

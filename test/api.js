@@ -134,6 +134,24 @@ await dene("istem §6'nın bütün girdilerini taşır", async () => {
   icerir(metin, "Kahvaltı, spordan sonraki 45 dakika içinde");   // çerçeve
 });
 
+await dene("§16 java yoksa istemde 'aktif değil' notu, java varsa hafta/faz/gün türü", async () => {
+  const kayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
+  await plan(istek(ORNEK_GOVDE), cevap());
+  icerir(kayit.istekler[0].govde.contents[0].parts[0].text,
+    "Roadmap bu tarihte aktif değil");
+
+  const kayit2 = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
+  const govde = Object.assign({}, ORNEK_GOVDE, {
+    java: { hafta: 5, tur: "calisma", faz: "Web ve veritabanı temelleri" }
+  });
+  await plan(istek(govde), cevap());
+  const metin = kayit2.istekler[0].govde.contents[0].parts[0].text;
+  icerir(metin, "Hafta 5/20 — Web ve veritabanı temelleri");
+  icerir(metin, "toplam 4,5 saat Java eğitimi");
+  icerir(metin, "1 saat");        // çerçevedeki sabit blok tarifi
+  icerir(metin, "ogrenme");       // yeni tür, çerçevede geçiyor
+});
+
 await dene("§6 dün uyumu: 'Dün' bölümü + değerlendirme + tek cümle isteme girer", async () => {
   const kayit = geminiTaklit(() => ({ metin: PLAN_CEVABI }));
   const govde = Object.assign({}, ORNEK_GOVDE, {
