@@ -70,6 +70,10 @@ function istemKur(g){
   return "Kullanıcı sana bir şey yazdı. Ne yapılması gerektiğine karar ver.\n\n" +
     "## Bugün\n" + (g.tarih || "") + " " + (g.gunAdi || "") + "\n" +
     (g.kurs ? "Kurs " + g.kurs.bas + " - " + g.kurs.bit + "\n" : "Bugün kurs yok.\n") +
+    (g.java ? "Java: hafta " + g.java.hafta + "/20, " +
+        (g.java.tur === "calisma" ? "çalışma günü (4,5 saat, sabit)"
+        : g.java.tur === "tekrar"  ? "tekrar + proje günü"
+        :                            "tam tatil") + "\n" : "") +
     (g.vakitler ? "Namaz: " + Object.keys(g.vakitler).map(k => k + " " + g.vakitler[k]).join(" · ") + "\n" : "") +
     "\n## Bugünün planı\n" + planYaz(g.plan) +
     "\n\n## Kullanıcı profili\n" + (g.profil || "Henüz yok.") +

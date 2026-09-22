@@ -578,6 +578,96 @@ await dene("kurs saatleri: salı/perşembe 19:00, cuma-cumartesi-pazar yok", asy
   esit(u.ic.kursSaati("2026-09-13"), null, "pazar");
 });
 
+bolum("§17 — Java eğitimi");
+
+await dene("javaDurumu: başlamadan önce ve 20 hafta bitince null", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00" });
+  esit(u.ic.javaDurumu("2026-09-21"), null, "başlangıçtan bir gün önce");
+  esit(u.ic.javaDurumu("2027-02-08").hafta, 20, "roadmap'in son günü, hafta 20");
+  esit(u.ic.javaDurumu("2027-02-09"), null, "20 hafta bitince");
+});
+
+await dene("javaDurumu: gün türleri ve hafta sayımı", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00" });
+  const ilk = u.ic.javaDurumu("2026-09-22");
+  esit(ilk.hafta, 1, "başlangıç günü");
+  esit(ilk.tur, "calisma", "salı, çalışma günü");
+  esit(ilk.faz, "Java temeli");
+  esit(u.ic.javaDurumu("2026-09-26").tur, "tekrar", "cumartesi");
+  esit(u.ic.javaDurumu("2026-09-27").tur, "tatil", "pazar");
+  esit(u.ic.javaDurumu("2026-09-28").hafta, 1, "hafta hâlâ 1 (7. gün)");
+  esit(u.ic.javaDurumu("2026-09-29").hafta, 2, "8. gün, hafta 2 başladı");
+});
+
+await dene("javaDurumu: faz sınırı hafta 4 → 5", async () => {
+  const u = await ac({ simdi:"2026-09-06T09:00:00" });
+  esit(u.ic.javaDurumu("2026-10-19").faz, "Java temeli", "hafta 4, son gün");
+  esit(u.ic.javaDurumu("2026-10-20").faz, "Web ve veritabanı temelleri", "hafta 5, ilk gün");
+});
+
+await dene("api/plan gövdesine java alanı gider", async () => {
+  const u = await ac({ simdi:"2026-09-22T09:00:00", api:{ plan:SAHTE_PLAN } });
+  const cagri = u.durum.apiCagrilari.find(c => c.ad === "plan");
+  dogru(cagri, "api/plan çağrılmalı");
+  const b = cagri.govde;
+  dogru(b.java, "java alanı gitmeli");
+  esit(b.java.hafta, 1);
+  esit(b.java.tur, "calisma");
+  esit(b.java.faz, "Java temeli");
+});
+
+bolum("§18 — haftalık Notion onayı");
+
+await dene("javaOnayGosterilsin: çalışma gününde hiç gösterilmez", async () => {
+  const u = await ac({ simdi:"2026-09-22T09:00:00" });   // salı, çalışma günü
+  esit(u.ic.javaOnayGosterilsin(), null);
+});
+
+await dene("javaOnayGosterilsin: tekrar/tatil gününde henüz onaylanmadıysa gösterilir", async () => {
+  const u = await ac({ simdi:"2026-09-26T09:00:00" });   // cumartesi, tekrar günü
+  const j = u.ic.javaOnayGosterilsin();
+  dogru(j, "kart gösterilmeli");
+  esit(j.hafta, 1);
+  esit(j.tur, "tekrar");
+  esit(j.faz, "Java temeli");
+  icerir(u.html("b-plan"), "Hafta 1");
+  icerir(u.html("b-plan"), "evet, biliyorum");
+});
+
+await dene("javaOnayGosterilsin: onaylanmış haftada bir daha gösterilmez", async () => {
+  const u = await ac({ simdi:"2026-09-26T09:00:00" });
+  u.ic.UYG.veri.javaOnay[1] = Date.now();
+  esit(u.ic.javaOnayGosterilsin(), null);
+});
+
+await dene("javaOnayGonder: başarılı istek javaOnay'a yazar", async () => {
+  const u = await ac({ simdi:"2026-09-26T09:00:00", api:{ notion:{ tamam:true, isaretlenen:5, toplam:5 } } });
+  await u.ic.javaOnayGonder(1);
+  dogru(u.veri().javaOnay[1], "hafta işaretlenmeli");
+  const cagri = u.durum.apiCagrilari.find(c => c.ad === "notion");
+  dogru(cagri, "api/notion çağrılmalı");
+  esit(cagri.govde.hafta, 1);
+  esit(u.ic.javaOnayGosterilsin(), null, "işaretlendikten sonra kart kaybolmalı");
+});
+
+await dene("javaOnayGonder: hata javaOnay'ı kirletmez, mesaj gösterilir", async () => {
+  const u = await ac({ simdi:"2026-09-26T09:00:00",
+    api:{ notion:{ durum:502, hata:"notion", mesaj:"Notion güncellenemedi." } } });
+  await u.ic.javaOnayGonder(1);
+  esit(u.veri().javaOnay[1], undefined, "hata varken işaretlenmemeli");
+  icerir(u.html("b-plan"), "Notion güncellenemedi.");
+  dogru(u.ic.javaOnayGosterilsin(), "hata sonrası kart hâlâ görünmeli");
+});
+
+await dene("'sonra' bu oturum için kartı gizler, işaretlenmiş saymaz", async () => {
+  const u = await ac({ simdi:"2026-09-26T09:00:00" });
+  dogru(u.ic.javaOnayGosterilsin(), "önce görünür olmalı");
+  u.ic.javaOnaySonrayaBirak();
+  esit(u.ic.javaOnayGosterilsin(), null, "bu oturumda bir daha gösterilmemeli");
+  esit(u.veri().javaOnay[1], undefined, "'sonra' onaylamak değildir");
+  icermez(u.html("b-plan"), "evet, biliyorum");
+});
+
 await dene("plan üretimi günde en fazla üç kez", async () => {
   const u = await ac({ simdi:"2026-09-06T09:00:00", api:{ plan:SAHTE_PLAN } });
   esit(u.ic.planHakki("2026-09-06"), 2, "açılıştaki üretim bir hak yakar");

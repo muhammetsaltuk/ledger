@@ -809,6 +809,7 @@ const VARSAYILAN = {
   islenmisVakitler: [],                                     // §5 — "tarih|vakit"
   sonKontrol: null,
   profil: "",                                               // §9
+  javaOnay: {},                                             // §18 — hafta -> onay zamanı
   etkinlikler: [],                                          // §7
   sohbet: [],                                               // §10
   ayar: {},
@@ -2242,6 +2243,7 @@ async function sohbetGonder(metin){
       tarih: tarih,
       gunAdi: gunAdi(tarih),
       kurs: kursSaati(tarih),
+      java: javaDurumu(tarih),
       vakitler: bugununVakitleri(),
       plan: (g.maddeler || []).map(m => ({
         saat:m.saat, sure:m.sure, baslik:m.baslik, tur:m.tur,
@@ -2788,7 +2790,7 @@ function suCiz(){
    =============================================================== */
 
 const TURLER = ["uyku","spor","yemek","kod","kitap","ingilizce","kurs",
-                "etkinlik","namaz","ev","bos"];
+                "etkinlik","namaz","ev","bos","ogrenme"];
 
 const $plan = document.getElementById("b-plan");
 let acikNot = null;                          // not alanı açık olan maddenin id'si
@@ -2904,6 +2906,7 @@ function planCiz(){
   const kaynak = g.planKaynak === "kopya" ? "dünün planından"
                : g.planKaynak === "model" ? "" : "";
   const hak = planHakki(bugun);
+  const javaOnay = javaOnayGosterilsin();
 
   $plan.innerHTML =
     '<h2 class="bolum-bas">Bugün' +
@@ -2930,6 +2933,19 @@ function planCiz(){
             '<button class="dg dg-bir" id="p-dun-uret">üret</button>' +
           '</div>' +
           '<button class="dg dg-sonuk" id="p-dun-gec" style="margin-top:8px">bu adımı geç</button>' +
+        '</div>'
+      : '') +
+    (javaOnay
+      ? '<div class="dun-soru">' +
+          '<p class="sonuk" style="margin:0 0 8px">Hafta ' + javaOnay.hafta + ' — ' + kacir(javaOnay.faz) +
+            ' bitti. Notion\'daki haftalık kontrolü bakmadan yapabiliyor musun?</p>' +
+          '<div class="plan-ekle">' +
+            '<button class="dg dg-bir" id="p-java-evet"' + (javaOnayBekliyor ? " disabled" : "") + '>' +
+              (javaOnayBekliyor ? "işaretleniyor…" : "evet, biliyorum") +
+            '</button>' +
+            '<button class="dg dg-sonuk" id="p-java-sonra"' + (javaOnayBekliyor ? " disabled" : "") + '>sonra</button>' +
+          '</div>' +
+          (javaOnayMesaj ? '<span class="sonuk">' + kacir(javaOnayMesaj) + '</span>' : "") +
         '</div>'
       : '') +
     '<div class="plan-alt">' +
@@ -2968,6 +2984,8 @@ $plan.addEventListener("click", e => {
   }
   else if(d.id === "p-dun-gec") planUret(true, "");
   else if(d.id === "p-etkinlik") etkinlikGirisAc();
+  else if(d.id === "p-java-evet"){ const j = javaOnayGosterilsin(); if(j) javaOnayGonder(j.hafta); }
+  else if(d.id === "p-java-sonra") javaOnaySonrayaBirak();
 });
 
 $plan.addEventListener("change", e => {
@@ -3016,6 +3034,31 @@ function gunNesnesi(tarih){
 }
 function kursSaati(tarih){ return KURS[gunNesnesi(tarih).getDay()] || null; }
 function gunAdi(tarih){ return GUN_ADI[gunNesnesi(tarih).getDay()]; }
+
+/* §17 — Java eğitimi: 22 Eylül 2026'da başlayan 20 haftalık öz-öğrenim
+   programı (Notion'daki yol haritasıyla aynı tarih ve fazlar). Hafta içi
+   (Pazartesi-Cuma) sabit süreli bir çalışma günü, Cumartesi tekrar+proje,
+   Pazar tam tatil — kurs saatleri gibi tarihe bağlı, sabit bir katman. */
+const JAVA_BASLANGIC = "2026-09-22";
+const JAVA_SURE_HAFTA = 20;
+const JAVA_FAZLAR = [
+  { ad:"Java temeli",                   ilk:1,  son:4  },
+  { ad:"Web ve veritabanı temelleri",   ilk:5,  son:7  },
+  { ad:"Spring Boot",                   ilk:8,  son:12 },
+  { ad:"DevOps temelleri",              ilk:13, son:16 },
+  { ad:"İleri konular ve iş hazırlığı", ilk:17, son:20 }
+];
+
+function javaDurumu(tarih){
+  const gunSayisi = Math.round((gunNesnesi(tarih) - gunNesnesi(JAVA_BASLANGIC)) / 86400000);
+  if(gunSayisi < 0) return null;                          // henüz başlamadı
+  const hafta = Math.floor(gunSayisi / 7) + 1;
+  if(hafta > JAVA_SURE_HAFTA) return null;                 // program bitti
+  const gun = gunNesnesi(tarih).getDay();                  // 0 pazar … 6 cumartesi
+  const tur = gun === 0 ? "tatil" : gun === 6 ? "tekrar" : "calisma";
+  const faz = JAVA_FAZLAR.find(f => hafta >= f.ilk && hafta <= f.son);
+  return { hafta: hafta, tur: tur, faz: faz ? faz.ad : "" };
+}
 
 /* §9 — kısa vadeli katman: son 14 günün ham kaydı, notlarıyla birlikte. */
 function son14Gun(bugun){
@@ -3072,6 +3115,56 @@ function planHakkiDus(tarih){
 
 let planMesaj = "";
 
+/* §18 — haftalık Notion onayı. Roadmap'in checkbox'ları "bakmadan" kendi
+   kendine test sorularıdır; ledger'daki bir günü "yapıldı" işaretlemek
+   "biliyorum" anlamına gelmez. Bu yüzden api/notion yalnız kullanıcı elle
+   onaylayınca çağrılır — otomatik tetiklenmez. */
+let javaOnayBekliyor = false;
+let javaOnayMesaj = "";
+let javaOnayGecildi = null;                  // bu oturumda "sonra" denen hafta
+
+/* Bugün Java'nın tekrar ya da tatil günüyse, o hafta henüz onaylanmadıysa ve
+   bu oturumda geçilmediyse onay kartı gösterilir. */
+function javaOnayGosterilsin(){
+  const j = javaDurumu(uygulamaGunu());
+  if(!j || j.tur === "calisma") return null;
+  if(UYG.veri.javaOnay[j.hafta]) return null;
+  if(javaOnayGecildi === j.hafta) return null;
+  return j;
+}
+
+async function javaOnayGonder(hafta){
+  javaOnayBekliyor = true;
+  javaOnayMesaj = "";
+  planCiz();
+  try{
+    const cevap = await fetch("api/notion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hafta: hafta })
+    });
+    if(!cevap.ok){
+      const h = await cevap.json().catch(() => ({}));
+      throw new Error(h.mesaj || "Notion güncellenemedi.");
+    }
+    UYG.veri.javaOnay[hafta] = Date.now();
+    kaydet();
+  }catch(e){
+    javaOnayMesaj = e.message || "Notion güncellenemedi.";
+  }
+  javaOnayBekliyor = false;
+  planCiz();
+}
+
+/** "sonra" düğmesi: bu oturumda kartı gizler, hafta onaylanmış sayılmaz —
+    uygulama yeniden açılınca (ya da hafta bitmeden) tekrar sorulur. */
+function javaOnaySonrayaBirak(){
+  const j = javaOnayGosterilsin();
+  if(!j) return;
+  javaOnayGecildi = j.hafta;
+  planCiz();
+}
+
 /* Dün bir plan vardı ama ne değerlendirme ne de tek cümlelik not girildiyse,
    "plan üret"e basınca önce "dün nasıl geçti?" diye sorulur (§6). */
 function dunUyumSorulsun(){
@@ -3125,6 +3218,7 @@ async function planUret(elle, dun){
         tarih: tarih,
         gunAdi: gunAdi(tarih),
         kurs: kursSaati(tarih),
+        java: javaDurumu(tarih),
         vakitler: bugununVakitleri(),
         etkinlikler: yaklasanEtkinlikler(tarih),
         profil: UYG.veri.profil || "",

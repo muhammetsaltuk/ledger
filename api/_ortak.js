@@ -81,7 +81,9 @@ function metinCoz(ham){
 /* §12 — ortak sistem promptu. Dört fonksiyon da bununla başlar. */
 const SISTEM = `Kullanıcı 25 yaşında, yazılım mühendisliği mezunu, bir buçuk yıldır işsiz.
 Yalnız yaşıyor, düzeni yok, kurmaya çalışıyor. Namaza yeni başladı.
-Akşamları İngilizce kursuna gidiyor.
+Akşamları İngilizce kursuna gidiyor. Evde kendi başına 22 Eylül 2026'da başlayan
+20 haftalık bir Java backend + DevOps öğrenme programı yürütüyor; hafta içi
+günde 4,5 saat buna ayırıyor.
 
 - Türkçe yaz. Kullanıcıya "sen" diye hitap et.
 - Övme. Motivasyon cümlesi kurma. Emoji kullanma.
@@ -91,7 +93,7 @@ Akşamları İngilizce kursuna gidiyor.
 - Tavsiye vereceksen tek ve ölçülebilir olsun.`;
 
 const TURLER = ["uyku","spor","yemek","kod","kitap","ingilizce","kurs",
-                "etkinlik","namaz","ev","bos"];
+                "etkinlik","namaz","ev","bos","ogrenme"];
 
 function anahtar(){
   return process.env.GEMINI_API_KEY || "";
