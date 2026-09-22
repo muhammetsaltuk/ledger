@@ -492,6 +492,16 @@ cevapsızdı. §19 bunu iki katmanda kapatıyor:
   atılır (kullanıcı roadmap'i Notion'da güncellerse ledger'da da hemen
   görünsün diye — bu, §18'in tersi yönü: Notion → ledger, salt okuma).
 
+**Gemini'den bağımsız erişim.** İlk sürümde roadmap'e giden tek yol "tam
+müfredatı gör" düğmesiydi, o da yalnız `javaGunu` doluyken (yani Gemini
+başarıyla plan ürettiğinde) çıkıyordu — ama roadmap'in kendisi Notion'a
+bağlı, Gemini'ye hiç ihtiyacı yok. Gemini kotası dolduğunda (§12, ücretsiz
+katmanın günlük sınırı) plan hiç üretilemiyor, dolayısıyla roadmap'e giden
+tek kapı da kapanmış oluyordu — canlıda gerçekten yaşandı. Artık `g.javaGunu`
+yoksa bile roadmap programı o gün aktifse (`javaDurumu(bugun)`) konu özeti
+olmadan yalın bir "Yol Haritası — Hafta N" bağlantısı çıkıyor; iki bağımsız
+sistemin biri (Gemini) çökse de diğeri (Notion) erişilebilir kalsın diye.
+
 **`api/_notion.js`** — §18'in yazdığı tek dosyalık yardımcı, artık üç uç
 noktanın (`plan`, `notion`, `roadmap`) paylaştığı ortak katman: sayfa
 bloklarını çekme, sayfalama, düz metin çıkarma hep aynı yerde.
@@ -672,6 +682,7 @@ gereken bir şey için `test/kaydirma.mjs` (opsiyonel, playwright + WebKit ister
 | §19 Plan sayfasında `javaGunu` varsa üstü kapalı özet + "tam müfredatı gör" çıkar | ✓ test |
 | §19 `api/roadmap`: hafta/gün/kaynak/uygulama/algoritma/kontrol doğru ayrıştırılır | ✓ test |
 | §19 hafta gezinmesi sınırlarda (1 ve 20) kapanır; "geri" açıldığı sekmeye döner | ✓ test |
+| §19 `javaGunu` yoksa (Gemini kotası dolsa) da roadmap programı aktifse yalın bağlantı çıkar | ✓ test |
 | §6 "plan üret" değerlendirme yoksa önce "dün nasıl geçti?" sorar | ✓ test |
 | "Koşuyu akşama al" hem planı hem profili değiştirir | ✓ test |
 | §6/§10 "Planı konuş" paneli plan sekmesinde açık başlar | ✓ test |

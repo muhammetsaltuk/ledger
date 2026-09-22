@@ -704,9 +704,20 @@ await dene("plan sayfasında javaGunu varsa üstü kapalı özet ve 'tam müfred
   icerir(h, "tam müfredatı gör");
 });
 
-await dene("javaGunu yoksa özet/düğme hiç çıkmaz", async () => {
+await dene("javaGunu yoksa ama roadmap aktifse, konu özeti olmadan yalın bir Yol Haritası bağlantısı çıkar", async () => {
+  // Gemini kotası/hatası yüzünden javaGunu boş kalsa da (SAHTE_PLAN'da yok),
+  // roadmap Notion'a bağlı olduğu için erişim engellenmemeli.
   const u = await ac({ simdi:"2026-09-22T09:00:00", api:{ plan:SAHTE_PLAN } });
-  icermez(u.html("b-plan"), "tam müfredatı gör");
+  const h = u.html("b-plan");
+  icermez(h, "tam müfredatı gör");     // konu özeti yok, çünkü javaGunu yok
+  icerir(h, "Yol Haritası — Hafta 1"); // ama bağlantı hâlâ var
+});
+
+await dene("roadmap programı aktif değilse (tarih dışı) hiçbir bağlantı çıkmaz", async () => {
+  const u = await ac({ simdi:"2026-09-10T09:00:00", api:{ plan:SAHTE_PLAN } });  // JAVA_BASLANGIC'tan önce
+  const h = u.html("b-plan");
+  icermez(h, "tam müfredatı gör");
+  icermez(h, "Yol Haritası —");
 });
 
 await dene("roadmapAc: api/roadmap'e doğru hafta gider, içerik çizilir", async () => {
